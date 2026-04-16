@@ -22,9 +22,9 @@ public class OpenApiConfig {
                                 .bearerFormat("JWT")
                 ))
                 .info(new Info()
-                        .title("Backend API")
-                        .description("Authentication endpoints for signup, login, and token refresh")
+                        .title("LegalFam")
+                        .description("Web-based automated legal advisory system in Family Law, based on agents with RAG and XAI, to facilitate access to justice for low-income people in Peru")
                         .version("v1")
-                        .contact(new Contact().name("LegalFam Backend")));
+                        .contact(new Contact().name("LegalFam")));
     }
 }

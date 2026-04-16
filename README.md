@@ -53,16 +53,16 @@ Open:
 
 ### Testing protected endpoints in Swagger
 
-1. Call `POST /api/auth/login` (or `signup`) and copy `accessToken`.
+1. Call `POST /api/v1/auth/login` (or `signup`) and copy `accessToken`.
 2. Click **Authorize** in Swagger.
 3. Paste only the raw token (without `Bearer `).
-4. Call protected endpoints (for example `GET /api/users`).
+4. Call protected endpoints (for example `GET /api/v1/users`).
 
 ## Authentication Flow
 
-- `POST /api/auth/signup` creates a user and returns tokens.
-- `POST /api/auth/login` validates credentials and returns tokens.
-- `POST /api/auth/refresh` rotates refresh token and returns new tokens.
+- `POST /api/v1/auth/signup` creates a user and returns tokens.
+- `POST /api/v1/auth/login` validates credentials and returns tokens.
+- `POST /api/v1/auth/refresh` rotates refresh token and returns new tokens.
 
 Token response format:
 
@@ -79,20 +79,20 @@ Token response format:
 
 ### Public endpoints (no token required)
 
-- `POST /api/auth/signup`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
+- `POST /api/v1/auth/signup`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
 
 ### Protected endpoints (Bearer token required)
 
-- `GET /api/users`
+- `GET /api/v1/users`
 
 ## Example Requests
 
 ### Signup
 
 ```bash
-curl -X POST http://localhost:8080/api/auth/signup \
+curl -X POST http://localhost:8080/api/v1/auth/signup \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"Password123!"}'
 ```
@@ -100,7 +100,7 @@ curl -X POST http://localhost:8080/api/auth/signup \
 ### Login
 
 ```bash
-curl -X POST http://localhost:8080/api/auth/login \
+curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"Password123!"}'
 ```
@@ -108,7 +108,7 @@ curl -X POST http://localhost:8080/api/auth/login \
 ### Refresh
 
 ```bash
-curl -X POST http://localhost:8080/api/auth/refresh \
+curl -X POST http://localhost:8080/api/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refreshToken":"<your_refresh_token>"}'
 ```
@@ -116,7 +116,7 @@ curl -X POST http://localhost:8080/api/auth/refresh \
 ### Get all users (protected)
 
 ```bash
-curl http://localhost:8080/api/users \
+curl http://localhost:8080/api/v1/users \
   -H "Authorization: Bearer <your_access_token>"
 ```
 

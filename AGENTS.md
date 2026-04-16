@@ -10,22 +10,24 @@ This document describes how contributors (human or AI agents) should work in thi
 ## Core Rules
 
 - Do not expose or return password hashes in API responses.
-- Keep `/api/auth/**` public.
+- Use `/api/v1` as the API prefix for all endpoints.
+- Keep `/api/v1/auth/**` public.
 - Keep non-auth endpoints protected with JWT Bearer authentication unless explicitly requested otherwise.
 - Preserve refresh token rotation behavior.
 - Preserve `401` for unauthenticated requests and `403` for forbidden requests.
+- Do not run compile/build verification commands after making changes unless explicitly requested by the user.
 
 ## Current API Surface
 
 ### Public
 
-- `POST /api/auth/signup`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
+- `POST /api/v1/auth/signup`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
 
 ### Protected
 
-- `GET /api/users`
+- `GET /api/v1/users`
 
 ## Security Expectations
 
