@@ -56,6 +56,22 @@ class AuthControllerTest {
     }
 
     @Test
+    void signupReturnsBadRequestWhenEmailIsInvalid() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"invalid-email\",\"password\":\"secret\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type", is("validation_error")))
+                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.message", is("Valid email is required")))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.path", is("/api/v1/auth/signup")))
+                .andExpect(jsonPath("$.timestamp", notNullValue()));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
     void signupReturnsCreatedWhenPayloadIsValid() throws Exception {
         when(authService.signup(anyString(), anyString()))
                 .thenReturn(new TokenResponse("access-1", "refresh-1", "Bearer", 900));
@@ -101,6 +117,22 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.status", is(401)))
                 .andExpect(jsonPath("$.path", is("/api/v1/auth/login")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
+    }
+
+    @Test
+    void loginReturnsBadRequestWhenEmailIsInvalid() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"invalid-email\",\"password\":\"secret\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type", is("validation_error")))
+                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.message", is("Valid email is required")))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.path", is("/api/v1/auth/login")))
+                .andExpect(jsonPath("$.timestamp", notNullValue()));
+
+        verifyNoInteractions(authService);
     }
 
     @Test

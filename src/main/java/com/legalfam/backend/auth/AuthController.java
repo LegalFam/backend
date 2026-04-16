@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +24,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Authentication")
 public class AuthController {
+
+    private static final Pattern EMAIL_PATTERN =
+            Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private final AuthService authService;
 
@@ -44,6 +48,9 @@ public class AuthController {
         if (request == null || isBlank(request.email()) || isBlank(request.password())) {
             throw new InvalidRequestException("Email and password are required");
         }
+        if (!isValidEmail(request.email().trim())) {
+            throw new InvalidRequestException("Valid email is required");
+        }
 
         TokenResponse tokens = authService.signup(request.email().trim(), request.password());
         return ResponseEntity.status(HttpStatus.CREATED).body(tokens);
@@ -62,6 +69,9 @@ public class AuthController {
     public ResponseEntity<TokenResponse> login(@RequestBody(required = false) LoginRequest request) {
         if (request == null || isBlank(request.email()) || isBlank(request.password())) {
             throw new InvalidRequestException("Email and password are required");
+        }
+        if (!isValidEmail(request.email().trim())) {
+            throw new InvalidRequestException("Valid email is required");
         }
 
         TokenResponse tokens = authService.login(request.email().trim(), request.password());
@@ -89,5 +99,9 @@ public class AuthController {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean isValidEmail(String value) {
+        return EMAIL_PATTERN.matcher(value).matches();
     }
 }
