@@ -1,9 +1,10 @@
 package com.legalfam.backend.auth;
 
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Date;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class JwtService {
 
-    private final Key signingKey;
+    private final SecretKey signingKey;
     private final long accessTokenExpirationMs;
 
     public JwtService(
@@ -36,6 +37,27 @@ public class JwtService {
 
     public long getAccessTokenExpirationSeconds() {
         return accessTokenExpirationMs / 1000;
+    }
+
+    public String extractEmail(String token) {
+        return Jwts.parser()
+                .verifyWith(signingKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
+    }
+
+    public boolean isTokenValid(String token) {
+        try {
+            Jwts.parser()
+                    .verifyWith(signingKey)
+                    .build()
+                    .parseSignedClaims(token);
+            return true;
+        } catch (JwtException | IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     private byte[] normalizeSecret(String secret) {
