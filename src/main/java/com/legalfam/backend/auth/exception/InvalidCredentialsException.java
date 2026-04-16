@@ -1,4 +1,4 @@
-package com.legalfam.backend.auth;
+package com.legalfam.backend.auth.exception;
 
 public class InvalidCredentialsException extends RuntimeException {
     public InvalidCredentialsException() {

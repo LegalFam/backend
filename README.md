@@ -126,6 +126,30 @@ curl http://localhost:8080/api/v1/users \
 - Authenticated but forbidden access returns `403`.
 - Passwords are stored hashed with BCrypt.
 
+## Error Response Format
+
+All API errors use a standardized JSON shape:
+
+```json
+{
+  "type": "authentication_error",
+  "code": "invalid_credentials",
+  "message": "Invalid credentials",
+  "status": 401,
+  "path": "/api/v1/auth/login",
+  "timestamp": "2026-04-15T12:34:56.789Z"
+}
+```
+
+Examples of error codes:
+- `invalid_request`
+- `malformed_json`
+- `email_already_exists`
+- `invalid_credentials`
+- `invalid_refresh_token`
+- `unauthorized`
+- `forbidden`
+
 ## Token Expiration Defaults
 
 Configured in `src/main/resources/application.properties`:

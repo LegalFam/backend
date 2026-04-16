@@ -7,6 +7,23 @@ This document describes how contributors (human or AI agents) should work in thi
 - Backend API built with Spring Boot.
 - Primary domain currently includes authentication and users listing.
 
+## Folder Management
+
+- Keep package-by-domain structure under `src/main/java/com/legalfam/backend`.
+- Place auth domain files in `auth/**`.
+  - Exceptions: `auth/exception/**`
+  - Exception handlers: `auth/exception/handler/**`
+  - Controllers/services/DTOs/tokens in their existing auth subpackages.
+- Place user domain files in `user/**` (controllers, repositories, DTOs).
+- Place cross-domain concerns in dedicated packages:
+  - `config/**` for security/filter/config beans.
+  - `error/**` for shared API error models and shared/common errors.
+    - Shared exceptions: `error/exception/**`
+    - Shared/global handlers: `error/handler/**`
+- Mirror main packages in `src/test/java/com/legalfam/backend/**`.
+- Do not place business/domain logic in `config/**`.
+- Add new packages only when an existing domain/shared package is clearly not appropriate.
+
 ## Core Rules
 
 - Do not expose or return password hashes in API responses.

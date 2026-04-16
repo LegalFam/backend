@@ -1,4 +1,4 @@
-package com.legalfam.backend.auth;
+package com.legalfam.backend.auth.exception;
 
 public class EmailAlreadyExistsException extends RuntimeException {
     public EmailAlreadyExistsException(String email) {

@@ -1,5 +1,8 @@
 package com.legalfam.backend.auth;
 
+import com.legalfam.backend.auth.exception.EmailAlreadyExistsException;
+import com.legalfam.backend.auth.exception.InvalidCredentialsException;
+import com.legalfam.backend.auth.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.auth.dto.TokenResponse;
 import com.legalfam.backend.auth.token.RefreshToken;
 import com.legalfam.backend.auth.token.RefreshTokenRepository;

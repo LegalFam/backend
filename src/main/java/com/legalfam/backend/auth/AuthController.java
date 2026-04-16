@@ -1,10 +1,11 @@
 package com.legalfam.backend.auth;
 
-import com.legalfam.backend.auth.dto.AuthResponse;
 import com.legalfam.backend.auth.dto.LoginRequest;
 import com.legalfam.backend.auth.dto.RefreshTokenRequest;
 import com.legalfam.backend.auth.dto.SignupRequest;
 import com.legalfam.backend.auth.dto.TokenResponse;
+import com.legalfam.backend.error.ApiError;
+import com.legalfam.backend.error.exception.InvalidRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -34,22 +35,18 @@ public class AuthController {
             @ApiResponse(responseCode = "201", description = "User created",
                     content = @Content(schema = @Schema(implementation = TokenResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
-                    content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "409", description = "Email already exists",
-                    content = @Content(schema = @Schema(implementation = AuthResponse.class)))
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping("/signup")
-    public ResponseEntity<Object> signup(@RequestBody SignupRequest request) {
+    public ResponseEntity<TokenResponse> signup(@RequestBody(required = false) SignupRequest request) {
         if (request == null || isBlank(request.email()) || isBlank(request.password())) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Email and password are required"));
+            throw new InvalidRequestException("Email and password are required");
         }
 
-        try {
-            TokenResponse tokens = authService.signup(request.email().trim(), request.password());
-            return ResponseEntity.status(HttpStatus.CREATED).body(tokens);
-        } catch (EmailAlreadyExistsException ex) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(new AuthResponse("Email already exists"));
-        }
+        TokenResponse tokens = authService.signup(request.email().trim(), request.password());
+        return ResponseEntity.status(HttpStatus.CREATED).body(tokens);
     }
 
     @Operation(summary = "Login with email and password")
@@ -57,22 +54,18 @@ public class AuthController {
             @ApiResponse(responseCode = "200", description = "Login successful",
                     content = @Content(schema = @Schema(implementation = TokenResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
-                    content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Invalid credentials",
-                    content = @Content(schema = @Schema(implementation = AuthResponse.class)))
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping("/login")
-    public ResponseEntity<Object> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<TokenResponse> login(@RequestBody(required = false) LoginRequest request) {
         if (request == null || isBlank(request.email()) || isBlank(request.password())) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Email and password are required"));
+            throw new InvalidRequestException("Email and password are required");
         }
 
-        try {
-            TokenResponse tokens = authService.login(request.email().trim(), request.password());
-            return ResponseEntity.ok(tokens);
-        } catch (InvalidCredentialsException ex) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new AuthResponse("Invalid credentials"));
-        }
+        TokenResponse tokens = authService.login(request.email().trim(), request.password());
+        return ResponseEntity.ok(tokens);
     }
 
     @Operation(summary = "Refresh access token")
@@ -80,22 +73,18 @@ public class AuthController {
             @ApiResponse(responseCode = "200", description = "Token refreshed",
                     content = @Content(schema = @Schema(implementation = TokenResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
-                    content = @Content(schema = @Schema(implementation = AuthResponse.class))),
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Invalid refresh token",
-                    content = @Content(schema = @Schema(implementation = AuthResponse.class)))
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping("/refresh")
-    public ResponseEntity<Object> refresh(@RequestBody RefreshTokenRequest request) {
+    public ResponseEntity<TokenResponse> refresh(@RequestBody(required = false) RefreshTokenRequest request) {
         if (request == null || isBlank(request.refreshToken())) {
-            return ResponseEntity.badRequest().body(new AuthResponse("Refresh token is required"));
+            throw new InvalidRequestException("Refresh token is required");
         }
 
-        try {
-            TokenResponse tokens = authService.refresh(request.refreshToken().trim());
-            return ResponseEntity.ok(tokens);
-        } catch (InvalidRefreshTokenException ex) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new AuthResponse("Invalid refresh token"));
-        }
+        TokenResponse tokens = authService.refresh(request.refreshToken().trim());
+        return ResponseEntity.ok(tokens);
     }
 
     private boolean isBlank(String value) {
