@@ -1,6 +1,6 @@
-package com.legalfam.backend.conversation.integration;
+package com.legalfam.backend.chat.integration;
 
-import com.legalfam.backend.conversation.exception.ConversationUpstreamException;
+import com.legalfam.backend.chat.exception.ChatUpstreamException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,7 +58,7 @@ public class N8nWebhookClient {
 
         if (webhookUrl == null || webhookUrl.isBlank()) {
             log.warn("Skipping n8n call because app.n8n.webhook-url is empty");
-            throw new ConversationUpstreamException("n8n webhook URL is not configured");
+            throw new ChatUpstreamException("n8n webhook URL is not configured");
         }
 
         validateWebhookUrl(webhookUrl);
@@ -77,16 +77,16 @@ public class N8nWebhookClient {
             }
             int statusCode = ex.getStatusCode().value();
             log.warn("n8n webhook returned non-success status: status={}, body={}", statusCode, bodyPreview);
-            throw new ConversationUpstreamException("n8n webhook returned status " + statusCode);
+            throw new ChatUpstreamException("n8n webhook returned status " + statusCode);
         } catch (ResourceAccessException ex) {
             if (isTimeout(ex)) {
-                throw new ConversationUpstreamException("n8n service timeout");
+                throw new ChatUpstreamException("n8n service timeout");
             }
             log.error("Failed to reach n8n webhook", ex);
-            throw new ConversationUpstreamException("n8n service unavailable");
+            throw new ChatUpstreamException("n8n service unavailable");
         } catch (RuntimeException ex) {
             log.error("Unexpected error while calling n8n webhook", ex);
-            throw new ConversationUpstreamException("n8n service unavailable");
+            throw new ChatUpstreamException("n8n service unavailable");
         }
 
         if (!response.getStatusCode().is2xxSuccessful()) {
@@ -96,7 +96,7 @@ public class N8nWebhookClient {
             }
             int statusCode = response.getStatusCode().value();
             log.warn("n8n webhook returned non-success status: status={}, body={}", statusCode, bodyPreview);
-            throw new ConversationUpstreamException("n8n webhook returned status " + statusCode);
+            throw new ChatUpstreamException("n8n webhook returned status " + statusCode);
         }
 
         return parseResponseBody(response.getBody());
@@ -106,7 +106,7 @@ public class N8nWebhookClient {
         try {
             URI.create(url.trim());
         } catch (IllegalArgumentException ex) {
-            throw new ConversationUpstreamException("n8n webhook URL is invalid");
+            throw new ChatUpstreamException("n8n webhook URL is invalid");
         }
     }
 
@@ -128,13 +128,13 @@ public class N8nWebhookClient {
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (Exception ex) {
-            throw new ConversationUpstreamException("Failed to serialize n8n request");
+            throw new ChatUpstreamException("Failed to serialize n8n request");
         }
     }
 
     private JsonNode parseResponseBody(String responseBody) {
         if (responseBody == null || responseBody.isBlank()) {
-            throw new ConversationUpstreamException("n8n returned an empty response");
+            throw new ChatUpstreamException("n8n returned an empty response");
         }
 
         try {

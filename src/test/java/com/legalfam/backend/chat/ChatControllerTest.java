@@ -1,4 +1,4 @@
-package com.legalfam.backend.conversation;
+package com.legalfam.backend.chat;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -9,8 +9,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.legalfam.backend.conversation.dto.ConversationAskResponse;
-import com.legalfam.backend.conversation.dto.ConversationCitationResponse;
+import com.legalfam.backend.chat.dto.ChatAskResponse;
+import com.legalfam.backend.chat.dto.ChatCitationResponse;
 import com.legalfam.backend.error.handler.GlobalExceptionHandler;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,16 +23,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 @ExtendWith(MockitoExtension.class)
-class ConversationControllerTest {
+class ChatControllerTest {
 
     @Mock
-    private ConversationService conversationService;
+    private ChatService chatService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new ConversationController(conversationService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(chatService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
@@ -49,13 +49,13 @@ class ConversationControllerTest {
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat")));
 
-        verifyNoInteractions(conversationService);
+        verifyNoInteractions(chatService);
     }
 
     @Test
     void chatDelegatesToService() throws Exception {
-        when(conversationService.chat(anyString()))
-                .thenReturn(new ConversationAskResponse("Answer", List.of()));
+        when(chatService.chat(anyString()))
+                .thenReturn(new ChatAskResponse("Answer", List.of()));
 
         mockMvc.perform(post("/api/v1/chat")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -63,16 +63,16 @@ class ConversationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message", is("Answer")));
 
-        verify(conversationService).chat("What does the contract say?");
+        verify(chatService).chat("What does the contract say?");
     }
 
     @Test
     void chatReturnsAnswerAndCitations() throws Exception {
-        List<ConversationCitationResponse> citations = List.of(
-                new ConversationCitationResponse("files/demo-1", "Contract.pdf", "Relevant excerpt")
+        List<ChatCitationResponse> citations = List.of(
+                new ChatCitationResponse("files/demo-1", "Contract.pdf", "Relevant excerpt")
         );
-        when(conversationService.chat(anyString()))
-                .thenReturn(new ConversationAskResponse("Grounded answer", citations));
+        when(chatService.chat(anyString()))
+                .thenReturn(new ChatAskResponse("Grounded answer", citations));
 
         mockMvc.perform(post("/api/v1/chat")
                         .contentType(MediaType.APPLICATION_JSON)

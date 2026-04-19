@@ -15,9 +15,9 @@ This document describes how contributors (human or AI agents) should work in thi
   - Exception handlers: `auth/exception/handler/**`
   - Controllers/services/DTOs/tokens in their existing auth subpackages.
 - Place user domain files in `user/**` (controllers, repositories, DTOs).
-- Place conversation domain files in `conversation/**`.
-  - Exceptions: `conversation/exception/**`
-  - Exception handlers: `conversation/exception/handler/**`
+- Place chat domain files in `chat/**`.
+  - Exceptions: `chat/exception/**`
+  - Exception handlers: `chat/exception/handler/**`
 - Place cross-domain concerns in dedicated packages:
   - `config/**` for security/filter/config beans.
   - `error/**` for shared API error models and shared/common errors.
@@ -84,7 +84,7 @@ Current relevant tables:
 When adding or changing endpoints:
 
 1. Update controller + service + DTOs.
-2. Add or update a domain-scoped exception handler (`@RestControllerAdvice(basePackages = "<domain-package>")`) for domain-specific errors (same pattern as `auth` and `conversation`).
+2. Add or update a domain-scoped exception handler (`@RestControllerAdvice(basePackages = "<domain-package>")`) for domain-specific errors (same pattern as `auth` and `chat`).
 3. Update security rules in `SecurityConfig`.
 4. Update Swagger annotations (requests/responses/security requirement).
 5. Ensure protected routes require Bearer token.

@@ -1,6 +1,6 @@
-package com.legalfam.backend.conversation.exception.handler;
+package com.legalfam.backend.chat.exception.handler;
 
-import com.legalfam.backend.conversation.exception.ConversationUpstreamException;
+import com.legalfam.backend.chat.exception.ChatUpstreamException;
 import com.legalfam.backend.error.ApiError;
 import com.legalfam.backend.error.ApiErrorFactory;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,12 +9,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice(basePackages = "com.legalfam.backend.conversation")
-public class ConversationExceptionHandler {
+@RestControllerAdvice(basePackages = "com.legalfam.backend.chat")
+public class ChatExceptionHandler {
 
-    @ExceptionHandler(ConversationUpstreamException.class)
-    public ResponseEntity<ApiError> handleConversationUpstream(
-            ConversationUpstreamException ex,
+    @ExceptionHandler(ChatUpstreamException.class)
+    public ResponseEntity<ApiError> handleChatUpstream(
+            ChatUpstreamException ex,
             HttpServletRequest request
     ) {
         return buildResponse(

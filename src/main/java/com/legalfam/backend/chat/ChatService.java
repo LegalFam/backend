@@ -1,9 +1,9 @@
-package com.legalfam.backend.conversation;
+package com.legalfam.backend.chat;
 
-import com.legalfam.backend.conversation.dto.ConversationAskResponse;
-import com.legalfam.backend.conversation.dto.ConversationCitationResponse;
-import com.legalfam.backend.conversation.exception.ConversationUpstreamException;
-import com.legalfam.backend.conversation.integration.N8nWebhookClient;
+import com.legalfam.backend.chat.dto.ChatAskResponse;
+import com.legalfam.backend.chat.dto.ChatCitationResponse;
+import com.legalfam.backend.chat.exception.ChatUpstreamException;
+import com.legalfam.backend.chat.integration.N8nWebhookClient;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
@@ -11,35 +11,35 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
-public class ConversationService {
+public class ChatService {
 
     private final N8nWebhookClient n8nWebhookClient;
 
-    public ConversationService(N8nWebhookClient n8nWebhookClient) {
+    public ChatService(N8nWebhookClient n8nWebhookClient) {
         this.n8nWebhookClient = n8nWebhookClient;
     }
 
-    public ConversationAskResponse chat(String prompt) {
+    public ChatAskResponse chat(String prompt) {
         JsonNode root = n8nWebhookClient.sendPrompt(prompt);
 
         String message = readText(root, "message");
         if (isBlank(message)) {
-            throw new ConversationUpstreamException("n8n response does not include a message");
+            throw new ChatUpstreamException("n8n response does not include a message");
         }
 
-        List<ConversationCitationResponse> citations = extractCitations(root.get("citations"));
+        List<ChatCitationResponse> citations = extractCitations(root.get("citations"));
 
-        return new ConversationAskResponse(message, citations);
+        return new ChatAskResponse(message, citations);
     }
 
-    private List<ConversationCitationResponse> extractCitations(JsonNode citationsNode) {
+    private List<ChatCitationResponse> extractCitations(JsonNode citationsNode) {
         if (citationsNode == null || citationsNode.isNull()) {
             return List.of();
         }
         if (citationsNode.isArray()) {
-            List<ConversationCitationResponse> citations = new ArrayList<>();
+            List<ChatCitationResponse> citations = new ArrayList<>();
             for (JsonNode citationNode : citationsNode) {
-                ConversationCitationResponse citation = mapCitation(citationNode);
+                ChatCitationResponse citation = mapCitation(citationNode);
                 if (citation != null) {
                     citations.add(citation);
                 }
@@ -47,7 +47,7 @@ public class ConversationService {
             return citations;
         }
         if (citationsNode.isObject()) {
-            ConversationCitationResponse singleCitation = mapCitation(citationsNode);
+            ChatCitationResponse singleCitation = mapCitation(citationsNode);
             if (singleCitation != null) {
                 return List.of(singleCitation);
             }
@@ -55,7 +55,7 @@ public class ConversationService {
         return List.of();
     }
 
-    private ConversationCitationResponse mapCitation(JsonNode citationNode) {
+    private ChatCitationResponse mapCitation(JsonNode citationNode) {
         if (citationNode == null || citationNode.isNull()) {
             return null;
         }
@@ -66,7 +66,7 @@ public class ConversationService {
         if (isBlank(fileId) && isBlank(fileName) && isBlank(snippet)) {
             return null;
         }
-        return new ConversationCitationResponse(fileId, fileName, snippet);
+        return new ChatCitationResponse(fileId, fileName, snippet);
     }
 
     private String readText(JsonNode node, String key) {

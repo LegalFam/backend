@@ -1,7 +1,7 @@
-package com.legalfam.backend.conversation;
+package com.legalfam.backend.chat;
 
-import com.legalfam.backend.conversation.dto.ConversationAskRequest;
-import com.legalfam.backend.conversation.dto.ConversationAskResponse;
+import com.legalfam.backend.chat.dto.ChatAskRequest;
+import com.legalfam.backend.chat.dto.ChatAskResponse;
 import com.legalfam.backend.error.ApiError;
 import com.legalfam.backend.error.exception.InvalidRequestException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,23 +21,23 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "Conversations")
-public class ConversationController {
+@Tag(name = "Chats")
+public class ChatController {
 
-    private static final Logger log = LoggerFactory.getLogger(ConversationController.class);
+    private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
-    private final ConversationService conversationService;
+    private final ChatService chatService;
 
-    public ConversationController(ConversationService conversationService) {
-        this.conversationService = conversationService;
+    public ChatController(ChatService chatService) {
+        this.chatService = chatService;
     }
 
     @PostMapping("/chat")
     @Operation(summary = "Chat using n8n workflow")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Conversation response generated",
-                    content = @Content(schema = @Schema(implementation = ConversationAskResponse.class))),
+            @ApiResponse(responseCode = "200", description = "Chat response generated",
+                    content = @Content(schema = @Schema(implementation = ChatAskResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized",
@@ -47,14 +47,14 @@ public class ConversationController {
             @ApiResponse(responseCode = "502", description = "Upstream service unavailable",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ConversationAskResponse> chat(@RequestBody(required = false) ConversationAskRequest request) {
+    public ResponseEntity<ChatAskResponse> chat(@RequestBody(required = false) ChatAskRequest request) {
         if (request == null || request.prompt() == null || request.prompt().isBlank()) {
             log.warn("Chat request rejected: blank prompt");
             throw new InvalidRequestException("Prompt is required");
         }
 
         log.info("Chat request started: promptLength={}", request.prompt().trim().length());
-        ConversationAskResponse response = conversationService.chat(request.prompt().trim());
+        ChatAskResponse response = chatService.chat(request.prompt().trim());
         log.info("Chat request completed: citations={}", response.citations() == null ? 0 : response.citations().size());
         return ResponseEntity.ok(response);
     }
