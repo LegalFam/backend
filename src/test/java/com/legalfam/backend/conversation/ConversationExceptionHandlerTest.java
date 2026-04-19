@@ -28,20 +28,20 @@ class ConversationExceptionHandlerTest {
 
     @Test
     void mapsConversationUpstreamToBadGateway() throws Exception {
-        mockMvc.perform(get("/api/v1/conversations/errors/upstream"))
+        mockMvc.perform(get("/api/v1/chat/errors/upstream"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.type", is("upstream_error")))
                 .andExpect(jsonPath("$.code", is("upstream_service_unavailable")))
                 .andExpect(jsonPath("$.message", is("Gemini service unavailable")))
                 .andExpect(jsonPath("$.status", is(502)))
-                .andExpect(jsonPath("$.path", is("/api/v1/conversations/errors/upstream")))
+                .andExpect(jsonPath("$.path", is("/api/v1/chat/errors/upstream")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
     }
 
     @RestController
     private static class ThrowingConversationController {
 
-        @GetMapping("/api/v1/conversations/errors/upstream")
+        @GetMapping("/api/v1/chat/errors/upstream")
         String upstream() {
             throw new ConversationUpstreamException("Gemini service unavailable");
         }

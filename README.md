@@ -32,20 +32,14 @@ JWT_SECRET=your-very-strong-secret-at-least-32-characters
 ADMIN_EMAILS=you@example.com,other-admin@example.com
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-2.5-flash
-GEMINI_FILE_SEARCH_STORE_NAME=fileSearchStores/your-store-name
-GEMINI_UPLOAD_POLL_ATTEMPTS=12
-GEMINI_UPLOAD_POLL_DELAY_MS=2000
-MULTIPART_MAX_FILE_SIZE=100MB
-MULTIPART_MAX_REQUEST_SIZE=100MB
 ```
 
 Notes:
 - `JWT_SECRET` must be at least 32 characters.
 - 64+ random characters is recommended for production.
 - `ADMIN_EMAILS` controls who can access admin-only upload endpoints.
-- `GEMINI_FILE_SEARCH_STORE_NAME` is the single store used for ask + upload.
-- For now, backend validates that ask and upload use the same single store.
-- `MULTIPART_MAX_FILE_SIZE` and `MULTIPART_MAX_REQUEST_SIZE` control upload size limits.
+- File search store is selected per request (upload and chat), not from env.
+- Upload limits and Gemini upload polling values are configured in `src/main/resources/application.properties`.
 
 ## Run Locally
 
@@ -98,9 +92,11 @@ Token response format:
 ### Protected endpoints (Bearer token required)
 
 - `GET /api/v1/users`
-- `POST /api/v1/conversations/ask`
+- `POST /api/v1/chat`
 - `POST /api/v1/admin/file-search/upload` (admin emails only)
 - `GET /api/v1/admin/file-search/stores` (admin emails only)
+- `POST /api/v1/admin/file-search/stores` (admin emails only)
+- `DELETE /api/v1/admin/file-search/stores?name=fileSearchStores/{storeId}` (admin emails only, supports `force=true|false`)
 
 ## Example Requests
 
@@ -135,13 +131,13 @@ curl http://localhost:8080/api/v1/users \
   -H "Authorization: Bearer <your_access_token>"
 ```
 
-### Ask conversation with Gemini file search (protected)
+### Chat with Gemini file search (protected)
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/conversations/ask \
+curl -X POST http://localhost:8080/api/v1/chat \
   -H "Authorization: Bearer <your_access_token>" \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"Summarize the payment terms from the uploaded contract."}'
+  -d '{"prompt":"Summarize the payment terms from the uploaded contract.","fileSearchStoreName":"fileSearchStores/your-store-name"}'
 ```
 
 ### Upload file directly to Gemini File Search store (admin only)
@@ -150,6 +146,7 @@ curl -X POST http://localhost:8080/api/v1/conversations/ask \
 curl -X POST http://localhost:8080/api/v1/admin/file-search/upload \
   -H "Authorization: Bearer <admin_access_token>" \
   -F "file=@/absolute/path/to/document.pdf" \
+  -F "fileSearchStoreName=fileSearchStores/your-store-name" \
   -F "displayName=contract-v1"
 ```
 
@@ -157,6 +154,22 @@ curl -X POST http://localhost:8080/api/v1/admin/file-search/upload \
 
 ```bash
 curl http://localhost:8080/api/v1/admin/file-search/stores \
+  -H "Authorization: Bearer <admin_access_token>"
+```
+
+### Create file search store (admin only)
+
+```bash
+curl -X POST http://localhost:8080/api/v1/admin/file-search/stores \
+  -H "Authorization: Bearer <admin_access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"displayName":"Docs on Semantic Retriever"}'
+```
+
+### Delete file search store (admin only)
+
+```bash
+curl -X DELETE "http://localhost:8080/api/v1/admin/file-search/stores?name=fileSearchStores/my-file-search-store-123a456b789c&force=true" \
   -H "Authorization: Bearer <admin_access_token>"
 ```
 

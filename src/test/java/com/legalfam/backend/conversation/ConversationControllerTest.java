@@ -38,30 +38,45 @@ class ConversationControllerTest {
 
     @Test
     void askReturnsBadRequestWhenPromptIsBlank() throws Exception {
-        mockMvc.perform(post("/api/v1/conversations/ask")
+        mockMvc.perform(post("/api/v1/chat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"prompt\":\"   \"}"))
+                        .content("{\"prompt\":\"   \",\"fileSearchStoreName\":\"fileSearchStores/legal-store\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
                 .andExpect(jsonPath("$.code", is("invalid_request")))
                 .andExpect(jsonPath("$.message", is("Prompt is required")))
                 .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.path", is("/api/v1/conversations/ask")));
+                .andExpect(jsonPath("$.path", is("/api/v1/chat")));
 
         verifyNoInteractions(conversationService);
     }
 
     @Test
-    void askReturnsAnswerAndCitations() throws Exception {
+    void chatReturnsBadRequestWhenStoreNameIsBlank() throws Exception {
+        mockMvc.perform(post("/api/v1/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"prompt\":\"What does the contract say?\",\"fileSearchStoreName\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type", is("validation_error")))
+                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.message", is("File search store name is required")))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.path", is("/api/v1/chat")));
+
+        verifyNoInteractions(conversationService);
+    }
+
+    @Test
+    void chatReturnsAnswerAndCitations() throws Exception {
         List<ConversationCitationResponse> citations = List.of(
                 new ConversationCitationResponse("files/demo-1", "Contract.pdf", "Relevant excerpt")
         );
-        when(conversationService.askWithFileSearch(anyString()))
+        when(conversationService.chatWithFileSearch(anyString(), anyString()))
                 .thenReturn(new ConversationAskResponse("Grounded answer", citations));
 
-        mockMvc.perform(post("/api/v1/conversations/ask")
+        mockMvc.perform(post("/api/v1/chat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"prompt\":\"What does the contract say?\"}"))
+                        .content("{\"prompt\":\"What does the contract say?\",\"fileSearchStoreName\":\"fileSearchStores/legal-store\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer", is("Grounded answer")))
                 .andExpect(jsonPath("$.citations[0].fileId", is("files/demo-1")))

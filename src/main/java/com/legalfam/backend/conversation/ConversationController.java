@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/conversations")
+@RequestMapping("/api/v1")
 @Tag(name = "Conversations")
 public class ConversationController {
 
@@ -32,8 +32,8 @@ public class ConversationController {
         this.conversationService = conversationService;
     }
 
-    @PostMapping("/ask")
-    @Operation(summary = "Ask a conversation question using Gemini file search")
+    @PostMapping("/chat")
+    @Operation(summary = "Chat using Gemini file search")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Conversation response generated",
@@ -47,15 +47,26 @@ public class ConversationController {
             @ApiResponse(responseCode = "502", description = "Gemini service unavailable",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ConversationAskResponse> ask(@RequestBody(required = false) ConversationAskRequest request) {
+    public ResponseEntity<ConversationAskResponse> chat(@RequestBody(required = false) ConversationAskRequest request) {
         if (request == null || request.prompt() == null || request.prompt().isBlank()) {
-            log.warn("Conversation ask rejected: blank prompt");
+            log.warn("Chat request rejected: blank prompt");
             throw new InvalidRequestException("Prompt is required");
         }
+        if (request.fileSearchStoreName() == null || request.fileSearchStoreName().isBlank()) {
+            log.warn("Chat request rejected: blank fileSearchStoreName");
+            throw new InvalidRequestException("File search store name is required");
+        }
 
-        log.info("Conversation ask started: promptLength={}", request.prompt().trim().length());
-        ConversationAskResponse response = conversationService.askWithFileSearch(request.prompt().trim());
-        log.info("Conversation ask completed: citations={}", response.citations() == null ? 0 : response.citations().size());
+        log.info(
+                "Chat request started: promptLength={}, fileSearchStoreName={}",
+                request.prompt().trim().length(),
+                request.fileSearchStoreName().trim()
+        );
+        ConversationAskResponse response = conversationService.chatWithFileSearch(
+                request.prompt().trim(),
+                request.fileSearchStoreName().trim()
+        );
+        log.info("Chat request completed: citations={}", response.citations() == null ? 0 : response.citations().size());
         return ResponseEntity.ok(response);
     }
 }

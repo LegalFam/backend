@@ -32,20 +32,17 @@ public class GeminiFileSearchUploadClient {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final String apiKey;
-    private final String uploadStoreName;
     private final int pollAttempts;
     private final long pollDelayMs;
 
     public GeminiFileSearchUploadClient(
             ObjectMapper objectMapper,
             @Value("${app.gemini.api-key:}") String apiKey,
-            @Value("${app.gemini.upload-store-name:}") String uploadStoreName,
             @Value("${app.gemini.upload-poll-attempts:12}") int pollAttempts,
             @Value("${app.gemini.upload-poll-delay-ms:2000}") long pollDelayMs
     ) {
         this.objectMapper = objectMapper;
         this.apiKey = apiKey == null ? "" : apiKey.trim();
-        this.uploadStoreName = normalizeStoreName(uploadStoreName);
         this.pollAttempts = Math.max(0, pollAttempts);
         this.pollDelayMs = Math.max(200, pollDelayMs);
         this.httpClient = HttpClient.newBuilder()
@@ -53,9 +50,13 @@ public class GeminiFileSearchUploadClient {
                 .build();
     }
 
-    public FileSearchUploadResponse uploadDocument(MultipartFile file, String displayName) {
-        validateConfiguration();
+    public FileSearchUploadResponse uploadDocument(MultipartFile file, String displayName, String fileSearchStoreName) {
+        validateApiKeyOnly();
         validateFile(file);
+        String normalizedStoreName = normalizeStoreName(fileSearchStoreName);
+        if (normalizedStoreName.isBlank()) {
+            throw new InvalidRequestException("File search store name is required");
+        }
 
         String effectiveDisplayName = (displayName == null || displayName.isBlank())
                 ? file.getOriginalFilename()
@@ -67,13 +68,13 @@ public class GeminiFileSearchUploadClient {
         try {
             log.info(
                     "Gemini upload started: store={}, fileName={}, sizeBytes={}, mimeType={}, displayName={}",
-                    uploadStoreName,
+                    normalizedStoreName,
                     file.getOriginalFilename(),
                     file.getSize(),
                     file.getContentType(),
                     effectiveDisplayName
             );
-            JsonNode operation = startUpload(file, effectiveDisplayName);
+            JsonNode operation = startUpload(file, effectiveDisplayName, normalizedStoreName);
             String operationName = readText(operation, "name");
             if (operationName.isBlank()) {
                 log.error("Gemini upload failed: operation name missing in response");
@@ -151,7 +152,101 @@ public class GeminiFileSearchUploadClient {
         }
     }
 
-    private JsonNode startUpload(MultipartFile file, String displayName) throws IOException, InterruptedException {
+    public FileSearchStoreResponse createStore(String displayName) {
+        validateApiKeyOnly();
+
+        try {
+            URI uri = URI.create(API_BASE_URL + "/v1beta/fileSearchStores?key=" + encode(apiKey));
+            ObjectNode payload = objectMapper.createObjectNode();
+            if (displayName != null && !displayName.isBlank()) {
+                payload.put("displayName", displayName.trim());
+            }
+
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                    .timeout(REQUEST_TIMEOUT)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                String apiErrorMessage = extractApiErrorMessage(response.body());
+                log.error(
+                        "Gemini create fileSearchStore failed: status={}, apiErrorMessage={}, body={}",
+                        response.statusCode(),
+                        apiErrorMessage,
+                        response.body()
+                );
+                throw new ConversationUpstreamException("Gemini create file search store failed");
+            }
+
+            JsonNode store = objectMapper.readTree(response.body());
+            FileSearchStoreResponse created = new FileSearchStoreResponse(
+                    readText(store, "name"),
+                    readText(store, "displayName"),
+                    pickText(store, "createTime", "create_time"),
+                    pickText(store, "updateTime", "update_time")
+            );
+            log.info("Gemini create fileSearchStore success: name={}", created.name());
+            return created;
+        } catch (IOException e) {
+            log.error("Gemini create fileSearchStore failed: io error", e);
+            throw new ConversationUpstreamException("Gemini create file search store service unavailable");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Gemini create fileSearchStore interrupted", e);
+            throw new ConversationUpstreamException("Gemini create file search store request interrupted");
+        }
+    }
+
+    public void deleteStore(String storeNameOrId, boolean force) {
+        validateApiKeyOnly();
+        String storeName = normalizeStoreName(storeNameOrId);
+        if (storeName.isBlank()) {
+            throw new InvalidRequestException("Store name is required");
+        }
+
+        try {
+            URI uri = URI.create(
+                    API_BASE_URL
+                            + "/v1beta/"
+                            + storeName
+                            + "?force="
+                            + force
+                            + "&key="
+                            + encode(apiKey)
+            );
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                    .timeout(REQUEST_TIMEOUT)
+                    .DELETE()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400) {
+                String apiErrorMessage = extractApiErrorMessage(response.body());
+                log.error(
+                        "Gemini delete fileSearchStore failed: store={}, force={}, status={}, apiErrorMessage={}, body={}",
+                        storeName,
+                        force,
+                        response.statusCode(),
+                        apiErrorMessage,
+                        response.body()
+                );
+                throw new ConversationUpstreamException("Gemini delete file search store failed");
+            }
+
+            log.info("Gemini delete fileSearchStore success: store={}, force={}", storeName, force);
+        } catch (IOException e) {
+            log.error("Gemini delete fileSearchStore failed: io error", e);
+            throw new ConversationUpstreamException("Gemini delete file search store service unavailable");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Gemini delete fileSearchStore interrupted", e);
+            throw new ConversationUpstreamException("Gemini delete file search store request interrupted");
+        }
+    }
+
+    private JsonNode startUpload(MultipartFile file, String displayName, String fileSearchStoreName) throws IOException, InterruptedException {
         String boundary = "Boundary-" + System.currentTimeMillis();
         String mimeType = file.getContentType() == null || file.getContentType().isBlank()
                 ? "application/octet-stream"
@@ -165,7 +260,7 @@ public class GeminiFileSearchUploadClient {
         URI uri = URI.create(
                 API_BASE_URL
                         + "/upload/v1beta/"
-                        + uploadStoreName
+                        + fileSearchStoreName
                         + ":uploadToFileSearchStore?uploadType=multipart&key="
                         + encode(apiKey)
         );
@@ -269,17 +364,6 @@ public class GeminiFileSearchUploadClient {
         System.arraycopy(fileBytes, 0, body, prefix.length, fileBytes.length);
         System.arraycopy(suffix, 0, body, prefix.length + fileBytes.length, suffix.length);
         return body;
-    }
-
-    private void validateConfiguration() {
-        if (apiKey.isBlank()) {
-            log.error("Gemini upload config error: api key missing");
-            throw new ConversationUpstreamException("Gemini API key is not configured");
-        }
-        if (uploadStoreName.isBlank()) {
-            log.error("Gemini upload config error: upload store missing");
-            throw new ConversationUpstreamException("Gemini upload store name is not configured");
-        }
     }
 
     private void validateApiKeyOnly() {

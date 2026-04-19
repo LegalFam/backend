@@ -13,7 +13,7 @@ public class ConversationService {
         this.geminiFileSearchClient = geminiFileSearchClient;
     }
 
-    public ConversationAskResponse askWithFileSearch(String prompt) {
-        return geminiFileSearchClient.generateAnswer(prompt);
+    public ConversationAskResponse chatWithFileSearch(String prompt, String fileSearchStoreName) {
+        return geminiFileSearchClient.generateAnswer(prompt, fileSearchStoreName);
     }
 }

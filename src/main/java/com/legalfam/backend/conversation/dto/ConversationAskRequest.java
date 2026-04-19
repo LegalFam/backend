@@ -1,4 +1,7 @@
 package com.legalfam.backend.conversation.dto;
 
-public record ConversationAskRequest(String prompt) {
+public record ConversationAskRequest(
+        String prompt,
+        String fileSearchStoreName
+) {
 }

@@ -4,7 +4,9 @@ import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -53,6 +55,7 @@ class AdminFileSearchControllerTest {
 
         mockMvc.perform(multipart("/api/v1/admin/file-search/upload")
                         .file(emptyFile)
+                        .param("fileSearchStoreName", "fileSearchStores/legal-store")
                         .principal(new UsernamePasswordAuthenticationToken("admin@example.com", null)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
@@ -68,11 +71,12 @@ class AdminFileSearchControllerTest {
                 "text/plain",
                 "hello".getBytes()
         );
-        when(geminiFileSearchUploadClient.uploadDocument(file, "sample-doc"))
+        when(geminiFileSearchUploadClient.uploadDocument(file, "sample-doc", "fileSearchStores/legal-store"))
                 .thenReturn(new FileSearchUploadResponse("operations/123", true, "fileSearchStores/s/documents/d1"));
 
         mockMvc.perform(multipart("/api/v1/admin/file-search/upload")
                         .file(file)
+                        .param("fileSearchStoreName", "fileSearchStores/legal-store")
                         .param("displayName", "sample-doc")
                         .principal(new UsernamePasswordAuthenticationToken(
                                 "admin@example.com",
@@ -96,6 +100,7 @@ class AdminFileSearchControllerTest {
 
         mockMvc.perform(multipart("/api/v1/admin/file-search/upload")
                         .file(file)
+                        .param("fileSearchStoreName", "fileSearchStores/legal-store")
                         .principal(new UsernamePasswordAuthenticationToken("user@example.com", null)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type", is("authorization_error")))
@@ -128,6 +133,69 @@ class AdminFileSearchControllerTest {
                 .requireAdmin(org.mockito.ArgumentMatchers.any());
 
         mockMvc.perform(get("/api/v1/admin/file-search/stores")
+                        .principal(new UsernamePasswordAuthenticationToken("user@example.com", null)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type", is("authorization_error")))
+                .andExpect(jsonPath("$.code", is("forbidden")))
+                .andExpect(jsonPath("$.message", is("Access is forbidden")));
+    }
+
+    @Test
+    void createStoreReturnsCreatedStore() throws Exception {
+        when(geminiFileSearchUploadClient.createStore("New Legal Store")).thenReturn(
+                new FileSearchStoreResponse(
+                        "fileSearchStores/new-legal-store-123a456b789c",
+                        "New Legal Store",
+                        "2026-04-17T00:00:00Z",
+                        "2026-04-17T00:00:00Z"
+                )
+        );
+
+        mockMvc.perform(post("/api/v1/admin/file-search/stores")
+                        .contentType("application/json")
+                        .content("{\"displayName\":\"New Legal Store\"}")
+                        .principal(new UsernamePasswordAuthenticationToken("admin@example.com", null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is("fileSearchStores/new-legal-store-123a456b789c")))
+                .andExpect(jsonPath("$.displayName", is("New Legal Store")));
+    }
+
+    @Test
+    void createStoreReturnsForbiddenForNonAdmin() throws Exception {
+        doThrow(new AccessDeniedException("forbidden"))
+                .when(adminAccessService)
+                .requireAdmin(org.mockito.ArgumentMatchers.any());
+
+        mockMvc.perform(post("/api/v1/admin/file-search/stores")
+                        .contentType("application/json")
+                        .content("{\"displayName\":\"New Legal Store\"}")
+                        .principal(new UsernamePasswordAuthenticationToken("user@example.com", null)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type", is("authorization_error")))
+                .andExpect(jsonPath("$.code", is("forbidden")))
+                .andExpect(jsonPath("$.message", is("Access is forbidden")));
+    }
+
+    @Test
+    void deleteStoreReturnsEmptyJsonObject() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/file-search/stores")
+                        .param("name", "fileSearchStores/legal-store-123a456b789c")
+                        .param("force", "true")
+                        .principal(new UsernamePasswordAuthenticationToken("admin@example.com", null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isMap());
+
+        verify(geminiFileSearchUploadClient).deleteStore("fileSearchStores/legal-store-123a456b789c", true);
+    }
+
+    @Test
+    void deleteStoreReturnsForbiddenForNonAdmin() throws Exception {
+        doThrow(new AccessDeniedException("forbidden"))
+                .when(adminAccessService)
+                .requireAdmin(org.mockito.ArgumentMatchers.any());
+
+        mockMvc.perform(delete("/api/v1/admin/file-search/stores")
+                        .param("name", "fileSearchStores/legal-store-123a456b789c")
                         .principal(new UsernamePasswordAuthenticationToken("user@example.com", null)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.type", is("authorization_error")))

@@ -35,34 +35,32 @@ public class GeminiFileSearchClient {
     private final HttpClient httpClient;
     private final String apiKey;
     private final String model;
-    private final List<String> fileSearchStoreNames;
 
     public GeminiFileSearchClient(
             ObjectMapper objectMapper,
             @Value("${app.gemini.api-key:}") String apiKey,
-            @Value("${app.gemini.model:gemini-2.5-flash}") String model,
-            @Value("${app.gemini.file-search-store-names:}") String fileSearchStoreNamesCsv
+            @Value("${app.gemini.model:gemini-2.5-flash}") String model
     ) {
         this.objectMapper = objectMapper;
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.model = model == null || model.isBlank() ? "gemini-2.5-flash" : model.trim();
-        this.fileSearchStoreNames = parseStoreNames(fileSearchStoreNamesCsv);
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
     }
 
-    public ConversationAskResponse generateAnswer(String prompt) {
-        validateConfiguration();
+    public ConversationAskResponse generateAnswer(String prompt, String fileSearchStoreName) {
+        String normalizedStoreName = normalizeStoreName(fileSearchStoreName);
+        validateConfiguration(normalizedStoreName);
         log.info(
-                "Gemini file search ask started: model={}, stores={}, promptLength={}",
+                "Gemini file search ask started: model={}, store={}, promptLength={}",
                 model,
-                fileSearchStoreNames,
+                normalizedStoreName,
                 prompt.length()
         );
 
         try {
-            String responseBody = callGenerateContent(prompt);
+            String responseBody = callGenerateContent(prompt, normalizedStoreName);
             JsonNode root = objectMapper.readTree(responseBody);
             JsonNode candidate = root.path("candidates").path(0);
 
@@ -81,18 +79,17 @@ public class GeminiFileSearchClient {
         }
     }
 
-    private void validateConfiguration() {
+    private void validateConfiguration(String fileSearchStoreName) {
         if (apiKey.isBlank()) {
             log.error("Gemini file search config error: api key missing");
             throw new ConversationUpstreamException("Gemini API key is not configured");
         }
-        if (fileSearchStoreNames.isEmpty()) {
-            log.error("Gemini file search config error: file search stores missing");
-            throw new ConversationUpstreamException("Gemini file search store names are not configured");
+        if (fileSearchStoreName.isBlank()) {
+            throw new ConversationUpstreamException("Gemini file search store name is required");
         }
     }
 
-    private String callGenerateContent(String prompt) throws IOException, InterruptedException {
+    private String callGenerateContent(String prompt, String fileSearchStoreName) throws IOException, InterruptedException {
         ObjectNode root = objectMapper.createObjectNode();
 
         ArrayNode contents = root.putArray("contents");
@@ -104,9 +101,7 @@ public class GeminiFileSearchClient {
         ObjectNode tool = tools.addObject();
         ObjectNode fileSearch = tool.putObject("file_search");
         ArrayNode storeNames = fileSearch.putArray("file_search_store_names");
-        for (String storeName : fileSearchStoreNames) {
-            storeNames.add(storeName);
-        }
+        storeNames.add(fileSearchStoreName);
 
         URI uri = URI.create(
                 API_BASE_URL
@@ -207,19 +202,11 @@ public class GeminiFileSearchClient {
         unique.putIfAbsent(key, new ConversationCitationResponse(sourceId, sourceName, snippet));
     }
 
-    private List<String> parseStoreNames(String csv) {
-        if (csv == null || csv.isBlank()) {
-            return List.of();
-        }
-        return java.util.Arrays.stream(csv.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isBlank())
-                .map(this::normalizeStoreName)
-                .distinct()
-                .toList();
-    }
-
     private String normalizeStoreName(String rawStoreName) {
+        if (rawStoreName == null || rawStoreName.isBlank()) {
+            return "";
+        }
+        rawStoreName = rawStoreName.trim();
         if (rawStoreName.startsWith("fileSearchStores/")) {
             return rawStoreName;
         }
