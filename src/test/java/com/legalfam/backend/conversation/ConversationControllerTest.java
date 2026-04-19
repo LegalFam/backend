@@ -61,7 +61,7 @@ class ConversationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"prompt\":\"What does the contract say?\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.answer", is("Answer")));
+                .andExpect(jsonPath("$.message", is("Answer")));
 
         verify(conversationService).chat("What does the contract say?");
     }
@@ -78,7 +78,7 @@ class ConversationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"prompt\":\"What does the contract say?\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.answer", is("Grounded answer")))
+                .andExpect(jsonPath("$.message", is("Grounded answer")))
                 .andExpect(jsonPath("$.citations[0].fileId", is("files/demo-1")))
                 .andExpect(jsonPath("$.citations[0].fileName", is("Contract.pdf")))
                 .andExpect(jsonPath("$.citations[0].snippet", is("Relevant excerpt")));
