@@ -1,4 +1,4 @@
-﻿package com.legalfam.backend.conversation.n8n;
+package com.legalfam.backend.conversation.n8n;
 
 import com.legalfam.backend.conversation.dto.ConversationAskResponse;
 import com.legalfam.backend.conversation.dto.ConversationCitationResponse;
@@ -96,28 +96,20 @@ public class N8nChatClient {
             throw new ConversationUpstreamException("n8n returned an empty response");
         }
 
-        try {
-            JsonNode root = objectMapper.readTree(body);
-            String answer = firstNonBlank(
-                    readText(root, "answer"),
-                    readText(root, "reply"),
-                    readText(root, "response"),
-                    readText(root, "output")
-            );
+        JsonNode root = objectMapper.readTree(body);
+        String answer = firstNonBlank(
+                readText(root, "answer"),
+                readText(root, "reply"),
+                readText(root, "response"),
+                readText(root, "output")
+        );
 
-            List<ConversationCitationResponse> citations = extractCitations(root);
-            if (answer.isBlank()) {
-                throw new ConversationUpstreamException("n8n returned an invalid response");
-            }
-
-            return new ConversationAskResponse(answer, citations);
-        } catch (IOException ignored) {
-            String answer = body.trim();
-            if (answer.isBlank()) {
-                throw new ConversationUpstreamException("n8n returned an empty response");
-            }
-            return new ConversationAskResponse(answer, List.of());
+        List<ConversationCitationResponse> citations = extractCitations(root);
+        if (answer.isBlank()) {
+            throw new ConversationUpstreamException("n8n returned an invalid response");
         }
+
+        return new ConversationAskResponse(answer, citations);
     }
 
     private List<ConversationCitationResponse> extractCitations(JsonNode root) {
@@ -164,7 +156,7 @@ public class N8nChatClient {
 
     private String readText(JsonNode node, String fieldName) {
         JsonNode field = node.get(fieldName);
-        return field == null || field.isNull() ? "" : field.asText("");
+        return field == null || field.isNull() ? "" : field.asString("");
     }
 
     private String firstNonBlank(String... values) {
