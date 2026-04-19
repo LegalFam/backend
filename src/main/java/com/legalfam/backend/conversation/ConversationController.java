@@ -33,7 +33,7 @@ public class ConversationController {
     }
 
     @PostMapping("/chat")
-    @Operation(summary = "Chat using Gemini file search")
+    @Operation(summary = "Chat using n8n workflow")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Conversation response generated",
@@ -44,7 +44,7 @@ public class ConversationController {
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "403", description = "Forbidden",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "502", description = "Gemini service unavailable",
+            @ApiResponse(responseCode = "502", description = "Upstream service unavailable",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<ConversationAskResponse> chat(@RequestBody(required = false) ConversationAskRequest request) {
@@ -52,20 +52,9 @@ public class ConversationController {
             log.warn("Chat request rejected: blank prompt");
             throw new InvalidRequestException("Prompt is required");
         }
-        if (request.fileSearchStoreName() == null || request.fileSearchStoreName().isBlank()) {
-            log.warn("Chat request rejected: blank fileSearchStoreName");
-            throw new InvalidRequestException("File search store name is required");
-        }
 
-        log.info(
-                "Chat request started: promptLength={}, fileSearchStoreName={}",
-                request.prompt().trim().length(),
-                request.fileSearchStoreName().trim()
-        );
-        ConversationAskResponse response = conversationService.chatWithFileSearch(
-                request.prompt().trim(),
-                request.fileSearchStoreName().trim()
-        );
+        log.info("Chat request started: promptLength={}", request.prompt().trim().length());
+        ConversationAskResponse response = conversationService.chat(request.prompt().trim());
         log.info("Chat request completed: citations={}", response.citations() == null ? 0 : response.citations().size());
         return ResponseEntity.ok(response);
     }

@@ -2,6 +2,7 @@ package com.legalfam.backend.conversation;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -40,7 +41,7 @@ class ConversationControllerTest {
     void askReturnsBadRequestWhenPromptIsBlank() throws Exception {
         mockMvc.perform(post("/api/v1/chat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"prompt\":\"   \",\"fileSearchStoreName\":\"fileSearchStores/legal-store\"}"))
+                        .content("{\"prompt\":\"   \"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
                 .andExpect(jsonPath("$.code", is("invalid_request")))
@@ -52,18 +53,17 @@ class ConversationControllerTest {
     }
 
     @Test
-    void chatReturnsBadRequestWhenStoreNameIsBlank() throws Exception {
+    void chatDelegatesToService() throws Exception {
+        when(conversationService.chat(anyString()))
+                .thenReturn(new ConversationAskResponse("Answer", List.of()));
+
         mockMvc.perform(post("/api/v1/chat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"prompt\":\"What does the contract say?\",\"fileSearchStoreName\":\"   \"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type", is("validation_error")))
-                .andExpect(jsonPath("$.code", is("invalid_request")))
-                .andExpect(jsonPath("$.message", is("File search store name is required")))
-                .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.path", is("/api/v1/chat")));
+                        .content("{\"prompt\":\"What does the contract say?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.answer", is("Answer")));
 
-        verifyNoInteractions(conversationService);
+        verify(conversationService).chat("What does the contract say?");
     }
 
     @Test
@@ -71,12 +71,12 @@ class ConversationControllerTest {
         List<ConversationCitationResponse> citations = List.of(
                 new ConversationCitationResponse("files/demo-1", "Contract.pdf", "Relevant excerpt")
         );
-        when(conversationService.chatWithFileSearch(anyString(), anyString()))
+        when(conversationService.chat(anyString()))
                 .thenReturn(new ConversationAskResponse("Grounded answer", citations));
 
         mockMvc.perform(post("/api/v1/chat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"prompt\":\"What does the contract say?\",\"fileSearchStoreName\":\"fileSearchStores/legal-store\"}"))
+                        .content("{\"prompt\":\"What does the contract say?\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer", is("Grounded answer")))
                 .andExpect(jsonPath("$.citations[0].fileId", is("files/demo-1")))

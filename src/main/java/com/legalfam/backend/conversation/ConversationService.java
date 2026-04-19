@@ -1,19 +1,19 @@
 package com.legalfam.backend.conversation;
 
 import com.legalfam.backend.conversation.dto.ConversationAskResponse;
-import com.legalfam.backend.conversation.gemini.GeminiFileSearchClient;
+import com.legalfam.backend.conversation.n8n.N8nChatClient;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ConversationService {
 
-    private final GeminiFileSearchClient geminiFileSearchClient;
+    private final N8nChatClient n8nChatClient;
 
-    public ConversationService(GeminiFileSearchClient geminiFileSearchClient) {
-        this.geminiFileSearchClient = geminiFileSearchClient;
+    public ConversationService(N8nChatClient n8nChatClient) {
+        this.n8nChatClient = n8nChatClient;
     }
 
-    public ConversationAskResponse chatWithFileSearch(String prompt, String fileSearchStoreName) {
-        return geminiFileSearchClient.generateAnswer(prompt, fileSearchStoreName);
+    public ConversationAskResponse chat(String prompt) {
+        return n8nChatClient.generateAnswer(prompt);
     }
 }

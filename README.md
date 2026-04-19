@@ -29,17 +29,15 @@ DB_NAME=your_db
 DB_USER=your_user
 DB_PASSWORD=your_password
 JWT_SECRET=your-very-strong-secret-at-least-32-characters
-ADMIN_EMAILS=you@example.com,other-admin@example.com
-GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-2.5-flash
+N8N_WEBHOOK_URL=http://localhost:5678/webhook/chat-process
+N8N_AUTH_HEADER_NAME=X-N8N-Token
+N8N_AUTH_TOKEN=your-shared-secret
 ```
 
 Notes:
 - `JWT_SECRET` must be at least 32 characters.
 - 64+ random characters is recommended for production.
-- `ADMIN_EMAILS` controls who can access admin-only upload endpoints.
-- File search store is selected per request (upload and chat), not from env.
-- Upload limits and Gemini upload polling values are configured in `src/main/resources/application.properties`.
+- `POST /api/v1/chat` sends the prompt to `N8N_WEBHOOK_URL`.
 
 ## Run Locally
 
@@ -50,6 +48,16 @@ Notes:
 By default, the API runs at:
 
 - `http://localhost:8080`
+
+Use the test profile (internal test config in `application-test.properties`):
+
+- Create `.env.test` and adjust values.
+- And then use:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=test
+```
+
 
 ## Swagger
 
@@ -93,10 +101,6 @@ Token response format:
 
 - `GET /api/v1/users`
 - `POST /api/v1/chat`
-- `POST /api/v1/admin/file-search/upload` (admin emails only)
-- `GET /api/v1/admin/file-search/stores` (admin emails only)
-- `POST /api/v1/admin/file-search/stores` (admin emails only)
-- `DELETE /api/v1/admin/file-search/stores?name=fileSearchStores/{storeId}` (admin emails only, supports `force=true|false`)
 
 ## Example Requests
 
@@ -131,46 +135,15 @@ curl http://localhost:8080/api/v1/users \
   -H "Authorization: Bearer <your_access_token>"
 ```
 
-### Chat with Gemini file search (protected)
+### Chat through n8n workflow (protected)
+
+Configure `N8N_WEBHOOK_URL` (`N8N_AUTH_TOKEN` optional).
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/chat \
   -H "Authorization: Bearer <your_access_token>" \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"Summarize the payment terms from the uploaded contract.","fileSearchStoreName":"fileSearchStores/your-store-name"}'
-```
-
-### Upload file directly to Gemini File Search store (admin only)
-
-```bash
-curl -X POST http://localhost:8080/api/v1/admin/file-search/upload \
-  -H "Authorization: Bearer <admin_access_token>" \
-  -F "file=@/absolute/path/to/document.pdf" \
-  -F "fileSearchStoreName=fileSearchStores/your-store-name" \
-  -F "displayName=contract-v1"
-```
-
-### List file search stores (admin only)
-
-```bash
-curl http://localhost:8080/api/v1/admin/file-search/stores \
-  -H "Authorization: Bearer <admin_access_token>"
-```
-
-### Create file search store (admin only)
-
-```bash
-curl -X POST http://localhost:8080/api/v1/admin/file-search/stores \
-  -H "Authorization: Bearer <admin_access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"displayName":"Docs on Semantic Retriever"}'
-```
-
-### Delete file search store (admin only)
-
-```bash
-curl -X DELETE "http://localhost:8080/api/v1/admin/file-search/stores?name=fileSearchStores/my-file-search-store-123a456b789c&force=true" \
-  -H "Authorization: Bearer <admin_access_token>"
+  -d '{"prompt":"Summarize this user message and return the next legal step."}'
 ```
 
 ## Security Behavior

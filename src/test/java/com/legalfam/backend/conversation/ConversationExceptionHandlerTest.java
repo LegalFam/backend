@@ -32,7 +32,7 @@ class ConversationExceptionHandlerTest {
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.type", is("upstream_error")))
                 .andExpect(jsonPath("$.code", is("upstream_service_unavailable")))
-                .andExpect(jsonPath("$.message", is("Gemini service unavailable")))
+                .andExpect(jsonPath("$.message", is("n8n service unavailable")))
                 .andExpect(jsonPath("$.status", is(502)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/errors/upstream")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
@@ -43,7 +43,7 @@ class ConversationExceptionHandlerTest {
 
         @GetMapping("/api/v1/chat/errors/upstream")
         String upstream() {
-            throw new ConversationUpstreamException("Gemini service unavailable");
+            throw new ConversationUpstreamException("n8n service unavailable");
         }
     }
 }
