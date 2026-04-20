@@ -41,13 +41,13 @@ class AuthControllerTest {
 
     @Test
     void signupReturnsBadRequestWhenPayloadIsInvalid() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/signup")
+                mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"   \",\"password\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
                 .andExpect(jsonPath("$.code", is("invalid_request")))
-                .andExpect(jsonPath("$.message", is("Email and password are required")))
+                .andExpect(jsonPath("$.message", is("Email, password, name and phone are required")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/auth/signup")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
@@ -59,7 +59,7 @@ class AuthControllerTest {
     void signupReturnsBadRequestWhenEmailIsInvalid() throws Exception {
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"invalid-email\",\"password\":\"secret\"}"))
+                        .content("{\"email\":\"invalid-email\",\"password\":\"secret\",\"name\":\"Name\",\"phone\":\"900000000\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
                 .andExpect(jsonPath("$.code", is("invalid_request")))
@@ -73,12 +73,12 @@ class AuthControllerTest {
 
     @Test
     void signupReturnsCreatedWhenPayloadIsValid() throws Exception {
-        when(authService.signup(anyString(), anyString()))
+        when(authService.signup(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new TokenResponse("access-1", "refresh-1", "Bearer", 900));
 
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"user@example.com\",\"password\":\"secret\"}"))
+                        .content("{\"email\":\"user@example.com\",\"password\":\"secret\",\"name\":\"Juan\",\"phone\":\"900000000\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken", is("access-1")))
                 .andExpect(jsonPath("$.refreshToken", is("refresh-1")))
@@ -88,12 +88,12 @@ class AuthControllerTest {
 
     @Test
     void signupReturnsConflictWhenEmailAlreadyExists() throws Exception {
-        when(authService.signup(anyString(), anyString()))
+        when(authService.signup(anyString(), anyString(), anyString(), anyString()))
                 .thenThrow(new EmailAlreadyExistsException("user@example.com"));
 
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"user@example.com\",\"password\":\"secret\"}"))
+                        .content("{\"email\":\"user@example.com\",\"password\":\"secret\",\"name\":\"Juan\",\"phone\":\"900000000\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type", is("conflict_error")))
                 .andExpect(jsonPath("$.code", is("email_already_exists")))

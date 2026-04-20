@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.legalfam.backend.auth.JwtService;
 import jakarta.servlet.ServletException;
 import java.io.IOException;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,12 +41,13 @@ class JwtAuthenticationFilterTest {
         MockFilterChain filterChain = new MockFilterChain();
 
         when(jwtService.isTokenValid("valid-token")).thenReturn(true);
-        when(jwtService.extractEmail("valid-token")).thenReturn("user@example.com");
+        UUID userId = UUID.randomUUID();
+        when(jwtService.extractUserId("valid-token")).thenReturn(userId);
 
         filter.doFilter(request, response, filterChain);
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        assertEquals("user@example.com", authentication.getPrincipal());
+        assertEquals(userId.toString(), authentication.getPrincipal());
     }
 
     @Test
@@ -61,7 +63,7 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, filterChain);
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
-        verify(jwtService, never()).extractEmail("invalid-token");
+        verify(jwtService, never()).extractUserId("invalid-token");
     }
 
     @Test

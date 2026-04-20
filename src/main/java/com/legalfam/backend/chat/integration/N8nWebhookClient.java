@@ -21,6 +21,7 @@ import tools.jackson.databind.node.ObjectNode;
 import java.net.URI;
 import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 public class N8nWebhookClient {
@@ -51,7 +52,7 @@ public class N8nWebhookClient {
         this.restTemplate = buildRestTemplate(this.timeoutMs);
     }
 
-    public JsonNode sendPrompt(String prompt) {
+    public JsonNode sendMessage(String message, UUID sessionId) {
         log.info("Preparing n8n webhook call: configuredUrl={}, timeoutMs={}",
                 webhookUrl == null || webhookUrl.isBlank() ? "<empty>" : webhookUrl,
                 timeoutMs);
@@ -62,12 +63,13 @@ public class N8nWebhookClient {
         }
 
         validateWebhookUrl(webhookUrl);
-        String payloadJson = buildPayload(prompt);
+        String payloadJson = buildPayload(message, sessionId);
         HttpEntity<String> requestEntity = buildRequestEntity(payloadJson);
         ResponseEntity<String> response;
 
         try {
-            log.info("Calling n8n webhook: url={}, promptLength={}", webhookUrl, prompt.length());
+            log.info("Calling n8n webhook: url={}, messageLength={}, sessionId={}",
+                    webhookUrl, message.length(), sessionId);
             response = restTemplate.exchange(webhookUrl.trim(), HttpMethod.POST, requestEntity, String.class);
         } catch (HttpStatusCodeException ex) {
             ex.getResponseBodyAsString();
@@ -122,9 +124,10 @@ public class N8nWebhookClient {
         return new HttpEntity<>(payloadJson, headers);
     }
 
-    private String buildPayload(String prompt) {
+    private String buildPayload(String message, UUID sessionId) {
         ObjectNode payload = objectMapper.createObjectNode();
-        payload.put("prompt", prompt);
+        payload.put("message", message);
+        payload.put("session_id", sessionId.toString());
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (Exception ex) {

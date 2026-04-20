@@ -40,7 +40,7 @@ public class AuthService {
     }
 
     @Transactional
-    public TokenResponse signup(String email, String rawPassword) {
+    public TokenResponse signup(String email, String rawPassword, String name, String phone) {
         if (userRepository.existsByEmail(email)) {
             throw new EmailAlreadyExistsException(email);
         }
@@ -48,6 +48,8 @@ public class AuthService {
         User user = new User();
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setName(name);
+        user.setPhone(phone);
 
         User savedUser = userRepository.save(user);
         return issueTokens(savedUser);
@@ -83,7 +85,7 @@ public class AuthService {
     }
 
     private TokenResponse issueTokens(User user) {
-        String accessToken = jwtService.generateAccessToken(user.getEmail());
+        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail());
         String refreshToken = createRefreshToken(user);
         return new TokenResponse(accessToken, refreshToken, "Bearer", jwtService.getAccessTokenExpirationSeconds());
     }

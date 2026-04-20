@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import java.util.UUID;
 
 @Getter
 @Entity
@@ -15,8 +16,8 @@ import lombok.Setter;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @Setter
     @Column(nullable = false, unique = true)
@@ -25,5 +26,13 @@ public class User {
     @Setter
     @Column(nullable = false)
     private String password;
+
+    @Setter
+    @Column(nullable = false)
+    private String name;
+
+    @Setter
+    @Column(nullable = false)
+    private String phone;
 
 }

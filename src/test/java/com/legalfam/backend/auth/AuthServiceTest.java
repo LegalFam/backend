@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -24,6 +24,7 @@ import com.legalfam.backend.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -71,7 +72,7 @@ class AuthServiceTest {
 
         assertThrows(
                 EmailAlreadyExistsException.class,
-                () -> authService.signup("user@example.com", "secret")
+                () -> authService.signup("user@example.com", "secret", "Juan", "900000000")
         );
 
         verify(userRepository, never()).save(any(User.class));
@@ -81,17 +82,23 @@ class AuthServiceTest {
     void signupCreatesUserAndReturnsTokens() {
         when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode("secret")).thenReturn("hashed-password");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(jwtService.generateAccessToken("user@example.com")).thenReturn("access-123");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User saved = invocation.getArgument(0);
+            setUserId(saved, UUID.randomUUID());
+            return saved;
+        });
+        when(jwtService.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("access-123");
         when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(900L);
         when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TokenResponse response = authService.signup("user@example.com", "secret");
+        TokenResponse response = authService.signup("user@example.com", "secret", "Juan", "900000000");
 
         verify(userRepository).save(userCaptor.capture());
         User savedUser = userCaptor.getValue();
         assertEquals("user@example.com", savedUser.getEmail());
         assertEquals("hashed-password", savedUser.getPassword());
+        assertEquals("Juan", savedUser.getName());
+        assertEquals("900000000", savedUser.getPhone());
 
         verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
         RefreshToken refreshToken = refreshTokenCaptor.getValue();
@@ -162,7 +169,7 @@ class AuthServiceTest {
         RefreshToken existing = createRefreshToken("old-refresh", user, Instant.now().plusSeconds(60), false);
         when(refreshTokenRepository.findByToken("old-refresh")).thenReturn(Optional.of(existing));
         when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(jwtService.generateAccessToken("user@example.com")).thenReturn("new-access");
+        when(jwtService.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("new-access");
         when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(900L);
 
         TokenResponse response = authService.refresh("old-refresh");
@@ -183,8 +190,11 @@ class AuthServiceTest {
 
     private static User createUser(String email, String password) {
         User user = new User();
+        setUserId(user, UUID.randomUUID());
         user.setEmail(email);
         user.setPassword(password);
+        user.setName("Test User");
+        user.setPhone("900000000");
         return user;
     }
 
@@ -195,5 +205,15 @@ class AuthServiceTest {
         refreshToken.setExpiresAt(expiresAt);
         refreshToken.setRevoked(revoked);
         return refreshToken;
+    }
+
+    private static void setUserId(User user, UUID id) {
+        try {
+            java.lang.reflect.Field idField = User.class.getDeclaredField("id");
+            idField.setAccessible(true);
+            idField.set(user, id);
+        } catch (ReflectiveOperationException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 }

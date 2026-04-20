@@ -34,7 +34,7 @@ public class AuthController {
         this.authService = authService;
     }
 
-    @Operation(summary = "Signup with email and password")
+    @Operation(summary = "Signup with email, password, name and phone")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "User created",
                     content = @Content(schema = @Schema(implementation = TokenResponse.class))),
@@ -45,14 +45,20 @@ public class AuthController {
     })
     @PostMapping("/signup")
     public ResponseEntity<TokenResponse> signup(@RequestBody(required = false) SignupRequest request) {
-        if (request == null || isBlank(request.email()) || isBlank(request.password())) {
-            throw new InvalidRequestException("Email and password are required");
+        if (request == null || isBlank(request.email()) || isBlank(request.password())
+                || isBlank(request.name()) || isBlank(request.phone())) {
+            throw new InvalidRequestException("Email, password, name and phone are required");
         }
         if (!isValidEmail(request.email().trim())) {
             throw new InvalidRequestException("Valid email is required");
         }
 
-        TokenResponse tokens = authService.signup(request.email().trim(), request.password());
+        TokenResponse tokens = authService.signup(
+                request.email().trim(),
+                request.password(),
+                request.name().trim(),
+                request.phone().trim()
+        );
         return ResponseEntity.status(HttpStatus.CREATED).body(tokens);
     }
 

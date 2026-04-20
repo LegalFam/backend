@@ -1,5 +1,7 @@
 package com.legalfam.backend.chat.exception.handler;
 
+import com.legalfam.backend.chat.exception.ChatAccessDeniedException;
+import com.legalfam.backend.chat.exception.ChatNotFoundException;
 import com.legalfam.backend.chat.exception.ChatUpstreamException;
 import com.legalfam.backend.error.ApiError;
 import com.legalfam.backend.error.ApiErrorFactory;
@@ -21,6 +23,34 @@ public class ChatExceptionHandler {
                 HttpStatus.BAD_GATEWAY,
                 "upstream_error",
                 "upstream_service_unavailable",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(ChatAccessDeniedException.class)
+    public ResponseEntity<ApiError> handleChatAccessDenied(
+            ChatAccessDeniedException ex,
+            HttpServletRequest request
+    ) {
+        return buildResponse(
+                HttpStatus.FORBIDDEN,
+                "authorization_error",
+                "forbidden",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(ChatNotFoundException.class)
+    public ResponseEntity<ApiError> handleChatNotFound(
+            ChatNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        return buildResponse(
+                HttpStatus.NOT_FOUND,
+                "resource_error",
+                "not_found",
                 ex.getMessage(),
                 request.getRequestURI()
         );

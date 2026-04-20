@@ -39,7 +39,7 @@ public class UserController {
     })
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
-                .map(user -> new UserResponse(user.getId(), user.getEmail()))
+                .map(user -> new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone()))
                 .toList();
     }
 }

@@ -33,11 +33,15 @@ class UserControllerTest {
         User user = new User();
         user.setEmail("user@example.com");
         user.setPassword("hashed-password");
+        user.setName("Juan");
+        user.setPhone("900000000");
         when(userRepository.findAll()).thenReturn(List.of(user));
 
         mockMvc.perform(get("/api/v1/users"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].email", is("user@example.com")))
+                .andExpect(jsonPath("$[0].name", is("Juan")))
+                .andExpect(jsonPath("$[0].phone", is("900000000")))
                 .andExpect(jsonPath("$[0].password").doesNotExist());
     }
 }

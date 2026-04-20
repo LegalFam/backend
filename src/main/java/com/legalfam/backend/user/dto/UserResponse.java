@@ -1,4 +1,6 @@
 package com.legalfam.backend.user.dto;
 
-public record UserResponse(Long id, String email) {
+import java.util.UUID;
+
+public record UserResponse(UUID id, String email, String name, String phone) {
 }

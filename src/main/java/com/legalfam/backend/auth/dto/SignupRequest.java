@@ -1,4 +1,4 @@
 package com.legalfam.backend.auth.dto;
 
-public record SignupRequest(String email, String password) {
+public record SignupRequest(String email, String password, String name, String phone) {
 }

@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat;
 
 import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -13,6 +14,7 @@ import com.legalfam.backend.chat.dto.ChatAskResponse;
 import com.legalfam.backend.chat.dto.ChatCitationResponse;
 import com.legalfam.backend.error.handler.GlobalExceptionHandler;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,11 +43,11 @@ class ChatControllerTest {
     void askReturnsBadRequestWhenPromptIsBlank() throws Exception {
         mockMvc.perform(post("/api/v1/chat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"prompt\":\"   \"}"))
+                        .content("{\"message\":\"   \"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
                 .andExpect(jsonPath("$.code", is("invalid_request")))
-                .andExpect(jsonPath("$.message", is("Prompt is required")))
+                .andExpect(jsonPath("$.message", is("Message is required")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat")));
 
@@ -54,33 +56,39 @@ class ChatControllerTest {
 
     @Test
     void chatDelegatesToService() throws Exception {
-        when(chatService.chat(anyString()))
-                .thenReturn(new ChatAskResponse("Answer", List.of()));
+        UUID sessionId = UUID.randomUUID();
+        UUID messageId = UUID.randomUUID();
+        when(chatService.chat(any(UUID.class), anyString(), any(), any()))
+                .thenReturn(new ChatAskResponse(sessionId, messageId, "Answer", List.of()));
 
         mockMvc.perform(post("/api/v1/chat")
+                        .principal(() -> UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"prompt\":\"What does the contract say?\"}"))
+                        .content("{\"message\":\"What does the contract say?\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message", is("Answer")));
+                .andExpect(jsonPath("$.message", is("Answer")))
+                .andExpect(jsonPath("$.sessionId", is(sessionId.toString())))
+                .andExpect(jsonPath("$.messageId", is(messageId.toString())));
 
-        verify(chatService).chat("What does the contract say?");
+        verify(chatService).chat(any(UUID.class), anyString(), any(), any());
     }
 
     @Test
     void chatReturnsAnswerAndCitations() throws Exception {
         List<ChatCitationResponse> citations = List.of(
-                new ChatCitationResponse("files/demo-1", "Contract.pdf", "Relevant excerpt")
+                new ChatCitationResponse("Contract.pdf", "Relevant excerpt", "https://example.com/doc-1")
         );
-        when(chatService.chat(anyString()))
-                .thenReturn(new ChatAskResponse("Grounded answer", citations));
+        when(chatService.chat(any(UUID.class), anyString(), any(), any()))
+                .thenReturn(new ChatAskResponse(UUID.randomUUID(), UUID.randomUUID(), "Grounded answer", citations));
 
         mockMvc.perform(post("/api/v1/chat")
+                        .principal(() -> UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"prompt\":\"What does the contract say?\"}"))
+                        .content("{\"message\":\"What does the contract say?\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message", is("Grounded answer")))
-                .andExpect(jsonPath("$.citations[0].fileId", is("files/demo-1")))
-                .andExpect(jsonPath("$.citations[0].fileName", is("Contract.pdf")))
-                .andExpect(jsonPath("$.citations[0].snippet", is("Relevant excerpt")));
+                .andExpect(jsonPath("$.citations[0].sourceTitle", is("Contract.pdf")))
+                .andExpect(jsonPath("$.citations[0].sourceSnippet", is("Relevant excerpt")))
+                .andExpect(jsonPath("$.citations[0].sourceUrl", is("https://example.com/doc-1")));
     }
 }

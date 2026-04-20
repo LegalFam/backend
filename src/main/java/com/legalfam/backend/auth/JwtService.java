@@ -6,6 +6,7 @@ import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -23,12 +24,13 @@ public class JwtService {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
     }
 
-    public String generateAccessToken(String email) {
+    public String generateAccessToken(UUID userId, String email) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenExpirationMs);
 
         return Jwts.builder()
                 .subject(email)
+                .claim("uid", userId.toString())
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(signingKey)
@@ -46,6 +48,16 @@ public class JwtService {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
+    }
+
+    public UUID extractUserId(String token) {
+        String rawUserId = Jwts.parser()
+                .verifyWith(signingKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("uid", String.class);
+        return UUID.fromString(rawUserId);
     }
 
     public boolean isTokenValid(String token) {
