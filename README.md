@@ -29,6 +29,7 @@ DB_NAME=your_db
 DB_USER=your_user
 DB_PASSWORD=your_password
 JWT_SECRET=your-very-strong-secret-at-least-32-characters
+CORS_ALLOWED_ORIGINS=*
 N8N_WEBHOOK_URL=http://localhost:5678/webhook/chat-process
 N8N_AUTH_HEADER_NAME=X-N8N-Token
 N8N_AUTH_TOKEN=your-shared-secret
@@ -37,6 +38,8 @@ N8N_AUTH_TOKEN=your-shared-secret
 Notes:
 - `JWT_SECRET` must be at least 32 characters.
 - 64+ random characters is recommended for production.
+- `CORS_ALLOWED_ORIGINS=*` allows all origins (current default behavior).
+- To allow only one origin later, set for example `CORS_ALLOWED_ORIGINS=http://localhost:3000`.
 - `POST /api/v1/chat` sends the message to `N8N_WEBHOOK_URL`.
 - Database schema migrations are managed manually (not by Flyway).
 
