@@ -13,11 +13,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.legalfam.backend.chat.dto.ChatAskResponse;
 import com.legalfam.backend.chat.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.dto.ChatMessageResponse;
+import com.legalfam.backend.chat.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.exception.handler.ChatExceptionHandler;
+import com.legalfam.backend.chat.service.ChatService;
+import com.legalfam.backend.chat.sse.ChatSseEmitterService;
 import com.legalfam.backend.error.handler.GlobalExceptionHandler;
 import java.time.Instant;
 import java.util.List;
@@ -34,6 +36,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @ExtendWith(MockitoExtension.class)
 class ChatControllerTest {
@@ -41,11 +44,14 @@ class ChatControllerTest {
     @Mock
     private ChatService chatService;
 
+    @Mock
+    private ChatSseEmitterService chatSseEmitterService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(chatService))
+        mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(chatService, chatSseEmitterService))
                 .setControllerAdvice(new ChatExceptionHandler(), new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
@@ -60,7 +66,7 @@ class ChatControllerTest {
     void chatReturnsBadRequestWhenMessageIsBlank() throws Exception {
         authenticateAs(UUID.randomUUID().toString());
 
-        mockMvc.perform(post("/api/v1/chat")
+        mockMvc.perform(post("/api/v1/chat/send")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"   \"}"))
                 .andExpect(status().isBadRequest())
@@ -68,37 +74,85 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.code", is("invalid_request")))
                 .andExpect(jsonPath("$.message", is("Message is required")))
                 .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.path", is("/api/v1/chat")))
+                .andExpect(jsonPath("$.path", is("/api/v1/chat/send")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
 
-        verifyNoInteractions(chatService);
+        verifyNoInteractions(chatService, chatSseEmitterService);
     }
 
     @Test
-    void chatReturnsOkWhenPayloadIsValid() throws Exception {
+    void sendReturnsBadRequestWhenSessionIdIsMissing() throws Exception {
+        authenticateAs(UUID.randomUUID().toString());
+
+        mockMvc.perform(post("/api/v1/chat/send")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"hola\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type", is("validation_error")))
+                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.message", is("Session id is required")))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.path", is("/api/v1/chat/send")))
+                .andExpect(jsonPath("$.timestamp", notNullValue()));
+
+        verifyNoInteractions(chatService, chatSseEmitterService);
+    }
+
+    @Test
+    void sendReturnsAcceptedWhenPayloadIsValid() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
-        UUID messageId = UUID.randomUUID();
+        UUID userMessageId = UUID.randomUUID();
         authenticateAs(userId.toString());
 
-        when(chatService.chat(eq(userId), eq("hola"), eq(sessionId)))
-                .thenReturn(new ChatAskResponse(
+        when(chatService.send(eq(userId), eq("hola"), eq(sessionId)))
+                .thenReturn(new ChatSendAcceptedResponse(
                         sessionId,
-                        messageId,
-                        "Respuesta",
-                        List.of(new ChatCitationResponse("Codigo Penal", "Art. 1", "https://example.com/doc"))
+                        userMessageId,
+                        "PROCESSING"
                 ));
 
-        mockMvc.perform(post("/api/v1/chat")
+        mockMvc.perform(post("/api/v1/chat/send")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"  hola  \",\"sessionId\":\"" + sessionId + "\"}"))
-                .andExpect(status().isOk())
+                .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.sessionId", is(sessionId.toString())))
-                .andExpect(jsonPath("$.messageId", is(messageId.toString())))
-                .andExpect(jsonPath("$.message", is("Respuesta")))
-                .andExpect(jsonPath("$.citations[0].sourceTitle", is("Codigo Penal")))
-                .andExpect(jsonPath("$.citations[0].sourceSnippet", is("Art. 1")))
-                .andExpect(jsonPath("$.citations[0].sourceUrl", is("https://example.com/doc")));
+                .andExpect(jsonPath("$.userMessageId", is(userMessageId.toString())))
+                .andExpect(jsonPath("$.status", is("PROCESSING")));
+    }
+
+    @Test
+    void subscribeReturnsOkForOwnedSession() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        authenticateAs(userId.toString());
+        SseEmitter emitter = new SseEmitter(60000L);
+
+        when(chatSseEmitterService.subscribe(userId, sessionId)).thenReturn(emitter);
+
+        mockMvc.perform(get("/api/v1/chat/subscribe/{sessionId}", sessionId))
+                .andExpect(status().isOk());
+
+        verify(chatService).assertSessionOwnershipExists(userId, sessionId);
+        verify(chatSseEmitterService).subscribe(userId, sessionId);
+    }
+
+    @Test
+    void createSessionReturnsCreated() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        authenticateAs(userId.toString());
+
+        when(chatService.createSession(userId))
+                .thenReturn(new ChatSessionResponse(
+                        sessionId,
+                        Instant.parse("2026-01-01T00:00:00Z"),
+                        Instant.parse("2026-01-01T00:00:00Z")
+                ));
+
+        mockMvc.perform(post("/api/v1/chat/sessions"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id", is(sessionId.toString())));
     }
 
     @Test
@@ -114,7 +168,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/sessions")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
 
-        verifyNoInteractions(chatService);
+        verifyNoInteractions(chatService, chatSseEmitterService);
     }
 
     @Test

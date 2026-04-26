@@ -87,42 +87,63 @@ Success response `200`:
 ]
 ```
 
-### `POST /api/v1/chat`
-Send user message to chat workflow.  
-If `sessionId` is omitted, backend creates a new session.
+### `POST /api/v1/chat/send`
+Send user message for asynchronous processing.  
+`sessionId` is required.
 
 Request body:
 ```json
 {
-  "message": "De acuerdo con el Código Civil, ¿cómo se calcula la pensión?",
-  "sessionId": "optional-uuid"
+  "message": "De acuerdo con el Codigo Civil, como se calcula la pension?",
+  "sessionId": "uuid"
 }
 ```
 
-Success response `200`:
+Success response `202`:
 ```json
 {
   "sessionId": "uuid",
-  "messageId": "uuid",
-  "message": "Respuesta del sistema...",
-  "citations": [
-    {
-      "sourceTitle": "Codigo_Civil_Peru.pdf",
-      "sourceSnippet": "Artículo 472...",
-      "sourceUrl": "https://url-al-archivo.com/doc_001"
-    }
-  ]
+  "userMessageId": "uuid",
+  "status": "PROCESSING"
 }
 ```
 
 Notes:
-- `citations` may be an empty array for simple messages (example: greetings).
-- If citations are returned by n8n, each one must include `file_url`; otherwise API returns `502`.
+- Backend persists the user message first, then calls n8n asynchronously.
+- Assistant response is persisted in DB before SSE dispatch is attempted.
+- If SSE is disconnected, frontend can recover data from `GET /api/v1/chat/sessions/{sessionId}/messages`.
 
 Common errors:
 - `400` `message` missing/blank
+- `400` `sessionId` missing
 - `403` session belongs to another user
-- `502` upstream n8n error
+
+### `POST /api/v1/chat/sessions`
+Create a new chat session.
+
+Success response `201`:
+```json
+{
+  "id": "uuid",
+  "createdAt": "2026-04-19T10:00:00Z",
+  "updatedAt": "2026-04-19T10:00:00Z"
+}
+```
+
+### `GET /api/v1/chat/subscribe/{sessionId}`
+Subscribe to assistant events using Server-Sent Events (SSE).
+
+Success response `200` with `text/event-stream`.
+
+Expected events:
+- `connected`
+- `heartbeat`
+- `assistant_message`
+- `assistant_error`
+
+Common errors:
+- `403` session belongs to another user
+- `404` session not found
 
 ### `GET /api/v1/chat/sessions`
 List chat sessions for current user.
@@ -155,7 +176,7 @@ Success response `200`:
   {
     "id": "uuid",
     "role": "ASSISTANT",
-    "content": "Hola, ¿en qué puedo ayudarte?",
+    "content": "Hola, en que puedo ayudarte?",
     "rating": 5,
     "createdAt": "2026-04-19T10:00:02Z",
     "citations": []
@@ -166,6 +187,10 @@ Success response `200`:
 Common errors:
 - `403` session belongs to another user
 - `404` session not found
+
+Failure behavior:
+- If upstream n8n fails (for example `404`), backend persists a `SYSTEM` message in the chat with an error text.
+- The same failure is emitted over SSE as `assistant_error`.
 
 ### `PATCH /api/v1/chat/messages/{messageId}/rating`
 Rate a message from 1 to 5.
@@ -193,7 +218,7 @@ All error responses return:
   "code": "invalid_request",
   "message": "Message is required",
   "status": 400,
-  "path": "/api/v1/chat",
+  "path": "/api/v1/chat/send",
   "timestamp": "2026-04-19T12:00:00.000Z"
 }
 ```
@@ -202,5 +227,10 @@ All error responses return:
 
 - Store `accessToken` + `refreshToken` securely on login/signup.
 - Retry failed protected calls after `POST /auth/refresh` on `401`.
-- Keep and reuse `sessionId` from `POST /chat` to continue the same conversation.
-- Use `messageId` from assistant messages if you plan to send ratings.
+- Recommended flow for new chats:
+1. `POST /api/v1/chat/sessions`
+2. `GET /api/v1/chat/subscribe/{sessionId}`
+3. `POST /api/v1/chat/send` with `sessionId`
+- Keep and reuse `sessionId` for all follow-up `/chat/send` requests.
+- Keep an open SSE connection with `GET /api/v1/chat/subscribe/{sessionId}` for real-time assistant events.
+- Use assistant `messageId` from listed messages if you plan to send ratings.

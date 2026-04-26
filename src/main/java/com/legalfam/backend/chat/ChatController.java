@@ -1,10 +1,12 @@
 package com.legalfam.backend.chat;
 
 import com.legalfam.backend.chat.dto.ChatAskRequest;
-import com.legalfam.backend.chat.dto.ChatAskResponse;
 import com.legalfam.backend.chat.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.dto.ChatRateMessageRequest;
+import com.legalfam.backend.chat.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.dto.ChatSessionResponse;
+import com.legalfam.backend.chat.service.ChatService;
+import com.legalfam.backend.chat.sse.ChatSseEmitterService;
 import com.legalfam.backend.error.ApiError;
 import com.legalfam.backend.error.exception.InvalidRequestException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,6 +22,8 @@ import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -38,27 +43,65 @@ public class ChatController {
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
     private final ChatService chatService;
+    private final ChatSseEmitterService chatSseEmitterService;
 
-    public ChatController(ChatService chatService) {
+    public ChatController(ChatService chatService, ChatSseEmitterService chatSseEmitterService) {
         this.chatService = chatService;
+        this.chatSseEmitterService = chatSseEmitterService;
     }
 
-    @PostMapping("/chat")
-    @Operation(summary = "Chat using n8n workflow")
+    @GetMapping(value = "/chat/subscribe/{sessionId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Subscribe to chat updates using SSE")
     @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Chat response generated",
-                    content = @Content(schema = @Schema(implementation = ChatAskResponse.class))),
+            @ApiResponse(responseCode = "200", description = "SSE subscription established"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Session not found",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<SseEmitter> subscribe(
+            @AuthenticationPrincipal String principalUserId,
+            @PathVariable("sessionId") UUID sessionId
+    ) {
+        UUID userId = parsePrincipalUserId(principalUserId);
+        chatService.assertSessionOwnershipExists(userId, sessionId);
+        SseEmitter emitter = chatSseEmitterService.subscribe(userId, sessionId);
+        return ResponseEntity.ok(emitter);
+    }
+
+    @PostMapping("/chat/sessions")
+    @Operation(summary = "Create a new chat session")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Session created",
+                    content = @Content(schema = @Schema(implementation = ChatSessionResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<ChatSessionResponse> createSession(@AuthenticationPrincipal String principalUserId) {
+        UUID userId = parsePrincipalUserId(principalUserId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(chatService.createSession(userId));
+    }
+
+    @PostMapping("/chat/send")
+    @Operation(summary = "Send message for asynchronous chat processing")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "202", description = "Message accepted for processing",
+                    content = @Content(schema = @Schema(implementation = ChatSendAcceptedResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "403", description = "Forbidden",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "502", description = "Upstream service unavailable",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<ChatAskResponse> chat(
+    public ResponseEntity<ChatSendAcceptedResponse> send(
             @AuthenticationPrincipal String principalUserId,
             @RequestBody(required = false) ChatAskRequest request
     ) {
@@ -66,16 +109,19 @@ public class ChatController {
             log.warn("Chat request rejected: blank message");
             throw new InvalidRequestException("Message is required");
         }
+        if (request.sessionId() == null) {
+            log.warn("Chat request rejected: missing sessionId");
+            throw new InvalidRequestException("Session id is required");
+        }
 
         UUID userId = parsePrincipalUserId(principalUserId);
-        log.info("Chat request started: messageLength={}", request.message().trim().length());
-        ChatAskResponse response = chatService.chat(
+        log.info("Chat request accepted: messageLength={}", request.message().trim().length());
+        ChatSendAcceptedResponse response = chatService.send(
                 userId,
                 request.message().trim(),
                 request.sessionId()
         );
-        log.info("Chat request completed: citations={}", response.citations() == null ? 0 : response.citations().size());
-        return ResponseEntity.ok(response);
+        return ResponseEntity.accepted().body(response);
     }
 
     @GetMapping("/chat/sessions")
@@ -150,3 +196,4 @@ public class ChatController {
         }
     }
 }
+

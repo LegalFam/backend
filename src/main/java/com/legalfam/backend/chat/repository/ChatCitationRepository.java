@@ -1,4 +1,4 @@
-package com.legalfam.backend.chat;
+package com.legalfam.backend.chat.repository;
 
 import com.legalfam.backend.chat.model.ChatCitation;
 import java.util.List;
@@ -8,3 +8,4 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ChatCitationRepository extends JpaRepository<ChatCitation, UUID> {
     List<ChatCitation> findByChatMessageIdOrderByIdAsc(UUID chatMessageId);
 }
+
