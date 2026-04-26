@@ -21,7 +21,11 @@ import com.legalfam.backend.auth.token.RefreshToken;
 import com.legalfam.backend.auth.token.RefreshTokenRepository;
 import com.legalfam.backend.user.User;
 import com.legalfam.backend.user.UserRepository;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -103,12 +107,14 @@ class AuthServiceTest {
         verify(refreshTokenRepository).save(refreshTokenCaptor.capture());
         RefreshToken refreshToken = refreshTokenCaptor.getValue();
         assertNotNull(refreshToken.getToken());
+        assertNotEquals(response.refreshToken(), refreshToken.getToken());
+        assertEquals(hashRefreshToken(response.refreshToken()), refreshToken.getToken());
         assertFalse(refreshToken.isRevoked());
         assertEquals(savedUser, refreshToken.getUser());
         assertTrue(refreshToken.getExpiresAt().isAfter(Instant.now()));
 
         assertEquals("access-123", response.accessToken());
-        assertEquals(refreshToken.getToken(), response.refreshToken());
+        assertNotEquals(refreshToken.getToken(), response.refreshToken());
         assertEquals("Bearer", response.tokenType());
         assertEquals(900L, response.expiresIn());
     }
@@ -138,12 +144,13 @@ class AuthServiceTest {
     @Test
     void refreshThrowsWhenTokenIsRevoked() {
         User user = createUser("user@example.com", "stored-hash");
-        RefreshToken existing = createRefreshToken("revoked-token", user, Instant.now().plusSeconds(60), true);
-        when(refreshTokenRepository.findByToken("revoked-token")).thenReturn(Optional.of(existing));
+        String rawToken = "revoked-token";
+        RefreshToken existing = createRefreshToken(hashRefreshToken(rawToken), user, Instant.now().plusSeconds(60), true);
+        when(refreshTokenRepository.findByToken(hashRefreshToken(rawToken))).thenReturn(Optional.of(existing));
 
         assertThrows(
                 InvalidRefreshTokenException.class,
-                () -> authService.refresh("revoked-token")
+                () -> authService.refresh(rawToken)
         );
 
         verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
@@ -152,12 +159,13 @@ class AuthServiceTest {
     @Test
     void refreshThrowsWhenTokenIsExpired() {
         User user = createUser("user@example.com", "stored-hash");
-        RefreshToken existing = createRefreshToken("expired-token", user, Instant.now().minusSeconds(60), false);
-        when(refreshTokenRepository.findByToken("expired-token")).thenReturn(Optional.of(existing));
+        String rawToken = "expired-token";
+        RefreshToken existing = createRefreshToken(hashRefreshToken(rawToken), user, Instant.now().minusSeconds(60), false);
+        when(refreshTokenRepository.findByToken(hashRefreshToken(rawToken))).thenReturn(Optional.of(existing));
 
         assertThrows(
                 InvalidRefreshTokenException.class,
-                () -> authService.refresh("expired-token")
+                () -> authService.refresh(rawToken)
         );
 
         verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
@@ -166,13 +174,15 @@ class AuthServiceTest {
     @Test
     void refreshRevokesOldTokenAndIssuesNewOne() {
         User user = createUser("user@example.com", "stored-hash");
-        RefreshToken existing = createRefreshToken("old-refresh", user, Instant.now().plusSeconds(60), false);
-        when(refreshTokenRepository.findByToken("old-refresh")).thenReturn(Optional.of(existing));
+        String oldRefreshRaw = "old-refresh";
+        String oldRefreshHashed = hashRefreshToken(oldRefreshRaw);
+        RefreshToken existing = createRefreshToken(oldRefreshHashed, user, Instant.now().plusSeconds(60), false);
+        when(refreshTokenRepository.findByToken(oldRefreshHashed)).thenReturn(Optional.of(existing));
         when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(jwtService.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("new-access");
         when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(900L);
 
-        TokenResponse response = authService.refresh("old-refresh");
+        TokenResponse response = authService.refresh(oldRefreshRaw);
 
         verify(refreshTokenRepository, times(2)).save(refreshTokenCaptor.capture());
         List<RefreshToken> savedTokens = refreshTokenCaptor.getAllValues();
@@ -182,10 +192,35 @@ class AuthServiceTest {
         assertTrue(revokedOldToken.isRevoked());
         assertFalse(newToken.isRevoked());
         assertEquals(user, newToken.getUser());
-        assertNotEquals("old-refresh", newToken.getToken());
+        assertNotEquals(oldRefreshRaw, newToken.getToken());
+        assertEquals(hashRefreshToken(response.refreshToken()), newToken.getToken());
 
         assertEquals("new-access", response.accessToken());
-        assertEquals(newToken.getToken(), response.refreshToken());
+        assertNotEquals(newToken.getToken(), response.refreshToken());
+    }
+
+    @Test
+    void refreshSupportsLegacyRawTokenStorage() {
+        User user = createUser("user@example.com", "stored-hash");
+        String legacyRawToken = "legacy-raw-token";
+        RefreshToken existing = createRefreshToken(legacyRawToken, user, Instant.now().plusSeconds(60), false);
+        when(refreshTokenRepository.findByToken(hashRefreshToken(legacyRawToken))).thenReturn(Optional.empty());
+        when(refreshTokenRepository.findByToken(legacyRawToken)).thenReturn(Optional.of(existing));
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtService.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("new-access");
+        when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(900L);
+
+        TokenResponse response = authService.refresh(legacyRawToken);
+
+        verify(refreshTokenRepository, times(2)).save(refreshTokenCaptor.capture());
+        List<RefreshToken> savedTokens = refreshTokenCaptor.getAllValues();
+        RefreshToken revokedOldToken = savedTokens.get(0);
+        RefreshToken newToken = savedTokens.get(1);
+
+        assertTrue(revokedOldToken.isRevoked());
+        assertEquals(legacyRawToken, revokedOldToken.getToken());
+        assertEquals(hashRefreshToken(response.refreshToken()), newToken.getToken());
+        assertEquals("new-access", response.accessToken());
     }
 
     private static User createUser(String email, String password) {
@@ -213,6 +248,16 @@ class AuthServiceTest {
             idField.setAccessible(true);
             idField.set(user, id);
         } catch (ReflectiveOperationException ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    private static String hashRefreshToken(String rawToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (NoSuchAlgorithmException ex) {
             throw new RuntimeException(ex);
         }
     }

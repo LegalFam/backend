@@ -8,6 +8,9 @@ import com.legalfam.backend.auth.token.RefreshToken;
 import com.legalfam.backend.auth.token.RefreshTokenRepository;
 import com.legalfam.backend.user.User;
 import com.legalfam.backend.user.UserRepository;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
@@ -70,8 +73,10 @@ public class AuthService {
 
     @Transactional
     public TokenResponse refresh(String refreshTokenValue) {
+        String tokenHash = hashRefreshToken(refreshTokenValue);
         RefreshToken refreshToken = refreshTokenRepository
-                .findByToken(refreshTokenValue)
+                .findByToken(tokenHash)
+                .or(() -> refreshTokenRepository.findByToken(refreshTokenValue))
                 .orElseThrow(InvalidRefreshTokenException::new);
 
         if (refreshToken.isRevoked() || refreshToken.getExpiresAt().isBefore(Instant.now())) {
@@ -94,14 +99,25 @@ public class AuthService {
         byte[] randomBytes = new byte[64];
         secureRandom.nextBytes(randomBytes);
         String tokenValue = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+        String tokenHash = hashRefreshToken(tokenValue);
 
         RefreshToken refreshToken = new RefreshToken();
-        refreshToken.setToken(tokenValue);
+        refreshToken.setToken(tokenHash);
         refreshToken.setRevoked(false);
         refreshToken.setExpiresAt(Instant.now().plusMillis(refreshTokenExpirationMs));
         refreshToken.setUser(user);
 
         refreshTokenRepository.save(refreshToken);
         return tokenValue;
+    }
+
+    private String hashRefreshToken(String rawToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 algorithm is unavailable", ex);
+        }
     }
 }

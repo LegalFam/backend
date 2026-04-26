@@ -20,10 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Users")
 public class UserController {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
-    public UserController(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public UserController(UserService userService) {
+        this.userService = userService;
     }
 
     @GetMapping
@@ -38,8 +38,6 @@ public class UserController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public List<UserResponse> getAllUsers() {
-        return userRepository.findAll().stream()
-                .map(user -> new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone()))
-                .toList();
+        return userService.getAllUsers();
     }
 }

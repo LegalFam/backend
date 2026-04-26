@@ -7,5 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ChatCitationRepository extends JpaRepository<ChatCitation, UUID> {
     List<ChatCitation> findByChatMessageIdOrderByIdAsc(UUID chatMessageId);
+
+    List<ChatCitation> findByChatMessageIdInOrderByChatMessageIdAscIdAsc(List<UUID> chatMessageIds);
 }
 

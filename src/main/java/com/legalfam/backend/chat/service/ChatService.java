@@ -22,8 +22,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
@@ -99,15 +102,25 @@ public class ChatService {
     @Transactional(readOnly = true)
     public List<ChatMessageResponse> listMessages(UUID userId, UUID sessionId) {
         ChatSession session = assertSessionOwnership(userId, sessionId);
+        List<ChatMessage> messages = chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(session.getId());
+        if (messages.isEmpty()) {
+            return List.of();
+        }
 
-        return chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(session.getId()).stream()
+        List<UUID> messageIds = messages.stream().map(ChatMessage::getId).toList();
+        Map<UUID, List<ChatCitation>> citationsByMessageId = chatCitationRepository
+                .findByChatMessageIdInOrderByChatMessageIdAscIdAsc(messageIds)
+                .stream()
+                .collect(Collectors.groupingBy(citation -> citation.getChatMessage().getId()));
+
+        return messages.stream()
                 .map(message -> new ChatMessageResponse(
                         message.getId(),
                         message.getRole().name(),
                         message.getContent(),
                         message.getRating(),
                         message.getCreatedAt(),
-                        mapCitations(chatCitationRepository.findByChatMessageIdOrderByIdAsc(message.getId()))
+                        mapCitations(citationsByMessageId.getOrDefault(message.getId(), Collections.emptyList()))
                 ))
                 .toList();
     }

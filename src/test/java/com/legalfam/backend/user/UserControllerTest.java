@@ -6,7 +6,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.legalfam.backend.user.dto.UserResponse;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,23 +21,20 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class UserControllerTest {
 
     @Mock
-    private UserRepository userRepository;
+    private UserService userService;
 
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new UserController(userRepository)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new UserController(userService)).build();
     }
 
     @Test
     void getAllUsersReturnsOnlyPublicFields() throws Exception {
-        User user = new User();
-        user.setEmail("user@example.com");
-        user.setPassword("hashed-password");
-        user.setName("Juan");
-        user.setPhone("900000000");
-        when(userRepository.findAll()).thenReturn(List.of(user));
+        when(userService.getAllUsers()).thenReturn(List.of(
+                new UserResponse(UUID.randomUUID(), "user@example.com", "Juan", "900000000")
+        ));
 
         mockMvc.perform(get("/api/v1/users"))
                 .andExpect(status().isOk())
