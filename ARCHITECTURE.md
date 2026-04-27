@@ -171,13 +171,17 @@ src/main/java/com/legalfam/backend
 - `api/ChatController`
 - `api/handler/ChatExceptionHandler`
 - `config/AsyncConfig`
+- `config/ChatRabbitConfig`
 - `integration/N8nWebhookClient`
 - `integration/ChatAsyncProcessor`
+- `integration/ChatLocalAsyncProcessor`
+- `integration/ChatMessageEventProcessor`
 - `sse/ChatSseEmitterService`
 - `persistence/ChatSessionRepository`
 - `persistence/ChatMessageRepository`
 - `persistence/ChatCitationRepository`
 - `adapter/events/SpringChatEventPublisherAdapter`
+- `adapter/events/RabbitChatEventPublisherAdapter`
 - `adapter/persistence/JpaChatPersistenceAdapter`
 
 ## Test Structure (Mirrors Modules)
@@ -201,32 +205,46 @@ This section explains how to model this project with C4: **Context -> Containers
 ### 1) System Context (C4 Level 1)
 Model the backend as a single system and show external actors/systems:
 - **Actors**
-- Web client / mobile client (consumes REST + SSE)
+- `Vulnerable User`: uses the app to ask legal questions in the Family Law domain.
+- `Administrator`: uploads and curates legal files for the RAG knowledge base.
 - **External systems**
-- PostgreSQL (persistent data)
-- n8n webhook endpoint (chat assistant upstream)
+- `Gemini API` (LLM + File Search capabilities used by the RAG flow)
 - **System under design**
 - `LegalFam Backend API` (Spring Boot service)
 
 Relationships:
-- Client -> Backend API (`HTTPS`, JSON REST, SSE for chat updates)
+- Vulnerable User -> Backend API (`HTTPS`, JSON REST, SSE for chat updates)
+- Administrator -> Backend API (`HTTPS`, admin/integration operations for ingestion workflows)
 - Backend API -> PostgreSQL (`JPA/Hibernate`)
-- Backend API -> n8n (`HTTP POST webhook`)
+- Backend API -> Gemini API (`HTTPS`, RAG/assistant operations through internal flows)
 
 ### 2) Containers (C4 Level 2)
-Inside the backend system, define runtime/deployment containers:
+Inside the deployment boundary, define runtime/deployment containers:
 - **Spring Boot Application Container**
 - Hosts modules: `auth`, `chat`, `user`, `common`
 - Exposes endpoints under `/api/v1/**`
 - Handles JWT auth, business logic, validation, error mapping
+- **n8n Container (Internal)**
+- Locally deployed and managed by your team
+- Orchestrates internal chat/RAG workflow steps
+- Invokes Gemini API and returns normalized responses to backend flows
 - **PostgreSQL Container**
 - Stores domain entities/tables (`users`, `refresh_tokens`, chat tables)
-- **External n8n Container** (outside ownership boundary)
-- Produces assistant responses consumed asynchronously
+- **RabbitMQ Container (Internal)**
+- Message broker for chat EDA.
+- Receives `chat.message.queued.v1` events and feeds chat workers/consumers.
+- **Gemini API (External Container/System)**
+- Third-party managed AI service outside your ownership boundary
 
-Optional infra containers (if modeled):
-- API Gateway / Reverse Proxy (if used in deployment)
-- Observability stack (logs/metrics/traces)
+Container connections for the C4 container diagram:
+- Vulnerable User -> Spring Boot API (`HTTPS` REST + SSE)
+- Administrator -> Spring Boot API (`HTTPS` admin/integration endpoints)
+- Spring Boot API -> PostgreSQL (`JPA/Hibernate`)
+- Spring Boot API -> RabbitMQ (`AMQP publish` on `chat.events.x` with routing key `chat.message.queued.v1`)
+- RabbitMQ -> Spring Boot API (`AMQP consume` from `chat.message.queued.q` via `ChatAsyncProcessor`)
+- Spring Boot API -> n8n (`HTTP POST` via `N8nWebhookClient` during queued message processing)
+- n8n -> Gemini API (`HTTPS`, internal workflow step managed by your team)
+- Spring Boot API -> Vulnerable User (`SSE` assistant updates via `ChatSseEmitterService`)
 
 ### 3) Components (C4 Level 3)
 Break the Spring Boot container into module components by responsibility:
@@ -242,7 +260,7 @@ Break the Spring Boot container into module components by responsibility:
 - API: `ChatController`, `ChatExceptionHandler`
 - Application: `ChatUseCase`, `ChatService`, `ChatAssistantPersistenceService`
 - Outbound ports: `ChatPersistencePort`, `ChatEventPublisherPort`
-- Adapters/infra: `JpaChatPersistenceAdapter`, `SpringChatEventPublisherAdapter`, `N8nWebhookClient`, `ChatAsyncProcessor`, `ChatSseEmitterService`
+- Adapters/infra: `JpaChatPersistenceAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `N8nWebhookClient`, `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `ChatSseEmitterService`
 - Domain: `ChatSession`, `ChatMessage`, `ChatCitation`, `ChatMessageRole`, chat exceptions
 
 #### User Components
@@ -282,6 +300,10 @@ For C4 level 4, focus on classes that carry business behavior and boundaries:
 ### Suggested Diagram Set
 - `c4-context-backend` (Level 1)
 - `c4-container-backend` (Level 2)
+- Include both actors in context/container diagrams:
+- `Vulnerable User`
+- `Administrator`
+- Show `n8n` and `RabbitMQ` as internal containers, and `Gemini API` as external
 - `c4-component-auth`, `c4-component-chat`, `c4-component-user`, `c4-component-common` (Level 3)
 - Optional class diagrams for:
 - `auth.application.service.AuthService`

@@ -109,7 +109,9 @@ Success response `202`:
 ```
 
 Notes:
-- Backend persists the user message first, then calls n8n asynchronously.
+- Backend persists the user message first, then publishes a chat event asynchronously.
+- Default mode (`CHAT_RABBIT_ENABLED=true`): publish to RabbitMQ, consume from queue, then process with n8n.
+- Fallback mode (`CHAT_RABBIT_ENABLED=false`): local async event listener processes without RabbitMQ.
 - Assistant response is persisted in DB before SSE dispatch is attempted.
 - If SSE is disconnected, frontend can recover data from `GET /api/v1/chat/sessions/{sessionId}/messages`.
 

@@ -5,26 +5,21 @@ This document describes how contributors (human or AI agents) should work in thi
 ## Scope
 
 - Backend API built with Spring Boot.
-- Primary domain currently includes authentication and users listing.
+- Main modules: `auth`, `chat`, `user`.
+- Shared cross-cutting module: `common`.
 
 ## Folder Management
 
-- Keep package-by-domain structure under `src/main/java/com/legalfam/backend`.
-- Place auth domain files in `auth/**`.
-  - Exceptions: `auth/exception/**`
-  - Exception handlers: `auth/exception/handler/**`
-  - Controllers/services/DTOs/tokens in their existing auth subpackages.
-- Place user domain files in `user/**` (controllers, repositories, DTOs).
-- Place chat domain files in `chat/**`.
-  - Exceptions: `chat/exception/**`
-  - Exception handlers: `chat/exception/handler/**`
-- Place cross-domain concerns in dedicated packages:
-  - `config/**` for security/filter/config beans.
-  - `error/**` for shared API error models and shared/common errors.
-    - Shared exceptions: `error/exception/**`
-    - Shared/global handlers: `error/handler/**`
+- Keep modular hexagonal structure under `src/main/java/com/legalfam/backend`.
+- For each business module (`auth`, `chat`, `user`), use:
+  - `domain/**` for entities/domain models and domain exceptions.
+  - `application/**` for use cases, ports, DTOs/events, and application services.
+  - `infrastructure/**` for controllers, handlers, adapters, repository interfaces, integrations, and module-level config.
+- Place cross-domain concerns in `common/**`:
+  - `common/config/**` for shared configuration.
+  - `common/error/**` for shared API error models/factories/exceptions/handlers.
 - Mirror main packages in `src/test/java/com/legalfam/backend/**`.
-- Do not place business/domain logic in `config/**`.
+- Do not place business/domain logic in `common/config/**`.
 - Add new packages only when an existing domain/shared package is clearly not appropriate.
 
 ## Core Rules
@@ -48,6 +43,12 @@ This document describes how contributors (human or AI agents) should work in thi
 ### Protected
 
 - `GET /api/v1/users`
+- `POST /api/v1/chat/sessions`
+- `GET /api/v1/chat/subscribe/{sessionId}`
+- `POST /api/v1/chat/send`
+- `GET /api/v1/chat/sessions`
+- `GET /api/v1/chat/sessions/{sessionId}/messages`
+- `PATCH /api/v1/chat/messages/{messageId}/rating`
 
 ## Security Expectations
 
@@ -64,6 +65,9 @@ This document describes how contributors (human or AI agents) should work in thi
 Current relevant tables:
 - `users`
 - `refresh_tokens`
+- `chat_sessions`
+- `chat_messages`
+- `chat_citations`
 
 ## Swagger / OpenAPI
 
@@ -84,11 +88,14 @@ Current relevant tables:
 When adding or changing endpoints:
 
 1. Update controller + service + DTOs.
-2. Add or update a domain-scoped exception handler (`@RestControllerAdvice(basePackages = "<domain-package>")`) for domain-specific errors (same pattern as `auth` and `chat`).
-3. Update security rules in `SecurityConfig`.
-4. Update Swagger annotations (requests/responses/security requirement).
-5. Ensure protected routes require Bearer token.
-6. Update `README.md` with new endpoint usage.
+2. Add/update `application` ports if new use cases/integrations are needed.
+3. Add/update infrastructure adapters for outbound ports.
+4. Add or update a domain-scoped exception handler (`@RestControllerAdvice(basePackages = "<domain-package>")`) for domain-specific errors (same pattern as `auth` and `chat`).
+5. Update security rules in `SecurityConfig`.
+6. For chat asynchronous flows, update RabbitMQ topology/properties/listeners if message contracts change.
+7. Update Swagger annotations (requests/responses/security requirement).
+8. Ensure protected routes require Bearer token.
+9. Update `README.md` with new endpoint usage.
 
 ## Local Run
 

@@ -8,6 +8,7 @@ Spring Boot backend with email/password authentication, JWT access tokens, refre
 - Spring Boot 4.0.5
 - Spring Security
 - Spring Data JPA
+- Spring AMQP (RabbitMQ)
 - PostgreSQL
 - JWT (`io.jsonwebtoken`)
 - Swagger / OpenAPI (`springdoc`)
@@ -33,6 +34,12 @@ CORS_ALLOWED_ORIGINS=*
 N8N_WEBHOOK_URL=http://localhost:5678/webhook/chat-process
 N8N_AUTH_HEADER_NAME=X-N8N-Token
 N8N_AUTH_TOKEN=your-shared-secret
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USER=guest
+RABBITMQ_PASSWORD=guest
+RABBITMQ_VHOST=/
+CHAT_RABBIT_ENABLED=true
 ```
 
 Notes:
@@ -40,7 +47,9 @@ Notes:
 - 64+ random characters is recommended for production.
 - `CORS_ALLOWED_ORIGINS=*` allows all origins (current default behavior).
 - To allow only one origin later, set for example `CORS_ALLOWED_ORIGINS=http://localhost:3000`.
-- `POST /api/v1/chat/send` sends the message to `N8N_WEBHOOK_URL` asynchronously.
+- `POST /api/v1/chat/send` enqueues message processing asynchronously.
+- With `CHAT_RABBIT_ENABLED=true` (default), chat processing is EDA through RabbitMQ.
+- With `CHAT_RABBIT_ENABLED=false`, the backend uses local async event processing.
 - Database schema migrations are managed manually (not by Flyway).
 
 ## Run Locally
@@ -145,7 +154,8 @@ curl http://localhost:8080/api/v1/users \
 
 ### Send chat message (protected, async)
 
-Configure `N8N_WEBHOOK_URL` (`N8N_AUTH_TOKEN` optional).
+Configure `N8N_WEBHOOK_URL` (`N8N_AUTH_TOKEN` optional).  
+By default this request is published to RabbitMQ and processed asynchronously by a consumer.
 `sessionId` is required.
 
 ```bash
@@ -233,3 +243,10 @@ Configured in `src/main/resources/application.properties`:
 - Refresh token: `604800000` ms (7 days)
 
 Refresh token rotation is enabled: each successful refresh revokes the old refresh token and issues a new one.
+
+## Architecture Docs
+
+- See [ARCHITECTURE.md](ARCHITECTURE.md) for:
+- Modular hexagonal structure (`domain`, `application`, `infrastructure`, `common`)
+- C4 model (Context, Containers, Components, main classes)
+- RabbitMQ EDA flow for chat module
