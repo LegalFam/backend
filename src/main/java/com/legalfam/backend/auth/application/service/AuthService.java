@@ -2,14 +2,14 @@ package com.legalfam.backend.auth.application.service;
 
 import com.legalfam.backend.auth.application.port.in.AuthUseCase;
 import com.legalfam.backend.auth.application.port.out.AccessTokenPort;
-import com.legalfam.backend.auth.application.port.out.AuthUserPort;
+import com.legalfam.backend.auth.application.port.out.UserPort;
 import com.legalfam.backend.auth.application.port.out.RefreshTokenPort;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
-import com.legalfam.backend.user.domain.model.User;
+import com.legalfam.backend.auth.domain.model.User;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService implements AuthUseCase {
 
-    private final AuthUserPort authUserPort;
+    private final UserPort userPort;
     private final RefreshTokenPort refreshTokenPort;
     private final PasswordEncoder passwordEncoder;
     private final AccessTokenPort accessTokenPort;
@@ -31,23 +31,23 @@ public class AuthService implements AuthUseCase {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(
-            AuthUserPort authUserPort,
+            UserPort userPort,
             RefreshTokenPort refreshTokenPort,
             PasswordEncoder passwordEncoder,
             AccessTokenPort accessTokenPort,
-            @org.springframework.beans.factory.annotation.Value("${app.jwt.refresh-token-expiration-ms}") long refreshTokenExpirationMs
+            AuthTokenProperties authTokenProperties
     ) {
-        this.authUserPort = authUserPort;
+        this.userPort = userPort;
         this.refreshTokenPort = refreshTokenPort;
         this.passwordEncoder = passwordEncoder;
         this.accessTokenPort = accessTokenPort;
-        this.refreshTokenExpirationMs = refreshTokenExpirationMs;
+        this.refreshTokenExpirationMs = authTokenProperties.refreshTokenExpirationMs();
     }
 
     @Override
     @Transactional
     public TokenResponse signup(String email, String rawPassword, String name, String phone) {
-        if (authUserPort.existsByEmail(email)) {
+        if (userPort.existsByEmail(email)) {
             throw new EmailAlreadyExistsException(email);
         }
 
@@ -57,14 +57,14 @@ public class AuthService implements AuthUseCase {
         user.setName(name);
         user.setPhone(phone);
 
-        User savedUser = authUserPort.save(user);
+        User savedUser = userPort.save(user);
         return issueTokens(savedUser);
     }
 
     @Override
     @Transactional
     public TokenResponse login(String email, String rawPassword) {
-        User user = authUserPort
+        User user = userPort
                 .findByEmail(email)
                 .orElseThrow(InvalidCredentialsException::new);
 
@@ -91,7 +91,9 @@ public class AuthService implements AuthUseCase {
         refreshToken.setRevoked(true);
         refreshTokenPort.save(refreshToken);
 
-        return issueTokens(refreshToken.getUser());
+        User user = userPort.findById(refreshToken.getUserId())
+                .orElseThrow(InvalidRefreshTokenException::new);
+        return issueTokens(user);
     }
 
     private TokenResponse issueTokens(User user) {
@@ -115,7 +117,7 @@ public class AuthService implements AuthUseCase {
         refreshToken.setToken(tokenHash);
         refreshToken.setRevoked(false);
         refreshToken.setExpiresAt(Instant.now().plusMillis(refreshTokenExpirationMs));
-        refreshToken.setUser(user);
+        refreshToken.setUserId(user.getId());
 
         refreshTokenPort.save(refreshToken);
         return tokenValue;

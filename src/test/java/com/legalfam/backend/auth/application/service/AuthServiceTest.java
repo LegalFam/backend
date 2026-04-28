@@ -14,14 +14,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.legalfam.backend.auth.application.port.out.AccessTokenPort;
-import com.legalfam.backend.auth.application.port.out.AuthUserPort;
+import com.legalfam.backend.auth.application.port.out.UserPort;
 import com.legalfam.backend.auth.application.port.out.RefreshTokenPort;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
-import com.legalfam.backend.user.domain.model.User;
+import com.legalfam.backend.auth.domain.model.User;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -45,7 +45,7 @@ class AuthServiceTest {
     private static final long REFRESH_EXPIRATION_MS = 86_400_000L;
 
     @Mock
-    private AuthUserPort authUserPort;
+    private UserPort userPort;
     @Mock
     private RefreshTokenPort refreshTokenPort;
     @Mock
@@ -63,33 +63,33 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         authService = new AuthService(
-                authUserPort,
+                userPort,
                 refreshTokenPort,
                 passwordEncoder,
                 accessTokenPort,
-                REFRESH_EXPIRATION_MS
+                new AuthTokenProperties(REFRESH_EXPIRATION_MS)
         );
     }
 
     @Test
     void signupThrowsWhenEmailAlreadyExists() {
-        when(authUserPort.existsByEmail("user@example.com")).thenReturn(true);
+        when(userPort.existsByEmail("user@example.com")).thenReturn(true);
 
         assertThrows(
                 EmailAlreadyExistsException.class,
                 () -> authService.signup("user@example.com", "secret", "Juan", "900000000")
         );
 
-        verify(authUserPort, never()).save(any(User.class));
+        verify(userPort, never()).save(any(User.class));
     }
 
     @Test
     void signupCreatesUserAndReturnsTokens() {
-        when(authUserPort.existsByEmail("user@example.com")).thenReturn(false);
+        when(userPort.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode("secret")).thenReturn("hashed-password");
-        when(authUserPort.save(any(User.class))).thenAnswer(invocation -> {
+        when(userPort.save(any(User.class))).thenAnswer(invocation -> {
             User saved = invocation.getArgument(0);
-            setUserId(saved, UUID.randomUUID());
+            saved.setId(UUID.randomUUID());
             return saved;
         });
         when(accessTokenPort.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("access-123");
@@ -98,7 +98,7 @@ class AuthServiceTest {
 
         TokenResponse response = authService.signup("user@example.com", "secret", "Juan", "900000000");
 
-        verify(authUserPort).save(userCaptor.capture());
+        verify(userPort).save(userCaptor.capture());
         User savedUser = userCaptor.getValue();
         assertEquals("user@example.com", savedUser.getEmail());
         assertEquals("hashed-password", savedUser.getPassword());
@@ -111,7 +111,7 @@ class AuthServiceTest {
         assertNotEquals(response.refreshToken(), refreshToken.getToken());
         assertEquals(hashRefreshToken(response.refreshToken()), refreshToken.getToken());
         assertFalse(refreshToken.isRevoked());
-        assertEquals(savedUser, refreshToken.getUser());
+        assertEquals(savedUser.getId(), refreshToken.getUserId());
         assertTrue(refreshToken.getExpiresAt().isAfter(Instant.now()));
 
         assertEquals("access-123", response.accessToken());
@@ -122,7 +122,7 @@ class AuthServiceTest {
 
     @Test
     void loginThrowsWhenUserDoesNotExist() {
-        when(authUserPort.findByEmail("missing@example.com")).thenReturn(Optional.empty());
+        when(userPort.findByEmail("missing@example.com")).thenReturn(Optional.empty());
 
         assertThrows(
                 InvalidCredentialsException.class,
@@ -133,7 +133,7 @@ class AuthServiceTest {
     @Test
     void loginThrowsWhenPasswordDoesNotMatch() {
         User user = createUser("user@example.com", "stored-hash");
-        when(authUserPort.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(userPort.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong-password", "stored-hash")).thenReturn(false);
 
         assertThrows(
@@ -179,6 +179,7 @@ class AuthServiceTest {
         String oldRefreshHashed = hashRefreshToken(oldRefreshRaw);
         RefreshToken existing = createRefreshToken(oldRefreshHashed, user, Instant.now().plusSeconds(60), false);
         when(refreshTokenPort.findByToken(oldRefreshHashed)).thenReturn(Optional.of(existing));
+        when(userPort.findById(user.getId())).thenReturn(Optional.of(user));
         when(refreshTokenPort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(accessTokenPort.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("new-access");
         when(accessTokenPort.getAccessTokenExpirationSeconds()).thenReturn(900L);
@@ -192,7 +193,7 @@ class AuthServiceTest {
 
         assertTrue(revokedOldToken.isRevoked());
         assertFalse(newToken.isRevoked());
-        assertEquals(user, newToken.getUser());
+        assertEquals(user.getId(), newToken.getUserId());
         assertNotEquals(oldRefreshRaw, newToken.getToken());
         assertEquals(hashRefreshToken(response.refreshToken()), newToken.getToken());
 
@@ -207,6 +208,7 @@ class AuthServiceTest {
         RefreshToken existing = createRefreshToken(legacyRawToken, user, Instant.now().plusSeconds(60), false);
         when(refreshTokenPort.findByToken(hashRefreshToken(legacyRawToken))).thenReturn(Optional.empty());
         when(refreshTokenPort.findByToken(legacyRawToken)).thenReturn(Optional.of(existing));
+        when(userPort.findById(user.getId())).thenReturn(Optional.of(user));
         when(refreshTokenPort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(accessTokenPort.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("new-access");
         when(accessTokenPort.getAccessTokenExpirationSeconds()).thenReturn(900L);
@@ -226,7 +228,7 @@ class AuthServiceTest {
 
     private static User createUser(String email, String password) {
         User user = new User();
-        setUserId(user, UUID.randomUUID());
+        user.setId(UUID.randomUUID());
         user.setEmail(email);
         user.setPassword(password);
         user.setName("Test User");
@@ -237,20 +239,10 @@ class AuthServiceTest {
     private static RefreshToken createRefreshToken(String token, User user, Instant expiresAt, boolean revoked) {
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setToken(token);
-        refreshToken.setUser(user);
+        refreshToken.setUserId(user.getId());
         refreshToken.setExpiresAt(expiresAt);
         refreshToken.setRevoked(revoked);
         return refreshToken;
-    }
-
-    private static void setUserId(User user, UUID id) {
-        try {
-            java.lang.reflect.Field idField = User.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(user, id);
-        } catch (ReflectiveOperationException ex) {
-            throw new RuntimeException(ex);
-        }
     }
 
     private static String hashRefreshToken(String rawToken) {

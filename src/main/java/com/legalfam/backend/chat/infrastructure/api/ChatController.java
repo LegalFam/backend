@@ -6,9 +6,9 @@ import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
+import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.infrastructure.sse.ChatSseEmitterService;
 import com.legalfam.backend.common.error.ApiError;
-import com.legalfam.backend.common.error.exception.InvalidRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -107,11 +107,11 @@ public class ChatController {
     ) {
         if (request == null || request.message() == null || request.message().isBlank()) {
             log.warn("Chat request rejected: blank message");
-            throw new InvalidRequestException("Message is required");
+            throw new InvalidChatRequestException("Message is required");
         }
         if (request.sessionId() == null) {
             log.warn("Chat request rejected: missing sessionId");
-            throw new InvalidRequestException("Session id is required");
+            throw new InvalidChatRequestException("Session id is required");
         }
 
         UUID userId = parsePrincipalUserId(principalUserId);
@@ -187,12 +187,12 @@ public class ChatController {
 
     private UUID parsePrincipalUserId(String principalUserId) {
         if (principalUserId == null || principalUserId.isBlank()) {
-            throw new InvalidRequestException("Authenticated user is required");
+            throw new InvalidChatRequestException("Authenticated user is required");
         }
         try {
             return UUID.fromString(principalUserId.trim());
         } catch (IllegalArgumentException ex) {
-            throw new InvalidRequestException("Authenticated user id is invalid");
+            throw new InvalidChatRequestException("Authenticated user id is invalid");
         }
     }
 }

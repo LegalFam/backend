@@ -2,7 +2,6 @@ package com.legalfam.backend.common.error.handler;
 
 import com.legalfam.backend.common.error.ApiError;
 import com.legalfam.backend.common.error.ApiErrorFactory;
-import com.legalfam.backend.common.error.exception.InvalidRequestException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,18 +17,6 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-    @ExceptionHandler(InvalidRequestException.class)
-    public ResponseEntity<ApiError> handleInvalidRequest(InvalidRequestException ex, HttpServletRequest request) {
-        log.warn("Invalid request: path={}, message={}", request.getRequestURI(), ex.getMessage());
-        return buildResponse(
-                HttpStatus.BAD_REQUEST,
-                "validation_error",
-                "invalid_request",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-    }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleMalformedJson(HttpServletRequest request) {

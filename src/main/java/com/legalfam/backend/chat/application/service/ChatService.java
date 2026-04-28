@@ -3,6 +3,7 @@ package com.legalfam.backend.chat.application.service;
 import com.legalfam.backend.chat.application.port.in.ChatUseCase;
 import com.legalfam.backend.chat.application.port.out.ChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.ChatUserLookupPort;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
@@ -10,12 +11,11 @@ import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.domain.exception.ChatAccessDeniedException;
 import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
+import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
-import com.legalfam.backend.common.error.exception.InvalidRequestException;
-import com.legalfam.backend.user.domain.model.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
@@ -30,28 +30,30 @@ public class ChatService implements ChatUseCase {
 
     private final ChatPersistencePort chatPersistencePort;
     private final ChatEventPublisherPort chatEventPublisherPort;
+    private final ChatUserLookupPort chatUserLookupPort;
 
     public ChatService(
             ChatPersistencePort chatPersistencePort,
-            ChatEventPublisherPort chatEventPublisherPort
+            ChatEventPublisherPort chatEventPublisherPort,
+            ChatUserLookupPort chatUserLookupPort
     ) {
         this.chatPersistencePort = chatPersistencePort;
         this.chatEventPublisherPort = chatEventPublisherPort;
+        this.chatUserLookupPort = chatUserLookupPort;
     }
 
     @Override
     @Transactional
     public ChatSendAcceptedResponse send(UUID userId, String messageInput, UUID sessionId) {
         if (sessionId == null) {
-            throw new InvalidRequestException("Session id is required");
+            throw new InvalidChatRequestException("Session id is required");
         }
-        User user = chatPersistencePort.findUserById(userId)
-                .orElseThrow(() -> new ChatAccessDeniedException("Authenticated user not found"));
-        ChatSession chatSession = assertSessionOwnership(user.getId(), sessionId);
+        assertUserExists(userId);
+        ChatSession chatSession = assertSessionOwnership(userId, sessionId);
         Instant now = Instant.now();
 
         ChatMessage userMessage = new ChatMessage();
-        userMessage.setChatSession(chatSession);
+        userMessage.setChatSessionId(chatSession.getId());
         userMessage.setRole(ChatMessageRole.USER);
         userMessage.setContent(messageInput);
         userMessage.setCreatedAt(now);
@@ -67,11 +69,10 @@ public class ChatService implements ChatUseCase {
     @Override
     @Transactional
     public ChatSessionResponse createSession(UUID userId) {
-        User user = chatPersistencePort.findUserById(userId)
-                .orElseThrow(() -> new ChatAccessDeniedException("Authenticated user not found"));
+        assertUserExists(userId);
         Instant now = Instant.now();
         ChatSession session = new ChatSession();
-        session.setUser(user);
+        session.setUserId(userId);
         session.setCreatedAt(now);
         session.setUpdatedAt(now);
         session = chatPersistencePort.saveSession(session);
@@ -103,7 +104,7 @@ public class ChatService implements ChatUseCase {
         Map<UUID, List<ChatCitation>> citationsByMessageId = chatPersistencePort
                 .findCitationsByMessageIdsOrderByMessageIdAndId(messageIds)
                 .stream()
-                .collect(Collectors.groupingBy(citation -> citation.getChatMessage().getId()));
+                .collect(Collectors.groupingBy(ChatCitation::getChatMessageId));
 
         return messages.stream()
                 .map(message -> new ChatMessageResponse(
@@ -121,16 +122,18 @@ public class ChatService implements ChatUseCase {
     @Transactional
     public void rateMessage(UUID userId, UUID messageId, ChatRateMessageRequest request) {
         if (request == null || request.rating() == null) {
-            throw new InvalidRequestException("Rating is required");
+            throw new InvalidChatRequestException("Rating is required");
         }
         if (request.rating() < 1 || request.rating() > 5) {
-            throw new InvalidRequestException("Rating must be between 1 and 5");
+            throw new InvalidChatRequestException("Rating must be between 1 and 5");
         }
 
         ChatMessage message = chatPersistencePort.findMessageById(messageId)
                 .orElseThrow(() -> new ChatNotFoundException("Chat message not found"));
 
-        UUID ownerId = message.getChatSession().getUser().getId();
+        ChatSession messageSession = chatPersistencePort.findSessionById(message.getChatSessionId())
+                .orElseThrow(() -> new ChatNotFoundException("Chat session not found"));
+        UUID ownerId = messageSession.getUserId();
         if (!ownerId.equals(userId)) {
             throw new ChatAccessDeniedException("Access is forbidden");
         }
@@ -149,10 +152,16 @@ public class ChatService implements ChatUseCase {
         ChatSession session = chatPersistencePort.findSessionById(sessionId)
                 .orElseThrow(() -> new ChatNotFoundException("Chat session not found"));
 
-        if (!session.getUser().getId().equals(userId)) {
+        if (!session.getUserId().equals(userId)) {
             throw new ChatAccessDeniedException("Access is forbidden");
         }
         return session;
+    }
+
+    private void assertUserExists(UUID userId) {
+        if (!chatUserLookupPort.existsById(userId)) {
+            throw new ChatAccessDeniedException("Authenticated user not found");
+        }
     }
 
     private List<ChatCitationResponse> mapCitations(List<ChatCitation> citations) {

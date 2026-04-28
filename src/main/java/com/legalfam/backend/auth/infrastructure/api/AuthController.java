@@ -5,8 +5,8 @@ import com.legalfam.backend.auth.application.dto.LoginRequest;
 import com.legalfam.backend.auth.application.dto.RefreshTokenRequest;
 import com.legalfam.backend.auth.application.dto.SignupRequest;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
+import com.legalfam.backend.auth.domain.exception.InvalidAuthRequestException;
 import com.legalfam.backend.common.error.ApiError;
-import com.legalfam.backend.common.error.exception.InvalidRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -48,10 +48,10 @@ public class AuthController {
     public ResponseEntity<TokenResponse> signup(@RequestBody(required = false) SignupRequest request) {
         if (request == null || isBlank(request.email()) || isBlank(request.password())
                 || isBlank(request.name()) || isBlank(request.phone())) {
-            throw new InvalidRequestException("Email, password, name and phone are required");
+            throw new InvalidAuthRequestException("Email, password, name and phone are required");
         }
         if (!isValidEmail(request.email().trim())) {
-            throw new InvalidRequestException("Valid email is required");
+            throw new InvalidAuthRequestException("Valid email is required");
         }
 
         TokenResponse tokens = authUseCase.signup(
@@ -75,10 +75,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@RequestBody(required = false) LoginRequest request) {
         if (request == null || isBlank(request.email()) || isBlank(request.password())) {
-            throw new InvalidRequestException("Email and password are required");
+            throw new InvalidAuthRequestException("Email and password are required");
         }
         if (!isValidEmail(request.email().trim())) {
-            throw new InvalidRequestException("Valid email is required");
+            throw new InvalidAuthRequestException("Valid email is required");
         }
 
         TokenResponse tokens = authUseCase.login(request.email().trim(), request.password());
@@ -97,7 +97,7 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<TokenResponse> refresh(@RequestBody(required = false) RefreshTokenRequest request) {
         if (request == null || isBlank(request.refreshToken())) {
-            throw new InvalidRequestException("Refresh token is required");
+            throw new InvalidAuthRequestException("Refresh token is required");
         }
 
         TokenResponse tokens = authUseCase.refresh(request.refreshToken().trim());

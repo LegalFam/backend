@@ -1,10 +1,10 @@
 package com.legalfam.backend.chat.infrastructure.integration;
 
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
+import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
+import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
-import com.legalfam.backend.chat.application.service.ChatAssistantPersistenceService;
-import com.legalfam.backend.chat.application.service.ChatAssistantPersistenceService.ChatAssistantErrorDispatch;
-import com.legalfam.backend.chat.application.service.ChatAssistantPersistenceService.ChatAssistantMessageDispatch;
+import com.legalfam.backend.chat.application.port.in.ChatAssistantPersistenceUseCase;
 import com.legalfam.backend.chat.infrastructure.sse.ChatSseEmitterService;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,16 +20,16 @@ public class ChatMessageEventProcessor {
     private static final Logger log = LoggerFactory.getLogger(ChatMessageEventProcessor.class);
 
     private final N8nWebhookClient n8nWebhookClient;
-    private final ChatAssistantPersistenceService chatAssistantPersistenceService;
+    private final ChatAssistantPersistenceUseCase chatAssistantPersistenceUseCase;
     private final ChatSseEmitterService chatSseEmitterService;
 
     public ChatMessageEventProcessor(
             N8nWebhookClient n8nWebhookClient,
-            ChatAssistantPersistenceService chatAssistantPersistenceService,
+            ChatAssistantPersistenceUseCase chatAssistantPersistenceUseCase,
             ChatSseEmitterService chatSseEmitterService
     ) {
         this.n8nWebhookClient = n8nWebhookClient;
-        this.chatAssistantPersistenceService = chatAssistantPersistenceService;
+        this.chatAssistantPersistenceUseCase = chatAssistantPersistenceUseCase;
         this.chatSseEmitterService = chatSseEmitterService;
     }
 
@@ -62,7 +62,7 @@ public class ChatMessageEventProcessor {
         }
 
         List<ChatCitationResponse> citations = extractCitations(root.get("citations"));
-        ChatAssistantMessageDispatch dispatch = chatAssistantPersistenceService.persistAssistantMessage(
+        ChatAssistantMessageDispatch dispatch = chatAssistantPersistenceUseCase.persistAssistantMessage(
                 chatSessionId,
                 message,
                 citations
@@ -75,7 +75,7 @@ public class ChatMessageEventProcessor {
     }
 
     private void persistAndDispatchFailure(UUID chatSessionId, String errorCode, String errorMessage) {
-        ChatAssistantErrorDispatch dispatch = chatAssistantPersistenceService.persistAssistantFailure(
+        ChatAssistantErrorDispatch dispatch = chatAssistantPersistenceUseCase.persistAssistantFailure(
                 chatSessionId,
                 errorCode,
                 errorMessage

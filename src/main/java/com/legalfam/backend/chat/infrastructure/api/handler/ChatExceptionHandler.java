@@ -3,6 +3,7 @@ package com.legalfam.backend.chat.infrastructure.api.handler;
 import com.legalfam.backend.chat.domain.exception.ChatAccessDeniedException;
 import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
+import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.common.error.ApiError;
 import com.legalfam.backend.common.error.ApiErrorFactory;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,6 +52,20 @@ public class ChatExceptionHandler {
                 HttpStatus.NOT_FOUND,
                 "resource_error",
                 "not_found",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(InvalidChatRequestException.class)
+    public ResponseEntity<ApiError> handleInvalidChatRequest(
+            InvalidChatRequestException ex,
+            HttpServletRequest request
+    ) {
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "validation_error",
+                "invalid_request",
                 ex.getMessage(),
                 request.getRequestURI()
         );

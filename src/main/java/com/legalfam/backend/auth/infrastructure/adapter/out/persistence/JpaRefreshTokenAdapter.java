@@ -17,11 +17,13 @@ public class JpaRefreshTokenAdapter implements RefreshTokenPort {
 
     @Override
     public Optional<RefreshToken> findByToken(String token) {
-        return refreshTokenRepository.findByToken(token);
+        return refreshTokenRepository.findByToken(token).map(RefreshTokenEntityMapper::toDomain);
     }
 
     @Override
     public RefreshToken save(RefreshToken refreshToken) {
-        return refreshTokenRepository.save(refreshToken);
+        return RefreshTokenEntityMapper.toDomain(
+                refreshTokenRepository.save(RefreshTokenEntityMapper.toEntity(refreshToken))
+        );
     }
 }

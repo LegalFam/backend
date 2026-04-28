@@ -82,7 +82,7 @@ Open:
 1. Call `POST /api/v1/auth/login` (or `signup`) and copy `accessToken`.
 2. Click **Authorize** in Swagger.
 3. Paste only the raw token (without `Bearer `).
-4. Call protected endpoints (for example `GET /api/v1/users`).
+4. Call protected endpoints (for example `POST /api/v1/chat/sessions`).
 
 ## Authentication Flow
 
@@ -111,7 +111,6 @@ Token response format:
 
 ### Protected endpoints (Bearer token required)
 
-- `GET /api/v1/users`
 - `POST /api/v1/chat/sessions`
 - `GET /api/v1/chat/subscribe/{sessionId}`
 - `POST /api/v1/chat/send`
@@ -143,13 +142,6 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 curl -X POST http://localhost:8080/api/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refreshToken":"<your_refresh_token>"}'
-```
-
-### Get all users (protected)
-
-```bash
-curl http://localhost:8080/api/v1/users \
-  -H "Authorization: Bearer <your_access_token>"
 ```
 
 ### Send chat message (protected, async)

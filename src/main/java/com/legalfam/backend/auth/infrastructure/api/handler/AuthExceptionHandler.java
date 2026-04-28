@@ -1,6 +1,7 @@
 package com.legalfam.backend.auth.infrastructure.api.handler;
 
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
+import com.legalfam.backend.auth.domain.exception.InvalidAuthRequestException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.common.error.ApiError;
@@ -43,6 +44,20 @@ public class AuthExceptionHandler {
                 "authentication_error",
                 "invalid_refresh_token",
                 "Invalid refresh token",
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(InvalidAuthRequestException.class)
+    public ResponseEntity<ApiError> handleInvalidAuthRequest(
+            InvalidAuthRequestException ex,
+            HttpServletRequest request
+    ) {
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "validation_error",
+                "invalid_request",
+                ex.getMessage(),
                 request.getRequestURI()
         );
     }

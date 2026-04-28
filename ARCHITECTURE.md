@@ -1,80 +1,72 @@
 # Backend Architecture
 
 ## Overview
-This project is organized with a **modular hexagonal architecture**.
+This project uses a modular hexagonal architecture.
 
-Each business module (`auth`, `chat`, `user`) is split into:
-- `domain`: core business model and domain exceptions.
-- `application`: use cases, ports, and application services.
-- `infrastructure`: adapters, controllers, persistence repositories, integrations, and framework wiring.
+Business modules:
+- `auth`
+- `chat`
 
-Shared cross-cutting concerns are in:
-- `common`: global configuration and generic API error handling.
+Cross-cutting module:
+- `common`
 
-The dependency direction is:
+For each business module:
+- `domain`: core business models and domain exceptions (framework-agnostic)
+- `application`: use cases, ports, DTOs, and application services
+- `infrastructure`: controllers, adapters, repositories, integrations, and framework wiring
+
+Dependency direction:
 - `infrastructure -> application -> domain`
-- `application` depends on abstractions (`ports`), not concrete framework classes.
-- `infrastructure` provides concrete implementations of outbound ports.
+- `application` depends on abstractions (`ports`) only
+- `infrastructure` implements outbound ports
 
 ## How It Is Implemented Here
 
 ### 1) Inbound flow (HTTP -> Use Case)
-- Controllers live in `*/infrastructure/api`.
-- Controllers depend on `application/port/in/*UseCase` interfaces.
-- Application services implement those use case interfaces.
+- Controllers live in `*/infrastructure/api`
+- Controllers depend on `application/port/in/*UseCase`
+- Application services implement use case interfaces
 
 Examples:
 - `AuthController -> AuthUseCase -> AuthService`
 - `ChatController -> ChatUseCase -> ChatService`
-- `UserController -> UserQueryUseCase -> UserService`
 
 ### 2) Outbound flow (Use Case -> External systems)
-- Application services call outbound ports in `application/port/out`.
-- Infrastructure adapters implement those ports and connect to JPA repositories, Spring events, JWT, etc.
+- Application services call outbound ports in `application/port/out`
+- Infrastructure adapters implement those ports for JPA, JWT, events, and integrations
 
 Examples:
-- `AuthService` uses `AuthUserPort`, `RefreshTokenPort`, `AccessTokenPort`.
-- `ChatService` uses `ChatPersistencePort`, `ChatEventPublisherPort`.
-- `UserService` uses `UserReadPort`.
+- `AuthService` uses `UserPort`, `RefreshTokenPort`, `AccessTokenPort`
+- `ChatService` uses `ChatPersistencePort`, `ChatEventPublisherPort`, `ChatUserLookupPort`
 
 ### 3) Domain model isolation
-- JPA entities are stored in each module `domain/model`.
-- Domain exceptions are in `domain/exception`.
-- Business rules stay in application services, not in common config.
+- Domain classes are plain Java classes in `domain/model`
+- JPA entities are in `infrastructure/persistence/entity`
+- Domain exceptions are in `domain/exception`
 
-### 4) Cross-cutting concerns in `common`
-- `common/config`: shared security and OpenAPI configuration.
-- `common/error`: shared API error contract and global error handling.
-
-### 5) Module-scoped config placement
-- Chat async executor config is module-local:
-  - `chat/infrastructure/config/AsyncConfig`
-- Auth JWT filter is module-local:
-  - `auth/infrastructure/security/JwtAuthenticationFilter`
-- Shared app-level config remains in:
-  - `common/config/SecurityConfig`
-  - `common/config/OpenApiConfig`
+### 4) Cross-cutting concerns
+- `common/config`: shared OpenAPI config
+- `common/error`: shared API error contract and global error handling
+- Security wiring is isolated in `security/infrastructure` (not in `common`)
 
 ## Project Structure
 
 ```text
 src/main/java/com/legalfam/backend
-├── BackendApplication.java
-├── auth
-│   ├── domain
-│   ├── application
-│   └── infrastructure
-├── chat
-│   ├── domain
-│   ├── application
-│   └── infrastructure
-├── user
-│   ├── domain
-│   ├── application
-│   └── infrastructure
-└── common
-    ├── config
-    └── error
+|-- BackendApplication.java
+|-- auth
+|   |-- domain
+|   |-- application
+|   `-- infrastructure
+|-- chat
+|   |-- domain
+|   |-- application
+|   `-- infrastructure
+|-- security
+|   `-- infrastructure
+`-- common
+    |-- config
+    `-- error
 ```
 
 ## Class Catalog (Main Source Set)
@@ -85,22 +77,28 @@ src/main/java/com/legalfam/backend
 ### `common`
 
 #### `common/config`
-- `SecurityConfig`
 - `OpenApiConfig`
 
 #### `common/error`
 - `ApiError` (record)
 - `ApiErrorFactory`
-- `exception/InvalidRequestException`
 - `handler/GlobalExceptionHandler`
+
+### `security`
+
+#### `security/infrastructure`
+- `SecurityConfig`
+- `JwtAuthenticationFilter`
 
 ### `auth`
 
 #### `auth/domain`
+- `model/User`
 - `model/RefreshToken`
 - `exception/EmailAlreadyExistsException`
 - `exception/InvalidCredentialsException`
 - `exception/InvalidRefreshTokenException`
+- `exception/InvalidAuthRequestException`
 
 #### `auth/application`
 - `dto/LoginRequest`
@@ -108,9 +106,9 @@ src/main/java/com/legalfam/backend
 - `dto/RefreshTokenRequest`
 - `dto/TokenResponse`
 - `port/in/AuthUseCase`
-- `port/out/AccessTokenPort`
-- `port/out/AuthUserPort`
+- `port/out/UserPort`
 - `port/out/RefreshTokenPort`
+- `port/out/AccessTokenPort`
 - `port/out/TokenValidationPort`
 - `service/AuthService`
 
@@ -118,26 +116,12 @@ src/main/java/com/legalfam/backend
 - `api/AuthController`
 - `api/handler/AuthExceptionHandler`
 - `security/JwtService`
-- `security/JwtAuthenticationFilter`
-- `persistence/RefreshTokenRepository`
-- `adapter/out/persistence/JpaAuthUserAdapter`
-- `adapter/out/persistence/JpaRefreshTokenAdapter`
-
-### `user`
-
-#### `user/domain`
-- `model/User`
-
-#### `user/application`
-- `dto/UserResponse`
-- `port/in/UserQueryUseCase`
-- `port/out/UserReadPort`
-- `service/UserService`
-
-#### `user/infrastructure`
-- `api/UserController`
 - `persistence/UserRepository`
-- `adapter/out/persistence/JpaUserReadAdapter`
+- `persistence/RefreshTokenRepository`
+- `persistence/entity/UserEntity`
+- `persistence/entity/RefreshTokenEntity`
+- `adapter/out/persistence/JpaUserAdapter`
+- `adapter/out/persistence/JpaRefreshTokenAdapter`
 
 ### `chat`
 
@@ -149,6 +133,7 @@ src/main/java/com/legalfam/backend
 - `exception/ChatAccessDeniedException`
 - `exception/ChatNotFoundException`
 - `exception/ChatUpstreamException`
+- `exception/InvalidChatRequestException`
 
 #### `chat/application`
 - `dto/ChatAskRequest`
@@ -158,12 +143,16 @@ src/main/java/com/legalfam/backend
 - `dto/ChatMessageResponse`
 - `dto/ChatCitationResponse`
 - `dto/ChatRateMessageRequest`
+- `dto/ChatAssistantMessageDispatch`
+- `dto/ChatAssistantErrorDispatch`
 - `event/ChatMessageQueuedEvent`
 - `event/ChatAssistantMessageEvent`
 - `event/ChatAssistantErrorEvent`
 - `port/in/ChatUseCase`
+- `port/in/ChatAssistantPersistenceUseCase`
 - `port/out/ChatPersistencePort`
 - `port/out/ChatEventPublisherPort`
+- `port/out/ChatUserLookupPort`
 - `service/ChatService`
 - `service/ChatAssistantPersistenceService`
 
@@ -180,132 +169,139 @@ src/main/java/com/legalfam/backend
 - `persistence/ChatSessionRepository`
 - `persistence/ChatMessageRepository`
 - `persistence/ChatCitationRepository`
+- `persistence/entity/ChatSessionEntity`
+- `persistence/entity/ChatMessageEntity`
+- `persistence/entity/ChatCitationEntity`
 - `adapter/events/SpringChatEventPublisherAdapter`
 - `adapter/events/RabbitChatEventPublisherAdapter`
 - `adapter/persistence/JpaChatPersistenceAdapter`
+- `adapter/persistence/UserIdentityChatLookupAdapter`
 
 ## Test Structure (Mirrors Modules)
 - `auth/application/service/*`
 - `auth/infrastructure/api/*`
-- `auth/infrastructure/security/*`
+- `security/infrastructure/*`
 - `chat/infrastructure/api/*`
 - `common/config/*`
 - `common/error/*`
-- `user/infrastructure/api/*`
+- `ArchitectureRulesTest`
 
 ## Practical Notes
-- New business rules should be implemented in `application/service` and exposed through `application/port/in`.
-- New external integrations (DB/API/events) should be added as adapters in `infrastructure`, implementing `application/port/out`.
-- `common` should only contain truly cross-module concerns.
+- Implement business rules in `application/service`, exposed through `application/port/in`
+- Add new external integrations in `infrastructure` implementing `application/port/out`
+- Keep `common` only for truly cross-module concerns
+- Keep `/api/v1/auth/**` public and all non-auth endpoints protected by JWT
 
-## C4 Model Guide For This Backend
+## C4 Model Guide
 
-This section explains how to model this project with C4: **Context -> Containers -> Components -> Code (main classes)**.
+This section explains how to model the backend with C4: Context -> Containers -> Components -> Code.
 
-### 1) System Context (C4 Level 1)
-Model the backend as a single system and show external actors/systems:
-- **Actors**
-- `Vulnerable User`: uses the app to ask legal questions in the Family Law domain.
-- `Administrator`: uploads and curates legal files for the RAG knowledge base.
-- **External systems**
-- `Gemini API` (LLM + File Search capabilities used by the RAG flow)
-- **System under design**
-- `LegalFam Backend API` (Spring Boot service)
+### 1) System Context (Level 1)
+Model the backend as one system and include external actors/systems.
+
+Actors:
+- `Vulnerable User`: uses the app to ask legal questions
+- `Administrator`: uploads and curates legal files directly in `n8n` (not in backend endpoints)
+
+External systems:
+- `Gemini API`: LLM + file search used by the RAG flow
+
+System under design:
+- `LegalFam Backend API` (Spring Boot)
 
 Relationships:
-- Vulnerable User -> Backend API (`HTTPS`, JSON REST, SSE for chat updates)
-- Administrator -> Backend API (`HTTPS`, admin/integration operations for ingestion workflows)
-- Backend API -> PostgreSQL (`JPA/Hibernate`)
-- Backend API -> Gemini API (`HTTPS`, RAG/assistant operations through internal flows)
+- `Vulnerable User -> Backend API` (HTTPS JSON + SSE)
+- `Backend API -> PostgreSQL` (JPA/Hibernate)
+- `Backend API -> RabbitMQ` (AMQP)
+- `Backend API -> n8n` (HTTP webhook)
+- `n8n -> Gemini API` (HTTPS)
+- `Administrator -> n8n` (direct ingestion/curation workflows)
 
-### 2) Containers (C4 Level 2)
-Inside the deployment boundary, define runtime/deployment containers:
-- **Spring Boot Application Container**
-- Hosts modules: `auth`, `chat`, `user`, `common`
-- Exposes endpoints under `/api/v1/**`
-- Handles JWT auth, business logic, validation, error mapping
-- **n8n Container (Internal)**
-- Locally deployed and managed by your team
-- Orchestrates internal chat/RAG workflow steps
-- Invokes Gemini API and returns normalized responses to backend flows
-- **PostgreSQL Container**
-- Stores domain entities/tables (`users`, `refresh_tokens`, chat tables)
-- **RabbitMQ Container (Internal)**
-- Message broker for chat EDA.
-- Receives `chat.message.queued.v1` events and feeds chat workers/consumers.
-- **Gemini API (External Container/System)**
-- Third-party managed AI service outside your ownership boundary
+### 2) Containers (Level 2)
+Define runtime containers:
+- `Spring Boot Application`: hosts `auth`, `chat`, `security`, `common`
+- `n8n` (internal): orchestrates chat/RAG workflow, manages admin ingestion workflows
+- `PostgreSQL`: stores `users`, `refresh_tokens`, `chat_sessions`, `chat_messages`, `chat_citations`
+- `RabbitMQ` (internal): async event broker for chat
+- `Gemini API` (external)
 
-Container connections for the C4 container diagram:
-- Vulnerable User -> Spring Boot API (`HTTPS` REST + SSE)
-- Administrator -> Spring Boot API (`HTTPS` admin/integration endpoints)
-- Spring Boot API -> PostgreSQL (`JPA/Hibernate`)
-- Spring Boot API -> RabbitMQ (`AMQP publish` on `chat.events.x` with routing key `chat.message.queued.v1`)
-- RabbitMQ -> Spring Boot API (`AMQP consume` from `chat.message.queued.q` via `ChatAsyncProcessor`)
-- Spring Boot API -> n8n (`HTTP POST` via `N8nWebhookClient` during queued message processing)
-- n8n -> Gemini API (`HTTPS`, internal workflow step managed by your team)
-- Spring Boot API -> Vulnerable User (`SSE` assistant updates via `ChatSseEmitterService`)
+Container connections:
+- `Vulnerable User -> Spring Boot API` (REST + SSE)
+- `Spring Boot API -> PostgreSQL` (JPA/Hibernate)
+- `Spring Boot API -> RabbitMQ` (publish `chat.message.queued.v1`)
+- `RabbitMQ -> Spring Boot API` (consume `chat.message.queued.q`)
+- `Spring Boot API -> n8n` (HTTP POST through `N8nWebhookClient`)
+- `n8n -> Gemini API` (HTTPS)
+- `Administrator -> n8n` (direct file upload/curation)
 
-### 3) Components (C4 Level 3)
-Break the Spring Boot container into module components by responsibility:
+### 3) Components (Level 3)
+Break Spring Boot into module components.
 
 #### Auth Components
 - API: `AuthController`, `AuthExceptionHandler`
 - Application: `AuthUseCase`, `AuthService`
-- Outbound ports: `AuthUserPort`, `RefreshTokenPort`, `AccessTokenPort`, `TokenValidationPort`
-- Adapters: `JpaAuthUserAdapter`, `JpaRefreshTokenAdapter`, `JwtService`, `JwtAuthenticationFilter`
-- Domain: `RefreshToken`, auth domain exceptions
+- Outbound ports: `UserPort`, `RefreshTokenPort`, `AccessTokenPort`, `TokenValidationPort`
+- Adapters: `JpaUserAdapter`, `JpaRefreshTokenAdapter`, `JwtService`, `JwtAuthenticationFilter`
+- Domain: `User`, `RefreshToken`, auth exceptions
 
 #### Chat Components
 - API: `ChatController`, `ChatExceptionHandler`
 - Application: `ChatUseCase`, `ChatService`, `ChatAssistantPersistenceService`
-- Outbound ports: `ChatPersistencePort`, `ChatEventPublisherPort`
-- Adapters/infra: `JpaChatPersistenceAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `N8nWebhookClient`, `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `ChatSseEmitterService`
+- Ports: `ChatPersistencePort`, `ChatEventPublisherPort`, `ChatUserLookupPort`, `ChatAssistantPersistenceUseCase`
+- Adapters/infra: `JpaChatPersistenceAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `N8nWebhookClient`, `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `ChatSseEmitterService`, `UserIdentityChatLookupAdapter`
 - Domain: `ChatSession`, `ChatMessage`, `ChatCitation`, `ChatMessageRole`, chat exceptions
 
-#### User Components
-- API: `UserController`
-- Application: `UserQueryUseCase`, `UserService`
-- Outbound port: `UserReadPort`
-- Adapter: `JpaUserReadAdapter`, `UserRepository`
-- Domain: `User`
+#### Common/Security Components
+- Security: `security.infrastructure.SecurityConfig`, `security.infrastructure.JwtAuthenticationFilter`
+- OpenAPI/Error: `common.config.OpenApiConfig`, `common.error.ApiError`, `common.error.ApiErrorFactory`, `common.error.handler.GlobalExceptionHandler`
 
-#### Common Components
-- Security/config: `SecurityConfig`, `OpenApiConfig`
-- Error handling: `ApiError`, `ApiErrorFactory`, `GlobalExceptionHandler`, `InvalidRequestException`
+### 4) Code / Class Diagrams (Level 4)
+For Level 4 in this project, use PlantUML class diagrams per module.
 
-### 4) Code / Main Classes (C4 Level 4)
-For C4 level 4, focus on classes that carry business behavior and boundaries:
-- **Entry points**
-- `auth.infrastructure.api.AuthController`
-- `chat.infrastructure.api.ChatController`
-- `user.infrastructure.api.UserController`
-- **Core use-case services**
-- `auth.application.service.AuthService`
-- `chat.application.service.ChatService`
-- `chat.application.service.ChatAssistantPersistenceService`
-- `user.application.service.UserService`
-- **Boundary abstractions (ports)**
-- all `application.port.in.*`
-- all `application.port.out.*`
-- **Infrastructure implementations**
-- `auth.infrastructure.security.JwtService`
-- `chat.infrastructure.integration.N8nWebhookClient`
-- `*.infrastructure.adapter.*`
-- `*.infrastructure.persistence.*`
-- **Shared control plane**
-- `common.config.SecurityConfig`
-- `common.error.handler.GlobalExceptionHandler`
+Required diagrams:
+- `l4-class-auth.puml`
+- `l4-class-chat.puml`
 
-### Suggested Diagram Set
+Instruction for `auth` class diagram:
+1. Include packages: `auth.domain`, `auth.application`, `auth.infrastructure`
+2. Show main classes/interfaces:
+   - `AuthController`, `AuthUseCase`, `AuthService`
+   - `UserPort`, `RefreshTokenPort`, `AccessTokenPort`, `TokenValidationPort`
+   - `JpaUserAdapter`, `JpaRefreshTokenAdapter`, `JwtService`
+   - `User`, `RefreshToken`, `UserEntity`, `RefreshTokenEntity`
+3. Show relations:
+   - controller depends on `AuthUseCase`
+   - service implements `AuthUseCase`
+   - service depends on outbound ports
+   - adapters implement outbound ports
+   - persistence adapters map domain <-> entity
+
+Instruction for `chat` class diagram:
+1. Include packages: `chat.domain`, `chat.application`, `chat.infrastructure`
+2. Show main classes/interfaces:
+   - `ChatController`, `ChatUseCase`, `ChatService`, `ChatAssistantPersistenceService`
+   - `ChatPersistencePort`, `ChatEventPublisherPort`, `ChatUserLookupPort`, `ChatAssistantPersistenceUseCase`
+   - `JpaChatPersistenceAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `UserIdentityChatLookupAdapter`
+   - `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `N8nWebhookClient`, `ChatSseEmitterService`
+   - `ChatSession`, `ChatMessage`, `ChatCitation`, related entities
+3. Show relations:
+   - controller depends on `ChatUseCase`
+   - service implements `ChatUseCase`
+   - service depends on ports
+   - adapters implement ports
+   - async processors consume/publish events and call application use cases
+
+Optional quality constraints for both Level 4 diagrams:
+- Stereotype interfaces as `<<port>>`
+- Stereotype adapter classes as `<<adapter>>`
+- Keep framework classes outside domain package
+- Avoid showing utility/noise classes unless they are architectural boundaries
+
+## Suggested Diagram Set
 - `c4-context-backend` (Level 1)
 - `c4-container-backend` (Level 2)
-- Include both actors in context/container diagrams:
-- `Vulnerable User`
-- `Administrator`
-- Show `n8n` and `RabbitMQ` as internal containers, and `Gemini API` as external
-- `c4-component-auth`, `c4-component-chat`, `c4-component-user`, `c4-component-common` (Level 3)
-- Optional class diagrams for:
-- `auth.application.service.AuthService`
-- `chat.application.service.ChatService`
-- `chat.infrastructure.integration.ChatAsyncProcessor`
+- `c4-component-auth` (Level 3)
+- `c4-component-chat` (Level 3)
+- `c4-component-common-security` (Level 3)
+- `l4-class-auth.puml` (Level 4)
+- `l4-class-chat.puml` (Level 4)

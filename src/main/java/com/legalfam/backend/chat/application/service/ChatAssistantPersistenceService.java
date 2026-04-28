@@ -1,9 +1,12 @@
 package com.legalfam.backend.chat.application.service;
 
+import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
+import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
 import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.event.ChatAssistantErrorEvent;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
+import com.legalfam.backend.chat.application.port.in.ChatAssistantPersistenceUseCase;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
@@ -17,7 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class ChatAssistantPersistenceService {
+public class ChatAssistantPersistenceService implements ChatAssistantPersistenceUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(ChatAssistantPersistenceService.class);
 
@@ -28,6 +31,7 @@ public class ChatAssistantPersistenceService {
     }
 
     @Transactional
+    @Override
     public ChatAssistantMessageDispatch persistAssistantMessage(
             UUID chatSessionId,
             String assistantMessageText,
@@ -41,7 +45,7 @@ public class ChatAssistantPersistenceService {
 
         Instant now = Instant.now();
         ChatMessage assistantMessage = new ChatMessage();
-        assistantMessage.setChatSession(chatSession);
+        assistantMessage.setChatSessionId(chatSession.getId());
         assistantMessage.setRole(ChatMessageRole.ASSISTANT);
         assistantMessage.setContent(assistantMessageText);
         assistantMessage.setCreatedAt(now);
@@ -53,7 +57,7 @@ public class ChatAssistantPersistenceService {
         chatPersistencePort.saveSession(chatSession);
 
         return new ChatAssistantMessageDispatch(
-                chatSession.getUser().getId(),
+                chatSession.getUserId(),
                 chatSession.getId(),
                 new ChatAssistantMessageEvent(
                         chatSession.getId(),
@@ -66,6 +70,7 @@ public class ChatAssistantPersistenceService {
     }
 
     @Transactional
+    @Override
     public ChatAssistantErrorDispatch persistAssistantFailure(
             UUID chatSessionId,
             String errorCode,
@@ -79,7 +84,7 @@ public class ChatAssistantPersistenceService {
 
         Instant now = Instant.now();
         ChatMessage failureMessage = new ChatMessage();
-        failureMessage.setChatSession(chatSession);
+        failureMessage.setChatSessionId(chatSession.getId());
         failureMessage.setRole(ChatMessageRole.SYSTEM);
         failureMessage.setContent(errorMessage);
         failureMessage.setCreatedAt(now);
@@ -89,7 +94,7 @@ public class ChatAssistantPersistenceService {
         chatPersistencePort.saveSession(chatSession);
 
         return new ChatAssistantErrorDispatch(
-                chatSession.getUser().getId(),
+                chatSession.getUserId(),
                 chatSession.getId(),
                 new ChatAssistantErrorEvent(
                         chatSession.getId(),
@@ -104,7 +109,7 @@ public class ChatAssistantPersistenceService {
     private void persistCitations(ChatMessage assistantMessage, List<ChatCitationResponse> citations) {
         for (ChatCitationResponse citation : citations) {
             ChatCitation entity = new ChatCitation();
-            entity.setChatMessage(assistantMessage);
+            entity.setChatMessageId(assistantMessage.getId());
             entity.setSourceTitle(defaultString(citation.sourceTitle()));
             entity.setSourceSnippet(defaultString(citation.sourceSnippet()));
             entity.setSourceUrl(citation.sourceUrl());
@@ -116,17 +121,4 @@ public class ChatAssistantPersistenceService {
         return value == null ? "" : value;
     }
 
-    public record ChatAssistantMessageDispatch(
-            UUID userId,
-            UUID chatSessionId,
-            ChatAssistantMessageEvent event
-    ) {
-    }
-
-    public record ChatAssistantErrorDispatch(
-            UUID userId,
-            UUID chatSessionId,
-            ChatAssistantErrorEvent event
-    ) {
-    }
 }

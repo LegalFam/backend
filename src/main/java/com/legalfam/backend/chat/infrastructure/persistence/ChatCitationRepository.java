@@ -1,13 +1,13 @@
 package com.legalfam.backend.chat.infrastructure.persistence;
 
-import com.legalfam.backend.chat.domain.model.ChatCitation;
+import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatCitationEntity;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface ChatCitationRepository extends JpaRepository<ChatCitation, UUID> {
-    List<ChatCitation> findByChatMessageIdOrderByIdAsc(UUID chatMessageId);
+public interface ChatCitationRepository extends JpaRepository<ChatCitationEntity, UUID> {
+    List<ChatCitationEntity> findByChatMessageIdOrderByIdAsc(UUID chatMessageId);
 
-    List<ChatCitation> findByChatMessageIdInOrderByChatMessageIdAscIdAsc(List<UUID> chatMessageIds);
+    List<ChatCitationEntity> findByChatMessageIdInOrderByChatMessageIdAscIdAsc(List<UUID> chatMessageIds);
 }
 
