@@ -18,7 +18,7 @@ public class SpringChatEventPublisherAdapter implements ChatEventPublisherPort {
     }
 
     @Override
-    public void publishMessageQueued(UUID chatSessionId, String userMessageInput) {
-        applicationEventPublisher.publishEvent(new ChatMessageQueuedEvent(chatSessionId, userMessageInput));
+    public void publishMessageQueued(UUID chatSessionId, UUID userMessageId, String userMessageInput) {
+        applicationEventPublisher.publishEvent(new ChatMessageQueuedEvent(chatSessionId, userMessageId, userMessageInput));
     }
 }

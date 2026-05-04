@@ -6,6 +6,7 @@ This project uses a modular hexagonal architecture.
 Business modules:
 - `auth`
 - `chat`
+- `payment`
 
 Cross-cutting module:
 - `common`
@@ -38,6 +39,7 @@ Examples:
 Examples:
 - `AuthService` uses `UserPort`, `RefreshTokenPort`, `AccessTokenPort`
 - `ChatService` uses `ChatPersistencePort`, `ChatEventPublisherPort`, `ChatUserLookupPort`
+- `PaymentService` uses `PaymentPersistencePort`, `PaymentGatewayPort`, `UserPort`
 
 ### 3) Domain model isolation
 - Domain classes are plain Java classes in `domain/model`
@@ -59,6 +61,10 @@ src/main/java/com/legalfam/backend
 |   |-- application
 |   `-- infrastructure
 |-- chat
+|   |-- domain
+|   |-- application
+|   `-- infrastructure
+|-- payment
 |   |-- domain
 |   |-- application
 |   `-- infrastructure
@@ -177,11 +183,58 @@ src/main/java/com/legalfam/backend
 - `adapter/persistence/JpaChatPersistenceAdapter`
 - `adapter/persistence/UserIdentityChatLookupAdapter`
 
+### `payment`
+
+#### `payment/domain`
+- `model/Subscription`
+- `model/SubscriptionPlanCode`
+- `model/SubscriptionStatus`
+- `model/PaymentProvider`
+- `model/TokenTransaction`
+- `model/TokenTransactionType`
+- `exception/InsufficientTokensException`
+- `exception/InvalidPaymentRequestException`
+- `exception/PaymentGatewayException`
+- `exception/PaymentWebhookException`
+- `exception/SubscriptionInactiveException`
+- `exception/SubscriptionNotFoundException`
+
+#### `payment/application`
+- `dto/CreateCheckoutSessionRequest`
+- `dto/CreateCheckoutSessionResponse`
+- `dto/PaymentPlanDefinition`
+- `dto/PaymentPlanResponse`
+- `dto/PaymentSubscriptionResponse`
+- `dto/PaymentSubscriptionSnapshot`
+- `dto/PaymentWebhookNotification`
+- `port/in/PaymentUseCase`
+- `port/in/PaymentProvisioningUseCase`
+- `port/in/PaymentTokenUseCase`
+- `port/out/PaymentGatewayPort`
+- `port/out/PaymentPersistencePort`
+- `service/PaymentService`
+
+#### `payment/infrastructure`
+- `api/PaymentController`
+- `api/PaymentWebhookController`
+- `api/handler/PaymentExceptionHandler`
+- `config/PaymentCatalog`
+- `adapter/gateway/MercadoPagoPaymentGatewayAdapter`
+- `adapter/persistence/JpaPaymentPersistenceAdapter`
+- `adapter/persistence/PaymentEntityMapper`
+- `persistence/SubscriptionRepository`
+- `persistence/TokenTransactionRepository`
+- `persistence/PaymentWebhookEventRepository`
+- `persistence/entity/SubscriptionEntity`
+- `persistence/entity/TokenTransactionEntity`
+- `persistence/entity/PaymentWebhookEventEntity`
+
 ## Test Structure (Mirrors Modules)
 - `auth/application/service/*`
 - `auth/infrastructure/api/*`
 - `security/infrastructure/*`
 - `chat/infrastructure/api/*`
+- `payment/infrastructure/api/*`
 - `common/config/*`
 - `common/error/*`
 - `ArchitectureRulesTest`
@@ -221,8 +274,9 @@ Relationships:
 Define runtime containers:
 - `Spring Boot Application`: hosts `auth`, `chat`, `security`, `common`
 - `n8n` (internal): orchestrates chat/RAG workflow, manages admin ingestion workflows
-- `PostgreSQL`: stores `users`, `refresh_tokens`, `chat_sessions`, `chat_messages`, `chat_citations`
+- `PostgreSQL`: stores `users`, `refresh_tokens`, `chat_session`, `chat_message`, `citations`, `subscriptions`, `token_transactions`, `payment_webhook_events`
 - `RabbitMQ` (internal): async event broker for chat
+- `Mercado Pago` (external): subscription checkout and recurring payment notifications
 - `Gemini API` (external)
 
 Container connections:
@@ -230,6 +284,7 @@ Container connections:
 - `Spring Boot API -> PostgreSQL` (JPA/Hibernate)
 - `Spring Boot API -> RabbitMQ` (publish `chat.message.queued.v1`)
 - `RabbitMQ -> Spring Boot API` (consume `chat.message.queued.q`)
+- `Spring Boot API -> Mercado Pago` (subscription checkout, cancellation, subscription lookup)
 - `Spring Boot API -> n8n` (HTTP POST through `N8nWebhookClient`)
 - `n8n -> Gemini API` (HTTPS)
 - `Administrator -> n8n` (direct file upload/curation)
@@ -250,6 +305,13 @@ Break Spring Boot into module components.
 - Ports: `ChatPersistencePort`, `ChatEventPublisherPort`, `ChatUserLookupPort`, `ChatAssistantPersistenceUseCase`
 - Adapters/infra: `JpaChatPersistenceAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `N8nWebhookClient`, `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `ChatSseEmitterService`, `UserIdentityChatLookupAdapter`
 - Domain: `ChatSession`, `ChatMessage`, `ChatCitation`, `ChatMessageRole`, chat exceptions
+
+#### Payment Components
+- API: `PaymentController`, `PaymentWebhookController`, `PaymentExceptionHandler`
+- Application: `PaymentUseCase`, `PaymentProvisioningUseCase`, `PaymentTokenUseCase`, `PaymentService`
+- Ports: `PaymentPersistencePort`, `PaymentGatewayPort`
+- Adapters/infra: `JpaPaymentPersistenceAdapter`, `MercadoPagoPaymentGatewayAdapter`, `PaymentCatalog`
+- Domain: `Subscription`, `TokenTransaction`, payment exceptions
 
 #### Common/Security Components
 - Security: `security.infrastructure.SecurityConfig`, `security.infrastructure.JwtAuthenticationFilter`
@@ -302,6 +364,7 @@ Optional quality constraints for both Level 4 diagrams:
 - `c4-container-backend` (Level 2)
 - `c4-component-auth` (Level 3)
 - `c4-component-chat` (Level 3)
+- `c4-component-payment` (Level 3)
 - `c4-component-common-security` (Level 3)
 - `l4-class-auth.puml` (Level 4)
 - `l4-class-chat.puml` (Level 4)

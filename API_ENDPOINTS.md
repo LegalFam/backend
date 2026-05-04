@@ -72,6 +72,96 @@ Use header:
 Authorization: Bearer <accessToken>
 ```
 
+## Payments
+
+### `GET /api/v1/payments/plans`
+Return the available plans for the authenticated user.
+
+Success response `200`:
+```json
+[
+  {
+    "code": "FREE",
+    "billingInterval": "month",
+    "monthlyPriceCents": null,
+    "currency": "pen",
+    "monthlyTokenLimit": 50,
+    "currentPlan": true,
+    "purchasable": true
+  },
+  {
+    "code": "BASIC",
+    "billingInterval": "month",
+    "monthlyPriceCents": 1499,
+    "currency": "pen",
+    "monthlyTokenLimit": 500,
+    "currentPlan": false,
+    "purchasable": true
+  },
+  {
+    "code": "PREMIUM",
+    "billingInterval": "month",
+    "monthlyPriceCents": 4999,
+    "currency": "pen",
+    "monthlyTokenLimit": 2500,
+    "currentPlan": false,
+    "purchasable": true
+  }
+]
+```
+
+### `GET /api/v1/payments/subscription`
+Return the current subscription and token balance.
+
+Success response `200`:
+```json
+{
+  "planCode": "FREE",
+  "status": "ACTIVE",
+  "provider": "FREE",
+  "currentPeriodStart": "2026-05-01T00:00:00Z",
+  "currentPeriodEnd": "2026-06-01T00:00:00Z",
+  "cancelAtPeriodEnd": false,
+  "monthlyTokenLimit": 50,
+  "remainingTokens": 49
+}
+```
+
+### `POST /api/v1/payments/checkout-sessions`
+Create a Mercado Pago checkout link for a paid subscription.
+
+Request body:
+```json
+{
+  "planCode": "BASIC",
+  "successUrl": "http://localhost:3000/billing/success"
+}
+```
+
+Success response `200`:
+```json
+{
+  "url": "https://www.mercadopago.com.pe/subscriptions/checkout"
+}
+```
+
+Common errors:
+- `400` invalid plan or missing request body
+- `403` user already has an active paid subscription
+
+### `POST /api/v1/payments/subscription/cancel`
+Cancel the current Mercado Pago subscription.
+
+Success response `204` with empty body.
+
+Common errors:
+- `400` no active Mercado Pago subscription to cancel
+
+### `POST /api/v1/payments/webhook/mercado-pago`
+Public webhook endpoint for Mercado Pago notifications.
+
+Success response `200` with empty body.
+
 ### `GET /api/v1/users`
 Get all users.
 
@@ -110,6 +200,8 @@ Success response `202`:
 
 Notes:
 - Backend persists the user message first, then publishes a chat event asynchronously.
+- Each accepted user message consumes `1` token from the current subscription period.
+- If async assistant processing fails later, that token is refunded automatically.
 - Default mode (`CHAT_RABBIT_ENABLED=true`): publish to RabbitMQ, consume from queue, then process with n8n.
 - Fallback mode (`CHAT_RABBIT_ENABLED=false`): local async event listener processes without RabbitMQ.
 - Assistant response is persisted in DB before SSE dispatch is attempted.
@@ -118,6 +210,8 @@ Notes:
 Common errors:
 - `400` `message` missing/blank
 - `400` `sessionId` missing
+- `403` insufficient tokens
+- `403` inactive subscription
 - `403` session belongs to another user
 
 ### `POST /api/v1/chat/sessions`

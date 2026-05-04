@@ -11,6 +11,7 @@ import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
+import com.legalfam.backend.payment.application.port.in.PaymentTokenUseCase;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -25,9 +26,14 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
     private static final Logger log = LoggerFactory.getLogger(ChatAssistantPersistenceService.class);
 
     private final ChatPersistencePort chatPersistencePort;
+    private final PaymentTokenUseCase paymentTokenUseCase;
 
-    public ChatAssistantPersistenceService(ChatPersistencePort chatPersistencePort) {
+    public ChatAssistantPersistenceService(
+            ChatPersistencePort chatPersistencePort,
+            PaymentTokenUseCase paymentTokenUseCase
+    ) {
         this.chatPersistencePort = chatPersistencePort;
+        this.paymentTokenUseCase = paymentTokenUseCase;
     }
 
     @Transactional
@@ -73,6 +79,7 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
     @Override
     public ChatAssistantErrorDispatch persistAssistantFailure(
             UUID chatSessionId,
+            UUID userMessageId,
             String errorCode,
             String errorMessage
     ) {
@@ -92,6 +99,7 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
 
         chatSession.setUpdatedAt(now);
         chatPersistencePort.saveSession(chatSession);
+        paymentTokenUseCase.refundChatToken(userMessageId);
 
         return new ChatAssistantErrorDispatch(
                 chatSession.getUserId(),

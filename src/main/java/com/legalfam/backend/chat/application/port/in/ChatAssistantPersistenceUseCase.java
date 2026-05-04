@@ -15,6 +15,7 @@ public interface ChatAssistantPersistenceUseCase {
 
     ChatAssistantErrorDispatch persistAssistantFailure(
             UUID chatSessionId,
+            UUID userMessageId,
             String errorCode,
             String errorMessage
     );

@@ -35,6 +35,7 @@ public class ChatMessageEventProcessor {
 
     public void process(ChatMessageQueuedEvent event) {
         UUID chatSessionId = event.chatSessionId();
+        UUID userMessageId = event.userMessageId();
         String userMessageInput = event.userMessageInput();
 
         JsonNode root;
@@ -44,6 +45,7 @@ public class ChatMessageEventProcessor {
             log.warn("n8n webhook call failed for chatSessionId={}: {}", chatSessionId, ex.getMessage());
             persistAndDispatchFailure(
                     chatSessionId,
+                    userMessageId,
                     resolveErrorCode(ex.getMessage()),
                     buildFailureMessage(ex.getMessage())
             );
@@ -55,6 +57,7 @@ public class ChatMessageEventProcessor {
             log.warn("n8n response has empty message for chatSessionId={}", chatSessionId);
             persistAndDispatchFailure(
                     chatSessionId,
+                    userMessageId,
                     "UPSTREAM_EMPTY_RESPONSE",
                     "Assistant unavailable. Empty response received from upstream service."
             );
@@ -74,9 +77,15 @@ public class ChatMessageEventProcessor {
         chatSseEmitterService.dispatchAssistantMessage(dispatch.userId(), dispatch.chatSessionId(), dispatch.event());
     }
 
-    private void persistAndDispatchFailure(UUID chatSessionId, String errorCode, String errorMessage) {
+    private void persistAndDispatchFailure(
+            UUID chatSessionId,
+            UUID userMessageId,
+            String errorCode,
+            String errorMessage
+    ) {
         ChatAssistantErrorDispatch dispatch = chatAssistantPersistenceUseCase.persistAssistantFailure(
                 chatSessionId,
+                userMessageId,
                 errorCode,
                 errorMessage
         );

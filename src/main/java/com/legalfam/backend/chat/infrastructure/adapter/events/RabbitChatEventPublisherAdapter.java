@@ -35,9 +35,9 @@ public class RabbitChatEventPublisherAdapter implements ChatEventPublisherPort {
     }
 
     @Override
-    public void publishMessageQueued(UUID chatSessionId, String userMessageInput) {
+    public void publishMessageQueued(UUID chatSessionId, UUID userMessageId, String userMessageInput) {
         try {
-            ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(chatSessionId, userMessageInput);
+            ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(chatSessionId, userMessageId, userMessageInput);
             String payload = objectMapper.writeValueAsString(event);
             rabbitTemplate.convertAndSend(exchange, chatMessageQueuedRoutingKey, payload);
             log.debug("Published chat message event to RabbitMQ: exchange={}, routingKey={}, sessionId={}",

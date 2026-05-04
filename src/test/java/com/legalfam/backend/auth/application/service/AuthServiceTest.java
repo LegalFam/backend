@@ -22,6 +22,7 @@ import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.domain.model.User;
+import com.legalfam.backend.payment.application.port.in.PaymentProvisioningUseCase;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -52,6 +53,8 @@ class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private AccessTokenPort accessTokenPort;
+    @Mock
+    private PaymentProvisioningUseCase paymentProvisioningUseCase;
 
     @Captor
     private ArgumentCaptor<User> userCaptor;
@@ -67,6 +70,7 @@ class AuthServiceTest {
                 refreshTokenPort,
                 passwordEncoder,
                 accessTokenPort,
+                paymentProvisioningUseCase,
                 new AuthTokenProperties(REFRESH_EXPIRATION_MS)
         );
     }
@@ -104,6 +108,7 @@ class AuthServiceTest {
         assertEquals("hashed-password", savedUser.getPassword());
         assertEquals("Juan", savedUser.getName());
         assertEquals("900000000", savedUser.getPhone());
+        verify(paymentProvisioningUseCase).provisionFreeSubscription(savedUser.getId());
 
         verify(refreshTokenPort).save(refreshTokenCaptor.capture());
         RefreshToken refreshToken = refreshTokenCaptor.getValue();

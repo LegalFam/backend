@@ -2,14 +2,15 @@ package com.legalfam.backend.auth.application.service;
 
 import com.legalfam.backend.auth.application.port.in.AuthUseCase;
 import com.legalfam.backend.auth.application.port.out.AccessTokenPort;
-import com.legalfam.backend.auth.application.port.out.UserPort;
 import com.legalfam.backend.auth.application.port.out.RefreshTokenPort;
+import com.legalfam.backend.auth.application.port.out.UserPort;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.domain.model.User;
+import com.legalfam.backend.payment.application.port.in.PaymentProvisioningUseCase;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -27,6 +28,7 @@ public class AuthService implements AuthUseCase {
     private final RefreshTokenPort refreshTokenPort;
     private final PasswordEncoder passwordEncoder;
     private final AccessTokenPort accessTokenPort;
+    private final PaymentProvisioningUseCase paymentProvisioningUseCase;
     private final long refreshTokenExpirationMs;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -35,12 +37,14 @@ public class AuthService implements AuthUseCase {
             RefreshTokenPort refreshTokenPort,
             PasswordEncoder passwordEncoder,
             AccessTokenPort accessTokenPort,
+            PaymentProvisioningUseCase paymentProvisioningUseCase,
             AuthTokenProperties authTokenProperties
     ) {
         this.userPort = userPort;
         this.refreshTokenPort = refreshTokenPort;
         this.passwordEncoder = passwordEncoder;
         this.accessTokenPort = accessTokenPort;
+        this.paymentProvisioningUseCase = paymentProvisioningUseCase;
         this.refreshTokenExpirationMs = authTokenProperties.refreshTokenExpirationMs();
     }
 
@@ -58,6 +62,7 @@ public class AuthService implements AuthUseCase {
         user.setPhone(phone);
 
         User savedUser = userPort.save(user);
+        paymentProvisioningUseCase.provisionFreeSubscription(savedUser.getId());
         return issueTokens(savedUser);
     }
 

@@ -4,6 +4,7 @@ import java.util.UUID;
 
 public record ChatMessageQueuedEvent(
         UUID chatSessionId,
+        UUID userMessageId,
         String userMessageInput
 ) {
 }

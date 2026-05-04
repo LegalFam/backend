@@ -5,7 +5,7 @@ This document describes how contributors (human or AI agents) should work in thi
 ## Scope
 
 - Backend API built with Spring Boot.
-- Main modules: `auth`, `chat`, `user`.
+- Main modules: `auth`, `chat`, `payment`, `user`.
 - Shared cross-cutting module: `common`.
 
 ## Folder Management
@@ -39,6 +39,7 @@ This document describes how contributors (human or AI agents) should work in thi
 - `POST /api/v1/auth/signup`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
+- `POST /api/v1/payments/webhook/mercado-pago`
 
 ### Protected
 
@@ -49,6 +50,10 @@ This document describes how contributors (human or AI agents) should work in thi
 - `GET /api/v1/chat/sessions`
 - `GET /api/v1/chat/sessions/{sessionId}/messages`
 - `PATCH /api/v1/chat/messages/{messageId}/rating`
+- `GET /api/v1/payments/plans`
+- `GET /api/v1/payments/subscription`
+- `POST /api/v1/payments/checkout-sessions`
+- `POST /api/v1/payments/subscription/cancel`
 
 ## Security Expectations
 
@@ -65,9 +70,12 @@ This document describes how contributors (human or AI agents) should work in thi
 Current relevant tables:
 - `users`
 - `refresh_tokens`
-- `chat_sessions`
-- `chat_messages`
-- `chat_citations`
+- `chat_session`
+- `chat_message`
+- `citations`
+- `subscriptions`
+- `token_transactions`
+- `payment_webhook_events`
 
 ## Swagger / OpenAPI
 
@@ -93,9 +101,10 @@ When adding or changing endpoints:
 4. Add or update a domain-scoped exception handler (`@RestControllerAdvice(basePackages = "<domain-package>")`) for domain-specific errors (same pattern as `auth` and `chat`).
 5. Update security rules in `SecurityConfig`.
 6. For chat asynchronous flows, update RabbitMQ topology/properties/listeners if message contracts change.
-7. Update Swagger annotations (requests/responses/security requirement).
-8. Ensure protected routes require Bearer token.
-9. Update `README.md` with new endpoint usage.
+7. For payment changes, keep Mercado Pago secrets in env and non-secret plan config in module resource files.
+8. Update Swagger annotations (requests/responses/security requirement).
+9. Ensure protected routes require Bearer token.
+10. Update `README.md` with new endpoint usage.
 
 ## Local Run
 

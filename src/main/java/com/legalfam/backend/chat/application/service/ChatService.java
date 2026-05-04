@@ -16,6 +16,7 @@ import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
+import com.legalfam.backend.payment.application.port.in.PaymentTokenUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
@@ -31,15 +32,18 @@ public class ChatService implements ChatUseCase {
     private final ChatPersistencePort chatPersistencePort;
     private final ChatEventPublisherPort chatEventPublisherPort;
     private final ChatUserLookupPort chatUserLookupPort;
+    private final PaymentTokenUseCase paymentTokenUseCase;
 
     public ChatService(
             ChatPersistencePort chatPersistencePort,
             ChatEventPublisherPort chatEventPublisherPort,
-            ChatUserLookupPort chatUserLookupPort
+            ChatUserLookupPort chatUserLookupPort,
+            PaymentTokenUseCase paymentTokenUseCase
     ) {
         this.chatPersistencePort = chatPersistencePort;
         this.chatEventPublisherPort = chatEventPublisherPort;
         this.chatUserLookupPort = chatUserLookupPort;
+        this.paymentTokenUseCase = paymentTokenUseCase;
     }
 
     @Override
@@ -58,10 +62,11 @@ public class ChatService implements ChatUseCase {
         userMessage.setContent(messageInput);
         userMessage.setCreatedAt(now);
         userMessage = chatPersistencePort.saveMessage(userMessage);
+        paymentTokenUseCase.consumeChatToken(userId, userMessage.getId());
 
         chatSession.setUpdatedAt(now);
         chatPersistencePort.saveSession(chatSession);
-        chatEventPublisherPort.publishMessageQueued(chatSession.getId(), messageInput);
+        chatEventPublisherPort.publishMessageQueued(chatSession.getId(), userMessage.getId(), messageInput);
 
         return new ChatSendAcceptedResponse(chatSession.getId(), userMessage.getId(), "PROCESSING");
     }

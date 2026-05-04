@@ -34,20 +34,31 @@ class ArchitectureRulesTest {
             .that().resideInAPackage("com.legalfam.backend.common..")
             .should().dependOnClassesThat().resideInAnyPackage(
                     "com.legalfam.backend.auth.infrastructure..",
-                    "com.legalfam.backend.chat.infrastructure.."
+                    "com.legalfam.backend.chat.infrastructure..",
+                    "com.legalfam.backend.payment.infrastructure.."
             );
 
     @ArchTest
     static final ArchRule auth_must_not_depend_on_other_module_infrastructure = noClasses()
             .that().resideInAPackage("com.legalfam.backend.auth..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                    "com.legalfam.backend.chat.infrastructure.."
+                    "com.legalfam.backend.chat.infrastructure..",
+                    "com.legalfam.backend.payment.infrastructure.."
             );
 
     @ArchTest
     static final ArchRule chat_must_not_depend_on_other_module_infrastructure = noClasses()
             .that().resideInAPackage("com.legalfam.backend.chat..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                    "com.legalfam.backend.auth.infrastructure.."
+                    "com.legalfam.backend.auth.infrastructure..",
+                    "com.legalfam.backend.payment.infrastructure.."
+            );
+
+    @ArchTest
+    static final ArchRule payment_must_not_depend_on_other_module_infrastructure = noClasses()
+            .that().resideInAPackage("com.legalfam.backend.payment..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.legalfam.backend.auth.infrastructure..",
+                    "com.legalfam.backend.chat.infrastructure.."
             );
 }
