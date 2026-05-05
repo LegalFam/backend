@@ -12,6 +12,7 @@ import com.legalfam.backend.payment.application.port.in.PaymentProvisioningUseCa
 import com.legalfam.backend.payment.application.port.in.PaymentTokenUseCase;
 import com.legalfam.backend.payment.application.port.in.PaymentUseCase;
 import com.legalfam.backend.payment.application.port.out.PaymentGatewayPort;
+import com.legalfam.backend.payment.application.port.out.PaymentPlanCatalogPort;
 import com.legalfam.backend.payment.application.port.out.PaymentPersistencePort;
 import com.legalfam.backend.payment.domain.exception.InsufficientTokensException;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
@@ -24,7 +25,6 @@ import com.legalfam.backend.payment.domain.model.SubscriptionPlanCode;
 import com.legalfam.backend.payment.domain.model.SubscriptionStatus;
 import com.legalfam.backend.payment.domain.model.TokenTransaction;
 import com.legalfam.backend.payment.domain.model.TokenTransactionType;
-import com.legalfam.backend.payment.infrastructure.config.PaymentCatalog;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -43,7 +43,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
 
     private final PaymentPersistencePort paymentPersistencePort;
     private final PaymentGatewayPort paymentGatewayPort;
-    private final PaymentCatalog paymentCatalog;
+    private final PaymentPlanCatalogPort paymentPlanCatalogPort;
     private final UserPort userPort;
     private final String defaultCheckoutSuccessUrl;
     private final Clock clock = Clock.systemUTC();
@@ -51,13 +51,13 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     public PaymentService(
             PaymentPersistencePort paymentPersistencePort,
             PaymentGatewayPort paymentGatewayPort,
-            PaymentCatalog paymentCatalog,
+            PaymentPlanCatalogPort paymentPlanCatalogPort,
             UserPort userPort,
             @Value("${app.payment.mercado-pago.checkout-success-url}") String defaultCheckoutSuccessUrl
     ) {
         this.paymentPersistencePort = paymentPersistencePort;
         this.paymentGatewayPort = paymentGatewayPort;
-        this.paymentCatalog = paymentCatalog;
+        this.paymentPlanCatalogPort = paymentPlanCatalogPort;
         this.userPort = userPort;
         this.defaultCheckoutSuccessUrl = defaultCheckoutSuccessUrl;
     }
@@ -67,7 +67,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     public List<PaymentPlanResponse> listPlans(UUID userId) {
         Subscription subscription = paymentPersistencePort.findSubscriptionByUserId(userId).orElse(null);
         SubscriptionPlanCode currentPlanCode = subscription == null ? SubscriptionPlanCode.FREE : subscription.getPlanCode();
-        return paymentCatalog.listPlans().stream()
+        return paymentPlanCatalogPort.listPlans().stream()
                 .map(plan -> new PaymentPlanResponse(
                         plan.code().name(),
                         BILLING_INTERVAL,
@@ -94,7 +94,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         if (request == null) {
             throw new InvalidPaymentRequestException("Checkout request is required");
         }
-        PaymentPlanDefinition plan = paymentCatalog.getPaidPlanOrThrow(request.planCode());
+        PaymentPlanDefinition plan = paymentPlanCatalogPort.getPaidPlanOrThrow(request.planCode());
         User user = getRequiredUser(userId);
         Subscription subscription = getOrCreateSubscription(userId);
         refreshFreeSubscriptionIfNeeded(subscription);
@@ -257,7 +257,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     }
 
     private Subscription createFreeSubscription(UUID userId, Instant anchor) {
-        PaymentPlanDefinition freePlan = paymentCatalog.getFreePlan();
+        PaymentPlanDefinition freePlan = paymentPlanCatalogPort.getFreePlan();
         Subscription subscription = new Subscription();
         subscription.setUserId(userId);
         subscription.setPlanCode(freePlan.code());
@@ -336,7 +336,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
             return;
         }
 
-        PaymentPlanDefinition plan = paymentCatalog.getPaidPlanOrThrow(notification.planCode());
+        PaymentPlanDefinition plan = paymentPlanCatalogPort.getPaidPlanOrThrow(notification.planCode());
         Subscription subscription = resolveGatewayBackedSubscription(notification);
         SubscriptionPlanCode previousPlan = subscription.getPlanCode();
         Instant previousPeriodStart = subscription.getCurrentPeriodStart();
@@ -404,7 +404,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     }
 
     private void downgradeToFreePlan(Subscription subscription, String description) {
-        PaymentPlanDefinition freePlan = paymentCatalog.getFreePlan();
+        PaymentPlanDefinition freePlan = paymentPlanCatalogPort.getFreePlan();
         int previousRemainingTokens = subscription.getRemainingTokens();
         Instant anchor = now();
 

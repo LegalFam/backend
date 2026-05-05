@@ -222,6 +222,7 @@ src/main/java/com/legalfam/backend
 - `port/in/PaymentUseCase`
 - `port/in/PaymentProvisioningUseCase`
 - `port/in/PaymentTokenUseCase`
+- `port/out/PaymentPlanCatalogPort`
 - `port/out/PaymentGatewayPort`
 - `port/out/PaymentPersistencePort`
 - `service/PaymentService`
@@ -230,7 +231,7 @@ src/main/java/com/legalfam/backend
 - `api/PaymentController`
 - `api/PaymentWebhookController`
 - `api/handler/PaymentExceptionHandler`
-- `config/PaymentCatalog`
+- `config/PaymentCatalog` (implements `PaymentPlanCatalogPort`)
 - `adapter/gateway/MercadoPagoPaymentGatewayAdapter`
 - `adapter/persistence/JpaPaymentPersistenceAdapter`
 - `adapter/persistence/PaymentEntityMapper`
@@ -345,7 +346,7 @@ Do not create a separate C4 component view for `common` or `security` as if they
 #### Payment Components
 - API: `PaymentController`, `PaymentWebhookController`, `PaymentExceptionHandler`
 - Application: `PaymentUseCase`, `PaymentProvisioningUseCase`, `PaymentTokenUseCase`, `PaymentService`
-- Ports: `PaymentPersistencePort`, `PaymentGatewayPort`
+- Ports: `PaymentPersistencePort`, `PaymentGatewayPort`, `PaymentPlanCatalogPort`
 - Adapters/infra: `JpaPaymentPersistenceAdapter`, `MercadoPagoPaymentGatewayAdapter`, `PaymentCatalog`
 - Domain: `Subscription`, `TokenTransaction`, payment exceptions
 

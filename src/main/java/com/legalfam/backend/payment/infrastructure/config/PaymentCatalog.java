@@ -1,6 +1,7 @@
 package com.legalfam.backend.payment.infrastructure.config;
 
 import com.legalfam.backend.payment.application.dto.PaymentPlanDefinition;
+import com.legalfam.backend.payment.application.port.out.PaymentPlanCatalogPort;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import com.legalfam.backend.payment.domain.model.SubscriptionPlanCode;
 import java.util.List;
@@ -11,7 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
-public class PaymentCatalog {
+public class PaymentCatalog implements PaymentPlanCatalogPort {
 
     private final List<PaymentPlanDefinition> plans;
     private final Map<SubscriptionPlanCode, PaymentPlanDefinition> plansByCode;
@@ -44,18 +45,22 @@ public class PaymentCatalog {
         this.plansByCode = plans.stream().collect(Collectors.toMap(PaymentPlanDefinition::code, plan -> plan));
     }
 
+    @Override
     public List<PaymentPlanDefinition> listPlans() {
         return plans;
     }
 
+    @Override
     public PaymentPlanDefinition getFreePlan() {
         return plansByCode.get(SubscriptionPlanCode.FREE);
     }
 
+    @Override
     public PaymentPlanDefinition getPlan(SubscriptionPlanCode code) {
         return plansByCode.get(code);
     }
 
+    @Override
     public PaymentPlanDefinition getPaidPlanOrThrow(String code) {
         SubscriptionPlanCode normalizedCode = parseCode(code);
         PaymentPlanDefinition plan = plansByCode.get(normalizedCode);
