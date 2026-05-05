@@ -53,8 +53,8 @@ Notes:
 - For the payment module, only `MERCADO_PAGO_ACCESS_TOKEN` needs to be provided as an env var.
 - Non-secret payment configuration lives in `src/main/resources/payment/payment.properties`.
 - `POST /api/v1/chat/send` enqueues message processing asynchronously.
-- With `CHAT_RABBIT_ENABLED=true` (default), chat processing is EDA through RabbitMQ.
-- With `CHAT_RABBIT_ENABLED=false`, the backend uses local async event processing.
+- With `CHAT_RABBIT_ENABLED=true` (default), chat processing uses `Transactional Outbox + RabbitMQ`.
+- With `CHAT_RABBIT_ENABLED=false`, the backend still uses the same transactional outbox, but the relay dispatches locally after commit.
 - Database schema is managed manually (not by Flyway).
 - Apply [`database/schema.sql`](database/schema.sql) before using the app outside the test profile.
 
@@ -158,7 +158,7 @@ curl -X POST http://localhost:8080/api/v1/auth/refresh \
 ### Send chat message (protected, async)
 
 Configure `N8N_WEBHOOK_URL` (`N8N_AUTH_TOKEN` optional).  
-By default this request is published to RabbitMQ and processed asynchronously by a consumer.
+By default this request writes the user message, token consumption, session update, and an outbox row in the same database transaction. A relay then publishes the queued event asynchronously to RabbitMQ (or local async processing when Rabbit is disabled).
 `sessionId` is required and each accepted request consumes `1` monthly token. If assistant processing fails later, that token is refunded automatically.
 
 ```bash
@@ -339,9 +339,19 @@ Refresh token rotation is enabled: each successful refresh revokes the old refre
 - Chat tokens are deducted when `POST /api/v1/chat/send` is accepted.
 - Failed assistant processing refunds the token tied to that user message.
 
+## Chat Delivery Model
+
+- `POST /api/v1/chat/send` keeps the public response contract stable and still returns `PROCESSING`.
+- The backend persists the user message, creates a separate internal processing record in state `QUEUED`, consumes one token, updates the session, and writes `chat_outbox_event` atomically in PostgreSQL.
+- `ChatOutboxRelay` polls ready outbox rows every `5s` in batches of `50` using row locking, publishes `chat.message.queued.v1`, and marks rows `PUBLISHED`, `FAILED`, or `DEAD`.
+- Relay retries after `1m`, `5m`, `15m`, `30m`, and `60m`. Outbox rows expire after `3h` by default.
+- When an outbox row expires before publication, the event is marked `DEAD` and the separate processing record becomes `EXPIRED`.
+- RabbitMQ is configured with a durable quorum queue, DLX/DLQ, main-queue TTL of `10800000` ms (`3h`), publisher confirms, and mandatory returns.
+- The consumer is idempotent: if the same `userMessageId` reaches a terminal state (`COMPLETED`, `FAILED`, `EXPIRED`), the duplicate is ignored.
+
 ## Architecture Docs
 
 - See [ARCHITECTURE.md](ARCHITECTURE.md) for:
 - Modular hexagonal structure (`domain`, `application`, `infrastructure`, `common`)
 - C4 model (Context, Containers, Components, main classes)
-- RabbitMQ EDA flow for chat module
+- Transactional outbox + RabbitMQ flow for chat module

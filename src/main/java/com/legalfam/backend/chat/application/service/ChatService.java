@@ -1,7 +1,7 @@
 package com.legalfam.backend.chat.application.service;
 
 import com.legalfam.backend.chat.application.port.in.ChatUseCase;
-import com.legalfam.backend.chat.application.port.out.ChatEventPublisherPort;
+import com.legalfam.backend.chat.application.port.out.ChatOutboxPort;
 import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.ChatUserLookupPort;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
@@ -14,6 +14,8 @@ import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
+import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
+import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
 import com.legalfam.backend.payment.application.port.in.PaymentTokenUseCase;
@@ -30,18 +32,18 @@ import java.util.stream.Collectors;
 public class ChatService implements ChatUseCase {
 
     private final ChatPersistencePort chatPersistencePort;
-    private final ChatEventPublisherPort chatEventPublisherPort;
+    private final ChatOutboxPort chatOutboxPort;
     private final ChatUserLookupPort chatUserLookupPort;
     private final PaymentTokenUseCase paymentTokenUseCase;
 
     public ChatService(
             ChatPersistencePort chatPersistencePort,
-            ChatEventPublisherPort chatEventPublisherPort,
+            ChatOutboxPort chatOutboxPort,
             ChatUserLookupPort chatUserLookupPort,
             PaymentTokenUseCase paymentTokenUseCase
     ) {
         this.chatPersistencePort = chatPersistencePort;
-        this.chatEventPublisherPort = chatEventPublisherPort;
+        this.chatOutboxPort = chatOutboxPort;
         this.chatUserLookupPort = chatUserLookupPort;
         this.paymentTokenUseCase = paymentTokenUseCase;
     }
@@ -62,11 +64,19 @@ public class ChatService implements ChatUseCase {
         userMessage.setContent(messageInput);
         userMessage.setCreatedAt(now);
         userMessage = chatPersistencePort.saveMessage(userMessage);
+
+        ChatMessageProcessing messageProcessing = new ChatMessageProcessing();
+        messageProcessing.setUserMessageId(userMessage.getId());
+        messageProcessing.setStatus(ChatMessageProcessingStatus.QUEUED);
+        messageProcessing.setCreatedAt(now);
+        messageProcessing.setUpdatedAt(now);
+        chatPersistencePort.saveMessageProcessing(messageProcessing);
+
         paymentTokenUseCase.consumeChatToken(userId, userMessage.getId());
 
         chatSession.setUpdatedAt(now);
         chatPersistencePort.saveSession(chatSession);
-        chatEventPublisherPort.publishMessageQueued(chatSession.getId(), userMessage.getId(), messageInput);
+        chatOutboxPort.enqueueMessageQueued(chatSession.getId(), userMessage.getId(), messageInput);
 
         return new ChatSendAcceptedResponse(chatSession.getId(), userMessage.getId(), "PROCESSING");
     }

@@ -21,7 +21,10 @@ public class ChatAsyncProcessor {
         this.chatMessageEventProcessor = chatMessageEventProcessor;
     }
 
-    @RabbitListener(queues = "${app.chat.messaging.rabbit.queue.chat-message-queued}")
+    @RabbitListener(
+            queues = "${app.chat.messaging.rabbit.queue.chat-message-queued}",
+            concurrency = "${app.chat.messaging.rabbit.listener.concurrency:1}"
+    )
     public void process(String payload) {
         ChatMessageQueuedEvent event = parseEvent(payload);
         chatMessageEventProcessor.process(event);

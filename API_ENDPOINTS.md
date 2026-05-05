@@ -199,11 +199,11 @@ Success response `202`:
 ```
 
 Notes:
-- Backend persists the user message first, then publishes a chat event asynchronously.
+- Backend persists the user message, token consumption, session update, and outbox event in one transaction before async delivery continues.
 - Each accepted user message consumes `1` token from the current subscription period.
 - If async assistant processing fails later, that token is refunded automatically.
-- Default mode (`CHAT_RABBIT_ENABLED=true`): publish to RabbitMQ, consume from queue, then process with n8n.
-- Fallback mode (`CHAT_RABBIT_ENABLED=false`): local async event listener processes without RabbitMQ.
+- Default mode (`CHAT_RABBIT_ENABLED=true`): transactional outbox -> RabbitMQ relay -> consumer -> n8n.
+- Fallback mode (`CHAT_RABBIT_ENABLED=false`): transactional outbox -> local async dispatch after commit.
 - Assistant response is persisted in DB before SSE dispatch is attempted.
 - If SSE is disconnected, frontend can recover data from `GET /api/v1/chat/sessions/{sessionId}/messages`.
 
@@ -330,3 +330,116 @@ All error responses return:
 - Keep and reuse `sessionId` for all follow-up `/chat/send` requests.
 - Keep an open SSE connection with `GET /api/v1/chat/subscribe/{sessionId}` for real-time assistant events.
 - Use assistant `messageId` from listed messages if you plan to send ratings.
+
+## Frontend Implementation Guide
+
+### 1. Auth and token refresh
+
+- Centralize all HTTP calls in one API client.
+- Add `Authorization: Bearer <accessToken>` automatically to protected endpoints.
+- On `401`, try exactly one `POST /api/v1/auth/refresh` and replay the original request once.
+- If refresh also fails with `401`, clear session state and redirect to login.
+- Prevent parallel refresh storms: if many requests fail with `401` at the same time, run one refresh request and queue the others until it finishes.
+
+### 2. Chat send: correct UX and duplicate prevention
+
+- When user presses send, create a local optimistic `USER` message in UI with a temporary client id and state like `sending`.
+- Disable repeated submits for the same text while the first `POST /api/v1/chat/send` is in flight.
+- If `/chat/send` returns `202`, replace the temporary id with `userMessageId` from backend and mark the message as `processing`.
+- Do not auto-retry `/chat/send` blindly after network timeout, browser abort, or unknown connection loss. The request may already have been accepted and would consume another token if sent again.
+- If send result is unknown, show a recoverable banner such as "Connection interrupted. We are checking your conversation status." then call `GET /api/v1/chat/sessions/{sessionId}/messages` to reconcile.
+- After reconciliation:
+- If the user message appears in history, keep it and continue waiting for assistant completion.
+- If it does not appear, allow the user to send again manually.
+
+### 3. SSE connection strategy
+
+- Open `GET /api/v1/chat/subscribe/{sessionId}` as soon as the session screen is active.
+- Reconnect SSE with exponential backoff, for example `1s`, `2s`, `5s`, `10s`, max `30s`.
+- On every reconnect, immediately reload `GET /api/v1/chat/sessions/{sessionId}/messages` before trusting only live events.
+- Treat SSE as a real-time delivery channel, not as the source of truth.
+- The source of truth for rendering the chat history is always `GET /api/v1/chat/sessions/{sessionId}/messages`.
+- Ignore duplicate SSE payloads if the same persisted message id is already rendered.
+- If SSE is unavailable for a prolonged period, continue polling `GET /api/v1/chat/sessions/{sessionId}/messages` every few seconds while there is at least one message still waiting for assistant completion.
+
+### 4. Recommended chat screen state machine
+
+- `idle`: input enabled, no pending request.
+- `sending`: `POST /chat/send` in flight.
+- `processing`: backend accepted the message and assistant response is still pending.
+- `completed`: assistant `ASSISTANT` message arrived.
+- `failed`: backend persisted a `SYSTEM` error message or SSE `assistant_error` was received.
+- `reconnecting`: SSE disconnected but chat can still be recovered from history endpoint.
+
+Recommended rendering behavior:
+- Show the user message immediately.
+- Show a spinner or "Analizando..." placeholder while in `processing`.
+- Replace placeholder when an `ASSISTANT` or `SYSTEM` persisted message appears in history.
+- Never depend on an internal backend processing field; those states are not exposed in v1 responses.
+
+### 5. History reconciliation logic
+
+Use `GET /api/v1/chat/sessions/{sessionId}/messages` in these cases:
+- Initial session load.
+- After browser refresh.
+- After SSE reconnect.
+- After unknown `/chat/send` result.
+- After app returns from offline state.
+- Before enabling message rating if the local state may be stale.
+
+Suggested reconciliation rule:
+- Merge by persisted `message.id`.
+- For `USER` messages, keep the oldest matching persisted item and remove local temporary duplicates.
+- For `ASSISTANT` and `SYSTEM` messages, append only if `message.id` is new.
+
+### 6. Connectivity and offline handling
+
+- Detect offline mode with browser connectivity signals, but do not trust them as exact truth.
+- If the browser goes offline while user is typing, keep the draft locally.
+- If the browser goes offline before `/chat/send` finishes, mark the message as `unknown_delivery` instead of failed.
+- When connection returns, reconcile against `GET /chat/sessions/{sessionId}/messages` before allowing resend.
+- For regular `GET` endpoints like plans, subscription, sessions, and messages, safe automatic retries with short backoff are acceptable.
+- For mutation endpoints like `/chat/send`, `/payments/checkout-sessions`, `/payments/subscription/cancel`, and `/chat/messages/{messageId}/rating`, retry only when the failure is clearly before request dispatch, not after an uncertain transport break.
+
+### 7. Error handling by endpoint type
+
+For `POST /api/v1/chat/send`:
+- `400`: show inline validation error.
+- `403` with insufficient tokens or inactive subscription: block input and refresh `GET /api/v1/payments/subscription`.
+- `403` session forbidden: return user to session list.
+- Unknown network failure: reconcile message history before offering resend.
+
+For `GET /api/v1/chat/subscribe/{sessionId}`:
+- `403` or `404`: stop reconnect loop and navigate away from the session view.
+- Transport disconnect: reconnect with backoff and refresh history.
+
+For `GET /api/v1/payments/subscription`:
+- Refresh this after accepted chat send, after assistant failure, after checkout success return, and after cancellation, because token balance or plan state may have changed.
+
+### 8. Payments flow recommendations
+
+- Use `GET /api/v1/payments/plans` to build pricing UI and disable plan buttons where `purchasable=false`.
+- After `POST /api/v1/payments/checkout-sessions`, redirect immediately to returned `url`.
+- When frontend returns from Mercado Pago success page, call `GET /api/v1/payments/subscription` and `GET /api/v1/payments/plans` to refresh plan badges and token quotas.
+- After `POST /api/v1/payments/subscription/cancel`, refresh subscription state and update UI to free-plan expectations only after backend confirms.
+- Do not assume webhook processing is instantaneous; the frontend must re-fetch subscription state instead of assuming checkout completed immediately.
+
+### 9. Minimal robust frontend flow for chat
+
+1. Create or load session.
+2. Load message history.
+3. Open SSE.
+4. Send message with optimistic local row.
+5. If `202`, mark local message as `processing` and refresh subscription summary in background.
+6. Wait for SSE, but also reconcile via history on reconnect or uncertainty.
+7. When persisted `ASSISTANT` message appears, stop pending UI.
+8. When persisted `SYSTEM` message appears, show error state and refresh subscription because token refund may have happened.
+
+## Why This Architecture Helps Frontend Resilience
+
+- `POST /api/v1/chat/send` only needs the backend to persist the minimum consistent state and accept the work; it does not wait for the full assistant pipeline to finish.
+- This reduces the time the user stays blocked on a slow network request and lowers the chance of browser/network timeouts on high-latency connections.
+- After acceptance, the frontend can safely move to a `processing` UI state while backend async processing continues through outbox + queue + consumer.
+- If the user's connection drops after acceptance, the chat is still recoverable because the source of truth is persisted in the database.
+- SSE improves responsiveness, but it is not required for correctness; the frontend can always resynchronize from `GET /api/v1/chat/sessions/{sessionId}/messages`.
+- This makes the UI robust for unstable mobile networks, intermittent Wi-Fi, browser refreshes, and temporary disconnects from SSE.

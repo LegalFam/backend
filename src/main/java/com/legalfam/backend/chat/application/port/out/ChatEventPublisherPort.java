@@ -1,7 +1,7 @@
 package com.legalfam.backend.chat.application.port.out;
 
-import java.util.UUID;
+import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 
 public interface ChatEventPublisherPort {
-    void publishMessageQueued(UUID chatSessionId, UUID userMessageId, String userMessageInput);
+    void publishMessageQueued(ChatMessageQueuedEvent event);
 }

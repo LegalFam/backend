@@ -2,7 +2,6 @@ package com.legalfam.backend.chat.infrastructure.adapter.events;
 
 import com.legalfam.backend.chat.application.port.out.ChatEventPublisherPort;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
-import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -18,7 +17,7 @@ public class SpringChatEventPublisherAdapter implements ChatEventPublisherPort {
     }
 
     @Override
-    public void publishMessageQueued(UUID chatSessionId, UUID userMessageId, String userMessageInput) {
-        applicationEventPublisher.publishEvent(new ChatMessageQueuedEvent(chatSessionId, userMessageId, userMessageInput));
+    public void publishMessageQueued(ChatMessageQueuedEvent event) {
+        applicationEventPublisher.publishEvent(event);
     }
 }

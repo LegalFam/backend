@@ -7,8 +7,11 @@ import java.util.List;
 import java.util.UUID;
 
 public interface ChatAssistantPersistenceUseCase {
+    boolean markUserMessageProcessing(UUID userMessageId);
+
     ChatAssistantMessageDispatch persistAssistantMessage(
             UUID chatSessionId,
+            UUID userMessageId,
             String assistantMessageText,
             List<ChatCitationResponse> citations
     );
@@ -19,4 +22,6 @@ public interface ChatAssistantPersistenceUseCase {
             String errorCode,
             String errorMessage
     );
+
+    void expireUserMessage(UUID userMessageId, String errorCode, String errorMessage);
 }

@@ -38,7 +38,7 @@ Examples:
 
 Examples:
 - `AuthService` uses `UserPort`, `RefreshTokenPort`, `AccessTokenPort`
-- `ChatService` uses `ChatPersistencePort`, `ChatEventPublisherPort`, `ChatUserLookupPort`
+- `ChatService` uses `ChatPersistencePort`, `ChatOutboxPort`, `ChatUserLookupPort`
 - `PaymentService` uses `PaymentPersistencePort`, `PaymentGatewayPort`, `UserPort`
 
 ### 3) Domain model isolation
@@ -134,7 +134,11 @@ src/main/java/com/legalfam/backend
 #### `chat/domain`
 - `model/ChatSession`
 - `model/ChatMessage`
+- `model/ChatMessageProcessing`
+- `model/ChatMessageProcessingStatus`
 - `model/ChatCitation`
+- `model/ChatOutboxEvent`
+- `model/ChatOutboxEventStatus`
 - `model/ChatMessageRole`
 - `exception/ChatAccessDeniedException`
 - `exception/ChatNotFoundException`
@@ -157,6 +161,7 @@ src/main/java/com/legalfam/backend
 - `port/in/ChatUseCase`
 - `port/in/ChatAssistantPersistenceUseCase`
 - `port/out/ChatPersistencePort`
+- `port/out/ChatOutboxPort`
 - `port/out/ChatEventPublisherPort`
 - `port/out/ChatUserLookupPort`
 - `service/ChatService`
@@ -168,16 +173,23 @@ src/main/java/com/legalfam/backend
 - `config/AsyncConfig`
 - `config/ChatRabbitConfig`
 - `integration/N8nWebhookClient`
+- `integration/ChatOutboxRelay`
+- `integration/ChatOutboxCleanupJob`
 - `integration/ChatAsyncProcessor`
 - `integration/ChatLocalAsyncProcessor`
 - `integration/ChatMessageEventProcessor`
 - `sse/ChatSseEmitterService`
 - `persistence/ChatSessionRepository`
 - `persistence/ChatMessageRepository`
+- `persistence/ChatMessageProcessingRepository`
 - `persistence/ChatCitationRepository`
+- `persistence/ChatOutboxEventRepository`
 - `persistence/entity/ChatSessionEntity`
 - `persistence/entity/ChatMessageEntity`
+- `persistence/entity/ChatMessageProcessingEntity`
 - `persistence/entity/ChatCitationEntity`
+- `persistence/entity/ChatOutboxEventEntity`
+- `adapter/events/TransactionalChatOutboxAdapter`
 - `adapter/events/SpringChatEventPublisherAdapter`
 - `adapter/events/RabbitChatEventPublisherAdapter`
 - `adapter/persistence/JpaChatPersistenceAdapter`
@@ -249,6 +261,13 @@ src/main/java/com/legalfam/backend
 
 This section explains how to model the backend with C4: Context -> Containers -> Components -> Code.
 
+General rules for all C4 diagrams in this repo:
+- Name each relationship with an action-oriented label, not only the transport. Example: `Sends chat request`, `Reads/writes business data`, `Publishes queued chat events`.
+- After the relationship name, describe the communication method in parentheses. Example: `(HTTPS JSON)`, `(AMQP)`, `(JPA/Hibernate over PostgreSQL)`, `(SSE over HTTPS)`.
+- Do not duplicate relationships between the same two elements just because the internal use case is different. If one container both reads and writes to PostgreSQL, model one relationship such as `Reads/writes business and outbox data`.
+- Keep relationship labels business-meaningful at Level 1 and Level 2. Move technical subflows such as outbox persistence, retry policy, or specific listeners to Level 3.
+- Prefer one directional arrow per actual initiator. If communication is bidirectional in practice, model the dominant request direction unless the reverse path is independently important.
+
 ### 1) System Context (Level 1)
 Model the backend as one system and include external actors/systems.
 
@@ -257,40 +276,57 @@ Actors:
 - `Administrator`: uploads and curates legal files directly in `n8n` (not in backend endpoints)
 
 External systems:
+- `Mercado Pago`: payment provider for subscription checkout and billing events
 - `Gemini API`: LLM + file search used by the RAG flow
 
 System under design:
-- `LegalFam Backend API` (Spring Boot)
+- `LegalFam Web Platform`
 
 Relationships:
-- `Vulnerable User -> Backend API` (HTTPS JSON + SSE)
-- `Backend API -> PostgreSQL` (JPA/Hibernate)
-- `Backend API -> RabbitMQ` (AMQP)
-- `Backend API -> n8n` (HTTP webhook)
-- `n8n -> Gemini API` (HTTPS)
-- `Administrator -> n8n` (direct ingestion/curation workflows)
+- `Vulnerable User -> LegalFam Web Platform`: `Uses legal chat and subscription features` `(Browser interaction)`
+- `Administrator -> LegalFam Web Platform`: `Uses administration and curation capabilities` `(Browser interaction)`
+- `LegalFam Web Platform -> Mercado Pago`: `Uses subscription checkout and billing services` `(HTTPS API + webhooks)`
+- `LegalFam Web Platform -> Gemini API`: `Uses AI retrieval and generation capabilities` `(Indirect AI workflow dependency)`
 
 ### 2) Containers (Level 2)
 Define runtime containers:
+- `Frontend Web Application`: browser-facing UI for end users and administrators
 - `Spring Boot Application`: hosts `auth`, `chat`, `security`, `common`
 - `n8n` (internal): orchestrates chat/RAG workflow, manages admin ingestion workflows
-- `PostgreSQL`: stores `users`, `refresh_tokens`, `chat_session`, `chat_message`, `citations`, `subscriptions`, `token_transactions`, `payment_webhook_events`
+- `PostgreSQL`: stores `users`, `refresh_tokens`, `chat_session`, `chat_message`, `chat_message_processing`, `citations`, `chat_outbox_event`, `subscriptions`, `token_transactions`, `payment_webhook_events`
 - `RabbitMQ` (internal): async event broker for chat
 - `Mercado Pago` (external): subscription checkout and recurring payment notifications
 - `Gemini API` (external)
 
 Container connections:
-- `Vulnerable User -> Spring Boot API` (REST + SSE)
-- `Spring Boot API -> PostgreSQL` (JPA/Hibernate)
-- `Spring Boot API -> RabbitMQ` (publish `chat.message.queued.v1`)
-- `RabbitMQ -> Spring Boot API` (consume `chat.message.queued.q`)
-- `Spring Boot API -> Mercado Pago` (subscription checkout, cancellation, subscription lookup)
-- `Spring Boot API -> n8n` (HTTP POST through `N8nWebhookClient`)
-- `n8n -> Gemini API` (HTTPS)
-- `Administrator -> n8n` (direct file upload/curation)
+- `Vulnerable User -> Frontend Web Application`: `Uses chat and subscription UI` `(Browser interaction)`
+- `Administrator -> Frontend Web Application`: `Uses administration UI` `(Browser interaction)`
+- `Frontend Web Application -> Spring Boot Application`: `Calls backend API and receives SSE updates` `(HTTPS JSON + SSE over HTTPS)`
+- `Spring Boot Application -> PostgreSQL`: `Reads/writes users, auth, chat, payments, and chat outbox data` `(JPA/Hibernate over PostgreSQL)`
+- `Spring Boot Application -> RabbitMQ`: `Publishes queued chat processing events` `(AMQP 0-9-1, publisher confirms)`
+- `RabbitMQ -> Spring Boot Application`: `Delivers queued chat events to consumer` `(AMQP 0-9-1, durable quorum queue + DLQ)`
+- `Spring Boot Application -> n8n`: `Coordinates assistant processing through queued chat flow` `(AMQP producer + HTTP JSON consumer flow)`
+- `n8n -> Spring Boot Application`: `Returns assistant results indirectly through backend-managed persistence flow` `(HTTP response / integration callback semantics inside processing flow)`
+- `Spring Boot Application -> Mercado Pago`: `Creates checkout sessions, cancels subscriptions, and queries gateway state` `(HTTPS REST/SDK)`
+- `Mercado Pago -> Spring Boot Application`: `Sends subscription/payment webhooks` `(HTTPS webhook)`
+- `n8n -> Gemini API`: `Executes retrieval and generation workflow` `(HTTPS API)`
+
+Recommended relation naming pattern for Level 2:
+- Format: ``Source -> Target: Verb + business object (technical channel)``
+- Good examples:
+  - `Spring Boot Application -> PostgreSQL: Reads/writes business and outbox data (JPA/Hibernate over PostgreSQL)`
+  - `Spring Boot Application -> RabbitMQ: Publishes queued chat events (AMQP 0-9-1)`
+  - `Mercado Pago -> Spring Boot Application: Sends payment webhooks (HTTPS webhook)`
+- Avoid labels that are only technology names:
+  - Bad: `Spring Boot API -> PostgreSQL (JPA/Hibernate)`
+  - Better: `Spring Boot API -> PostgreSQL: Reads/writes business data (JPA/Hibernate over PostgreSQL)`
 
 ### 3) Components (Level 3)
-Break Spring Boot into module components.
+Break the main runtime containers into relevant components. In this system, prioritize:
+- `Spring Boot Application` components
+- `n8n` workflow/integration components
+
+Do not create a separate C4 component view for `common` or `security` as if they were business modules. Keep them inside the backend component view only when they are needed for understanding a concrete flow.
 
 #### Auth Components
 - API: `AuthController`, `AuthExceptionHandler`
@@ -302,9 +338,9 @@ Break Spring Boot into module components.
 #### Chat Components
 - API: `ChatController`, `ChatExceptionHandler`
 - Application: `ChatUseCase`, `ChatService`, `ChatAssistantPersistenceService`
-- Ports: `ChatPersistencePort`, `ChatEventPublisherPort`, `ChatUserLookupPort`, `ChatAssistantPersistenceUseCase`
-- Adapters/infra: `JpaChatPersistenceAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `N8nWebhookClient`, `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `ChatSseEmitterService`, `UserIdentityChatLookupAdapter`
-- Domain: `ChatSession`, `ChatMessage`, `ChatCitation`, `ChatMessageRole`, chat exceptions
+- Ports: `ChatPersistencePort`, `ChatOutboxPort`, `ChatEventPublisherPort`, `ChatUserLookupPort`, `ChatAssistantPersistenceUseCase`
+- Adapters/infra: `JpaChatPersistenceAdapter`, `TransactionalChatOutboxAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `ChatOutboxRelay`, `ChatOutboxCleanupJob`, `N8nWebhookClient`, `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `ChatSseEmitterService`, `UserIdentityChatLookupAdapter`
+- Domain: `ChatSession`, `ChatMessage`, `ChatMessageProcessing`, `ChatMessageProcessingStatus`, `ChatCitation`, `ChatOutboxEvent`, `ChatOutboxEventStatus`, `ChatMessageRole`, chat exceptions
 
 #### Payment Components
 - API: `PaymentController`, `PaymentWebhookController`, `PaymentExceptionHandler`
@@ -342,15 +378,17 @@ Instruction for `chat` class diagram:
 1. Include packages: `chat.domain`, `chat.application`, `chat.infrastructure`
 2. Show main classes/interfaces:
    - `ChatController`, `ChatUseCase`, `ChatService`, `ChatAssistantPersistenceService`
-   - `ChatPersistencePort`, `ChatEventPublisherPort`, `ChatUserLookupPort`, `ChatAssistantPersistenceUseCase`
-   - `JpaChatPersistenceAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `UserIdentityChatLookupAdapter`
-   - `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `N8nWebhookClient`, `ChatSseEmitterService`
-   - `ChatSession`, `ChatMessage`, `ChatCitation`, related entities
+   - `ChatPersistencePort`, `ChatOutboxPort`, `ChatEventPublisherPort`, `ChatUserLookupPort`, `ChatAssistantPersistenceUseCase`
+   - `JpaChatPersistenceAdapter`, `TransactionalChatOutboxAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `UserIdentityChatLookupAdapter`
+   - `ChatOutboxRelay`, `ChatOutboxCleanupJob`, `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `N8nWebhookClient`, `ChatSseEmitterService`
+   - `ChatSession`, `ChatMessage`, `ChatMessageProcessing`, `ChatMessageProcessingStatus`, `ChatCitation`, `ChatOutboxEvent`, related entities
 3. Show relations:
    - controller depends on `ChatUseCase`
    - service implements `ChatUseCase`
    - service depends on ports
    - adapters implement ports
+   - `ChatService` writes the user message, processing record, and outbox row in one transaction
+   - `ChatOutboxRelay` reads PostgreSQL, publishes to RabbitMQ, and updates outbox state
    - async processors consume/publish events and call application use cases
 
 Optional quality constraints for both Level 4 diagrams:
@@ -359,12 +397,50 @@ Optional quality constraints for both Level 4 diagrams:
 - Keep framework classes outside domain package
 - Avoid showing utility/noise classes unless they are architectural boundaries
 
+Modeling note for Level 3:
+- This is the right level to show the chat outbox flow explicitly.
+- Example component relationships worth naming:
+  - `ChatService -> ChatPersistencePort`: `Persists session/message state`
+  - `ChatService -> ChatOutboxPort`: `Registers queued chat event`
+  - `TransactionalChatOutboxAdapter -> PostgreSQL`: `Stores outbox event`
+  - `ChatOutboxRelay -> ChatEventPublisherPort`: `Publishes ready outbox event`
+  - `RabbitChatEventPublisherAdapter -> RabbitMQ`: `Publishes chat.message.queued.v1`
+  - `ChatAsyncProcessor -> ChatMessageEventProcessor`: `Consumes queued chat event`
+  - `ChatMessageEventProcessor -> N8nWebhookClient`: `Requests assistant response`
+
 ## Suggested Diagram Set
 - `c4-context-backend` (Level 1)
-- `c4-container-backend` (Level 2)
-- `c4-component-auth` (Level 3)
-- `c4-component-chat` (Level 3)
-- `c4-component-payment` (Level 3)
-- `c4-component-common-security` (Level 3)
+- Scope:
+  - `Vulnerable User`
+  - `Administrator`
+  - `LegalFam Web App`
+  - `Mercado Pago`
+  - `Gemini API`
+- Main idea:
+  - users/admin interact with the web system, and the web system depends on backend capabilities plus external payment/AI ecosystem
+
+- `c4-container-platform` (Level 2)
+- Scope:
+  - `Vulnerable User -> Frontend Web Application -> Spring Boot Application`
+  - `Spring Boot Application <-> n8n`
+  - `Spring Boot Application -> Mercado Pago`
+  - `n8n -> Gemini API`
+  - supporting internal containers: `PostgreSQL`, `RabbitMQ`
+
+- `c4-component-backend` (Level 3)
+- Scope:
+  - backend components for `auth`, `chat`, `payment`
+  - include `common` and `security` only as supporting internals when they clarify a flow, not as standalone business modules
+
+- `c4-component-n8n` (Level 3)
+- Scope:
+  - chat/RAG workflow orchestration
+  - ingestion/curation workflows
+  - Gemini integration boundary
+
 - `l4-class-auth.puml` (Level 4)
 - `l4-class-chat.puml` (Level 4)
+- `l4-class-payment.puml` (Level 4)
+- Scope:
+  - code diagrams should be organized by business module only: `auth`, `chat`, `payment`
+  - do not create Level 4 module diagrams for `common` or `security`

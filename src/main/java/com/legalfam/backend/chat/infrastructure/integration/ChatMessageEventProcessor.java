@@ -38,6 +38,11 @@ public class ChatMessageEventProcessor {
         UUID userMessageId = event.userMessageId();
         String userMessageInput = event.userMessageInput();
 
+        if (!chatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)) {
+            log.debug("Ignoring duplicate or terminal chat event userMessageId={}", userMessageId);
+            return;
+        }
+
         JsonNode root;
         try {
             root = n8nWebhookClient.sendMessage(userMessageInput, chatSessionId);
@@ -67,6 +72,7 @@ public class ChatMessageEventProcessor {
         List<ChatCitationResponse> citations = extractCitations(root.get("citations"));
         ChatAssistantMessageDispatch dispatch = chatAssistantPersistenceUseCase.persistAssistantMessage(
                 chatSessionId,
+                userMessageId,
                 message,
                 citations
         );

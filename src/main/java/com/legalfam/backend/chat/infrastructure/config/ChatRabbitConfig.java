@@ -36,11 +36,14 @@ public class ChatRabbitConfig {
     public Queue chatMessageQueuedQueue(
             @Value("${app.chat.messaging.rabbit.queue.chat-message-queued}") String queueName,
             @Value("${app.chat.messaging.rabbit.exchange.dlx}") String deadLetterExchange,
-            @Value("${app.chat.messaging.rabbit.routing-key.dlq}") String deadLetterRoutingKey
+            @Value("${app.chat.messaging.rabbit.routing-key.dlq}") String deadLetterRoutingKey,
+            @Value("${app.chat.messaging.rabbit.queue.ttl-ms:10800000}") long messageTtlMs
     ) {
         return QueueBuilder.durable(queueName)
                 .deadLetterExchange(deadLetterExchange)
                 .deadLetterRoutingKey(deadLetterRoutingKey)
+                .ttl((int) messageTtlMs)
+                .withArgument("x-queue-type", "quorum")
                 .build();
     }
 

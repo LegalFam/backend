@@ -9,6 +9,8 @@ import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.port.in.ChatAssistantPersistenceUseCase;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
+import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
+import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
 import com.legalfam.backend.payment.application.port.in.PaymentTokenUseCase;
@@ -38,8 +40,45 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
 
     @Transactional
     @Override
+    public boolean markUserMessageProcessing(UUID userMessageId) {
+        ChatMessage userMessage = chatPersistencePort.findMessageById(userMessageId).orElse(null);
+        if (userMessage == null) {
+            log.warn("Skipping processing start: chat message not found userMessageId={}", userMessageId);
+            return false;
+        }
+        if (userMessage.getRole() != ChatMessageRole.USER) {
+            log.warn("Skipping processing start: message is not a user message userMessageId={} role={}",
+                    userMessageId, userMessage.getRole());
+            return false;
+        }
+
+        ChatMessageProcessing processing = chatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
+                .orElseGet(() -> initializeProcessingRecord(userMessageId, Instant.now()));
+        if (processing.getStatus() == ChatMessageProcessingStatus.COMPLETED
+                || processing.getStatus() == ChatMessageProcessingStatus.FAILED
+                || processing.getStatus() == ChatMessageProcessingStatus.EXPIRED) {
+            return false;
+        }
+        if (processing.getStatus() == ChatMessageProcessingStatus.PROCESSING) {
+            return true;
+        }
+
+        Instant now = Instant.now();
+        processing.setStatus(ChatMessageProcessingStatus.PROCESSING);
+        processing.setStartedAt(now);
+        processing.setFinishedAt(null);
+        processing.setErrorCode(null);
+        processing.setErrorMessage(null);
+        processing.setUpdatedAt(now);
+        chatPersistencePort.saveMessageProcessing(processing);
+        return true;
+    }
+
+    @Transactional
+    @Override
     public ChatAssistantMessageDispatch persistAssistantMessage(
             UUID chatSessionId,
+            UUID userMessageId,
             String assistantMessageText,
             List<ChatCitationResponse> citations
     ) {
@@ -58,6 +97,7 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
         assistantMessage = chatPersistencePort.saveMessage(assistantMessage);
 
         persistCitations(assistantMessage, citations);
+        markUserMessageCompleted(userMessageId, now);
 
         chatSession.setUpdatedAt(now);
         chatPersistencePort.saveSession(chatSession);
@@ -96,6 +136,7 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
         failureMessage.setContent(errorMessage);
         failureMessage.setCreatedAt(now);
         failureMessage = chatPersistencePort.saveMessage(failureMessage);
+        markUserMessageFailed(userMessageId, errorCode, errorMessage, now);
 
         chatSession.setUpdatedAt(now);
         chatPersistencePort.saveSession(chatSession);
@@ -114,6 +155,33 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
         );
     }
 
+    @Transactional
+    @Override
+    public void expireUserMessage(UUID userMessageId, String errorCode, String errorMessage) {
+        Instant now = Instant.now();
+        ChatMessage userMessage = chatPersistencePort.findMessageById(userMessageId).orElse(null);
+        if (userMessage == null || userMessage.getRole() != ChatMessageRole.USER) {
+            return;
+        }
+        ChatMessageProcessing processing = chatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
+                .orElseGet(() -> initializeProcessingRecord(userMessageId, now));
+        if (processing.getStatus() == ChatMessageProcessingStatus.COMPLETED
+                || processing.getStatus() == ChatMessageProcessingStatus.FAILED
+                || processing.getStatus() == ChatMessageProcessingStatus.EXPIRED) {
+            return;
+        }
+
+        processing.setStatus(ChatMessageProcessingStatus.EXPIRED);
+        processing.setErrorCode(errorCode);
+        processing.setErrorMessage(errorMessage);
+        if (processing.getStartedAt() == null) {
+            processing.setStartedAt(now);
+        }
+        processing.setFinishedAt(now);
+        processing.setUpdatedAt(now);
+        chatPersistencePort.saveMessageProcessing(processing);
+    }
+
     private void persistCitations(ChatMessage assistantMessage, List<ChatCitationResponse> citations) {
         for (ChatCitationResponse citation : citations) {
             ChatCitation entity = new ChatCitation();
@@ -127,6 +195,51 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
 
     private String defaultString(String value) {
         return value == null ? "" : value;
+    }
+
+    private void markUserMessageCompleted(UUID userMessageId, Instant now) {
+        ChatMessage userMessage = chatPersistencePort.findMessageById(userMessageId).orElse(null);
+        if (userMessage == null || userMessage.getRole() != ChatMessageRole.USER) {
+            return;
+        }
+        ChatMessageProcessing processing = chatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
+                .orElseGet(() -> initializeProcessingRecord(userMessageId, now));
+        processing.setStatus(ChatMessageProcessingStatus.COMPLETED);
+        processing.setFinishedAt(now);
+        processing.setErrorCode(null);
+        processing.setErrorMessage(null);
+        if (processing.getStartedAt() == null) {
+            processing.setStartedAt(now);
+        }
+        processing.setUpdatedAt(now);
+        chatPersistencePort.saveMessageProcessing(processing);
+    }
+
+    private void markUserMessageFailed(UUID userMessageId, String errorCode, String errorMessage, Instant now) {
+        ChatMessage userMessage = chatPersistencePort.findMessageById(userMessageId).orElse(null);
+        if (userMessage == null || userMessage.getRole() != ChatMessageRole.USER) {
+            return;
+        }
+        ChatMessageProcessing processing = chatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
+                .orElseGet(() -> initializeProcessingRecord(userMessageId, now));
+        processing.setStatus(ChatMessageProcessingStatus.FAILED);
+        processing.setErrorCode(errorCode);
+        processing.setErrorMessage(errorMessage);
+        if (processing.getStartedAt() == null) {
+            processing.setStartedAt(now);
+        }
+        processing.setFinishedAt(now);
+        processing.setUpdatedAt(now);
+        chatPersistencePort.saveMessageProcessing(processing);
+    }
+
+    private ChatMessageProcessing initializeProcessingRecord(UUID userMessageId, Instant now) {
+        ChatMessageProcessing processing = new ChatMessageProcessing();
+        processing.setUserMessageId(userMessageId);
+        processing.setStatus(ChatMessageProcessingStatus.QUEUED);
+        processing.setCreatedAt(now);
+        processing.setUpdatedAt(now);
+        return processing;
     }
 
 }

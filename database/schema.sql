@@ -44,6 +44,43 @@ CREATE TABLE IF NOT EXISTS chat_message (
 CREATE INDEX idx_chat_message_session_created_at
     ON chat_message(chat_session_id, created_at ASC);
 
+CREATE TABLE IF NOT EXISTS chat_message_processing (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_message_id UUID NOT NULL UNIQUE REFERENCES chat_message(id) ON DELETE CASCADE,
+    status VARCHAR(32) NOT NULL CHECK (status IN ('QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED', 'EXPIRED')),
+    error_code VARCHAR(255) NULL,
+    error_message TEXT NULL,
+    started_at TIMESTAMP WITH TIME ZONE NULL,
+    finished_at TIMESTAMP WITH TIME ZONE NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX idx_chat_message_processing_status_updated_at
+    ON chat_message_processing(status, updated_at);
+
+CREATE TABLE IF NOT EXISTS chat_outbox_event (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_type VARCHAR(128) NOT NULL,
+    aggregate_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
+    chat_session_id UUID NOT NULL REFERENCES chat_session(id) ON DELETE CASCADE,
+    payload TEXT NOT NULL,
+    status VARCHAR(32) NOT NULL CHECK (status IN ('PENDING', 'PUBLISHED', 'FAILED', 'DEAD')),
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    available_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    published_at TIMESTAMP WITH TIME ZONE NULL,
+    last_error TEXT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX idx_chat_outbox_event_status_available_at
+    ON chat_outbox_event(status, available_at, created_at);
+
+CREATE INDEX idx_chat_outbox_event_aggregate_id
+    ON chat_outbox_event(aggregate_id);
+
 CREATE TABLE IF NOT EXISTS citations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chat_message_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,

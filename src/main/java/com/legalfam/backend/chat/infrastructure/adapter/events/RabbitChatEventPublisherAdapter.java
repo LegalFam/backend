@@ -2,7 +2,6 @@ package com.legalfam.backend.chat.infrastructure.adapter.events;
 
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.port.out.ChatEventPublisherPort;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -35,13 +34,12 @@ public class RabbitChatEventPublisherAdapter implements ChatEventPublisherPort {
     }
 
     @Override
-    public void publishMessageQueued(UUID chatSessionId, UUID userMessageId, String userMessageInput) {
+    public void publishMessageQueued(ChatMessageQueuedEvent event) {
         try {
-            ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(chatSessionId, userMessageId, userMessageInput);
             String payload = objectMapper.writeValueAsString(event);
             rabbitTemplate.convertAndSend(exchange, chatMessageQueuedRoutingKey, payload);
             log.debug("Published chat message event to RabbitMQ: exchange={}, routingKey={}, sessionId={}",
-                    exchange, chatMessageQueuedRoutingKey, chatSessionId);
+                    exchange, chatMessageQueuedRoutingKey, event.chatSessionId());
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to publish chat message event to RabbitMQ", ex);
         }

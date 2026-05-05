@@ -2,7 +2,12 @@ package com.legalfam.backend.chat.application.port.out;
 
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
+import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
+import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
+import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatSession;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,4 +28,18 @@ public interface ChatPersistencePort {
     List<ChatCitation> findCitationsByMessageIdsOrderByMessageIdAndId(List<UUID> messageIds);
 
     ChatCitation saveCitation(ChatCitation chatCitation);
+
+    ChatMessageProcessing saveMessageProcessing(ChatMessageProcessing chatMessageProcessing);
+
+    Optional<ChatMessageProcessing> findMessageProcessingByUserMessageId(UUID userMessageId);
+
+    Optional<ChatMessageProcessing> findMessageProcessingByUserMessageIdForUpdate(UUID userMessageId);
+
+    ChatOutboxEvent saveOutboxEvent(ChatOutboxEvent chatOutboxEvent);
+
+    List<ChatOutboxEvent> lockReadyOutboxEvents(Instant now, int batchSize);
+
+    long deleteOutboxEventsByStatusAndPublishedAtBefore(ChatOutboxEventStatus status, Instant threshold);
+
+    long deleteOutboxEventsByStatusInAndUpdatedAtBefore(Collection<ChatOutboxEventStatus> statuses, Instant threshold);
 }

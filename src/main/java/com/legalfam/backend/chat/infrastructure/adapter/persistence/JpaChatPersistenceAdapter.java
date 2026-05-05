@@ -3,10 +3,17 @@ package com.legalfam.backend.chat.infrastructure.adapter.persistence;
 import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
+import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
+import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
+import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatSession;
 import com.legalfam.backend.chat.infrastructure.persistence.ChatCitationRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.ChatMessageRepository;
+import com.legalfam.backend.chat.infrastructure.persistence.ChatMessageProcessingRepository;
+import com.legalfam.backend.chat.infrastructure.persistence.ChatOutboxEventRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.ChatSessionRepository;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,15 +25,21 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatCitationRepository chatCitationRepository;
+    private final ChatMessageProcessingRepository chatMessageProcessingRepository;
+    private final ChatOutboxEventRepository chatOutboxEventRepository;
 
     public JpaChatPersistenceAdapter(
             ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
-            ChatCitationRepository chatCitationRepository
+            ChatCitationRepository chatCitationRepository,
+            ChatMessageProcessingRepository chatMessageProcessingRepository,
+            ChatOutboxEventRepository chatOutboxEventRepository
     ) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.chatCitationRepository = chatCitationRepository;
+        this.chatMessageProcessingRepository = chatMessageProcessingRepository;
+        this.chatOutboxEventRepository = chatOutboxEventRepository;
     }
 
     @Override
@@ -76,5 +89,51 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
     @Override
     public ChatCitation saveCitation(ChatCitation chatCitation) {
         return ChatEntityMapper.toDomain(chatCitationRepository.save(ChatEntityMapper.toEntity(chatCitation)));
+    }
+
+    @Override
+    public ChatMessageProcessing saveMessageProcessing(ChatMessageProcessing chatMessageProcessing) {
+        return ChatEntityMapper.toDomain(
+                chatMessageProcessingRepository.save(ChatEntityMapper.toEntity(chatMessageProcessing))
+        );
+    }
+
+    @Override
+    public Optional<ChatMessageProcessing> findMessageProcessingByUserMessageId(UUID userMessageId) {
+        return chatMessageProcessingRepository.findByUserMessageId(userMessageId).map(ChatEntityMapper::toDomain);
+    }
+
+    @Override
+    public Optional<ChatMessageProcessing> findMessageProcessingByUserMessageIdForUpdate(UUID userMessageId) {
+        return Optional.ofNullable(chatMessageProcessingRepository.findByUserMessageIdForUpdate(userMessageId))
+                .map(ChatEntityMapper::toDomain);
+    }
+
+    @Override
+    public ChatOutboxEvent saveOutboxEvent(ChatOutboxEvent chatOutboxEvent) {
+        return ChatEntityMapper.toDomain(
+                chatOutboxEventRepository.save(ChatEntityMapper.toEntity(chatOutboxEvent))
+        );
+    }
+
+    @Override
+    public List<ChatOutboxEvent> lockReadyOutboxEvents(Instant now, int batchSize) {
+        return chatOutboxEventRepository.lockReadyBatch(now, batchSize)
+                .stream()
+                .map(ChatEntityMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public long deleteOutboxEventsByStatusAndPublishedAtBefore(ChatOutboxEventStatus status, Instant threshold) {
+        return chatOutboxEventRepository.deleteByStatusAndPublishedAtBefore(status, threshold);
+    }
+
+    @Override
+    public long deleteOutboxEventsByStatusInAndUpdatedAtBefore(
+            Collection<ChatOutboxEventStatus> statuses,
+            Instant threshold
+    ) {
+        return chatOutboxEventRepository.deleteByStatusInAndUpdatedAtBefore(statuses, threshold);
     }
 }
