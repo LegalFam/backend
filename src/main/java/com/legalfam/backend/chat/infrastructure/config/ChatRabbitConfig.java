@@ -33,8 +33,8 @@ public class ChatRabbitConfig {
     }
 
     @Bean
-    public Queue chatMessageQueuedQueue(
-            @Value("${app.chat.messaging.rabbit.queue.chat-message-queued}") String queueName,
+    public Queue assistantDeliveryQueue(
+            @Value("${app.chat.messaging.rabbit.queue.assistant-delivery}") String queueName,
             @Value("${app.chat.messaging.rabbit.exchange.dlx}") String deadLetterExchange,
             @Value("${app.chat.messaging.rabbit.routing-key.dlq}") String deadLetterRoutingKey,
             @Value("${app.chat.messaging.rabbit.queue.ttl-ms:10800000}") long messageTtlMs
@@ -48,28 +48,28 @@ public class ChatRabbitConfig {
     }
 
     @Bean
-    public Queue chatMessageQueuedDeadLetterQueue(
+    public Queue assistantDeliveryDeadLetterQueue(
             @Value("${app.chat.messaging.rabbit.queue.dlq}") String deadLetterQueueName
     ) {
         return QueueBuilder.durable(deadLetterQueueName).build();
     }
 
     @Bean
-    public Binding chatMessageQueuedBinding(
-            @Qualifier("chatMessageQueuedQueue") Queue chatMessageQueuedQueue,
+    public Binding assistantDeliveryBinding(
+            @Qualifier("assistantDeliveryQueue") Queue assistantDeliveryQueue,
             TopicExchange chatEventsExchange,
-            @Value("${app.chat.messaging.rabbit.routing-key.chat-message-queued}") String routingKey
+            @Value("${app.chat.messaging.rabbit.routing-key.assistant-delivery}") String routingKey
     ) {
-        return BindingBuilder.bind(chatMessageQueuedQueue).to(chatEventsExchange).with(routingKey);
+        return BindingBuilder.bind(assistantDeliveryQueue).to(chatEventsExchange).with(routingKey);
     }
 
     @Bean
-    public Binding chatMessageQueuedDeadLetterBinding(
-            @Qualifier("chatMessageQueuedDeadLetterQueue") Queue chatMessageQueuedDeadLetterQueue,
+    public Binding assistantDeliveryDeadLetterBinding(
+            @Qualifier("assistantDeliveryDeadLetterQueue") Queue assistantDeliveryDeadLetterQueue,
             DirectExchange chatDeadLetterExchange,
             @Value("${app.chat.messaging.rabbit.routing-key.dlq}") String deadLetterRoutingKey
     ) {
-        return BindingBuilder.bind(chatMessageQueuedDeadLetterQueue)
+        return BindingBuilder.bind(assistantDeliveryDeadLetterQueue)
                 .to(chatDeadLetterExchange)
                 .with(deadLetterRoutingKey);
     }

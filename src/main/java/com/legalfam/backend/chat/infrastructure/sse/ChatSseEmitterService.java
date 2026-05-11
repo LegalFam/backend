@@ -68,17 +68,17 @@ public class ChatSseEmitterService {
         return emitter;
     }
 
-    public void dispatchAssistantMessage(UUID userId, UUID sessionId, ChatAssistantMessageEvent event) {
+    public boolean dispatchAssistantMessage(UUID userId, UUID sessionId, ChatAssistantMessageEvent event) {
         Map<UUID, SseEmitter> userEmitters = emittersByUser.get(userId);
         if (userEmitters == null) {
             log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return;
+            return false;
         }
 
         SseEmitter emitter = userEmitters.get(sessionId);
         if (emitter == null) {
             log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return;
+            return false;
         }
 
         try {
@@ -86,24 +86,26 @@ public class ChatSseEmitterService {
                     .name("assistant_message")
                     .id(event.messageId().toString())
                     .data(event));
+            return true;
         } catch (IOException | IllegalStateException ex) {
             log.info("Failed to dispatch SSE event for userId={} sessionId={}: {}", userId, sessionId, ex.getMessage());
             removeEmitter(userId, sessionId, emitter);
             emitter.completeWithError(ex);
+            return false;
         }
     }
 
-    public void dispatchAssistantError(UUID userId, UUID sessionId, ChatAssistantErrorEvent event) {
+    public boolean dispatchAssistantError(UUID userId, UUID sessionId, ChatAssistantErrorEvent event) {
         Map<UUID, SseEmitter> userEmitters = emittersByUser.get(userId);
         if (userEmitters == null) {
             log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return;
+            return false;
         }
 
         SseEmitter emitter = userEmitters.get(sessionId);
         if (emitter == null) {
             log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return;
+            return false;
         }
 
         try {
@@ -111,10 +113,12 @@ public class ChatSseEmitterService {
                     .name("assistant_error")
                     .id(event.messageId().toString())
                     .data(event));
+            return true;
         } catch (IOException | IllegalStateException ex) {
             log.info("Failed to dispatch SSE error event for userId={} sessionId={}: {}", userId, sessionId, ex.getMessage());
             removeEmitter(userId, sessionId, emitter);
             emitter.completeWithError(ex);
+            return false;
         }
     }
 

@@ -1,7 +1,7 @@
 package com.legalfam.backend.chat.application.port.out;
 
-import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
+import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
 
 public interface ChatEventPublisherPort {
-    void publishMessageQueued(ChatMessageQueuedEvent event);
+    void publishAssistantDelivery(ChatAssistantDeliveryQueuedEvent event);
 }

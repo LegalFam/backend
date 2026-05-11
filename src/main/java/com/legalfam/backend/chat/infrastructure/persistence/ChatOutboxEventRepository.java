@@ -2,22 +2,46 @@ package com.legalfam.backend.chat.infrastructure.persistence;
 
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatOutboxEventEntity;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ChatOutboxEventRepository extends JpaRepository<ChatOutboxEventEntity, UUID> {
 
+    Optional<ChatOutboxEventEntity> findByAggregateId(UUID aggregateId);
+
+    List<ChatOutboxEventEntity> findByAggregateIdIn(List<UUID> aggregateIds);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select event from ChatOutboxEventEntity event where event.aggregateId = :aggregateId")
+    ChatOutboxEventEntity findByAggregateIdForUpdate(@Param("aggregateId") UUID aggregateId);
+
+    @Query(
+            value = """
+                    select exists(
+                        select 1
+                        from chat_outbox_event event
+                        where event.chat_session_id = :sessionId
+                          and event.status <> 'READ'
+                    )
+                    """,
+            nativeQuery = true
+    )
+    boolean existsUnreadAssistantMessageBySessionId(@Param("sessionId") UUID sessionId);
+
     @Query(
             value = """
                     select *
                     from chat_outbox_event
-                    where status in ('PENDING', 'FAILED')
+                    where status in ('PENDING', 'PUBLISHED')
                       and available_at <= :now
                     order by created_at asc
                     limit :batchSize
@@ -28,7 +52,7 @@ public interface ChatOutboxEventRepository extends JpaRepository<ChatOutboxEvent
     List<ChatOutboxEventEntity> lockReadyBatch(@Param("now") Instant now, @Param("batchSize") int batchSize);
 
     @Modifying
-    long deleteByStatusAndPublishedAtBefore(ChatOutboxEventStatus status, Instant threshold);
+    long deleteByStatusAndReadAtBefore(ChatOutboxEventStatus status, Instant threshold);
 
     @Modifying
     long deleteByStatusInAndUpdatedAtBefore(Collection<ChatOutboxEventStatus> statuses, Instant threshold);

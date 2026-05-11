@@ -203,7 +203,9 @@ class ChatControllerTest {
                         "Hola",
                         5,
                         Instant.parse("2026-01-01T00:00:00Z"),
-                        List.of(new ChatCitationResponse("Ley", "Texto", "https://example.com/ley"))
+                        List.of(new ChatCitationResponse("Ley", "Texto", "https://example.com/ley")),
+                        "PUBLISHED",
+                        null
                 )));
 
         mockMvc.perform(get("/api/v1/chat/sessions/{sessionId}/messages", sessionId))
@@ -212,6 +214,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$[0].role", is("ASSISTANT")))
                 .andExpect(jsonPath("$[0].content", is("Hola")))
                 .andExpect(jsonPath("$[0].rating", is(5)))
+                .andExpect(jsonPath("$[0].receiptStatus", is("PUBLISHED")))
                 .andExpect(jsonPath("$[0].citations[0].sourceUrl", is("https://example.com/ley")));
     }
 
@@ -227,6 +230,18 @@ class ChatControllerTest {
                 .andExpect(status().isOk());
 
         verify(chatService).rateMessage(eq(userId), eq(messageId), any());
+    }
+
+    @Test
+    void confirmReceiptReturnsNoContent() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID messageId = UUID.randomUUID();
+        authenticateAs(userId.toString());
+
+        mockMvc.perform(patch("/api/v1/chat/messages/{messageId}/receipt", messageId))
+                .andExpect(status().isNoContent());
+
+        verify(chatService).confirmAssistantReceipt(userId, messageId);
     }
 
     private void authenticateAs(String principal) {

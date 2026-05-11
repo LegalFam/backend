@@ -2,11 +2,13 @@ package com.legalfam.backend.chat.application.service;
 
 import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
+import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
 import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.event.ChatAssistantErrorEvent;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.port.in.ChatAssistantPersistenceUseCase;
+import com.legalfam.backend.chat.application.port.out.ChatOutboxPort;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
@@ -28,13 +30,16 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
     private static final Logger log = LoggerFactory.getLogger(ChatAssistantPersistenceService.class);
 
     private final ChatPersistencePort chatPersistencePort;
+    private final ChatOutboxPort chatOutboxPort;
     private final PaymentTokenUseCase paymentTokenUseCase;
 
     public ChatAssistantPersistenceService(
             ChatPersistencePort chatPersistencePort,
+            ChatOutboxPort chatOutboxPort,
             PaymentTokenUseCase paymentTokenUseCase
     ) {
         this.chatPersistencePort = chatPersistencePort;
+        this.chatOutboxPort = chatOutboxPort;
         this.paymentTokenUseCase = paymentTokenUseCase;
     }
 
@@ -102,16 +107,26 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
         chatSession.setUpdatedAt(now);
         chatPersistencePort.saveSession(chatSession);
 
+        ChatAssistantMessageEvent assistantMessageEvent = new ChatAssistantMessageEvent(
+                chatSession.getId(),
+                assistantMessage.getId(),
+                assistantMessageText,
+                assistantMessage.getCreatedAt(),
+                citations,
+                "PENDING",
+                true
+        );
+        chatOutboxPort.enqueueAssistantDelivery(new ChatAssistantDeliveryQueuedEvent(
+                chatSession.getUserId(),
+                chatSession.getId(),
+                assistantMessage.getId(),
+                assistantMessageEvent
+        ));
+
         return new ChatAssistantMessageDispatch(
                 chatSession.getUserId(),
                 chatSession.getId(),
-                new ChatAssistantMessageEvent(
-                        chatSession.getId(),
-                        assistantMessage.getId(),
-                        assistantMessageText,
-                        assistantMessage.getCreatedAt(),
-                        citations
-                )
+                assistantMessageEvent
         );
     }
 

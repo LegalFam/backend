@@ -5,7 +5,7 @@ import java.util.UUID;
 
 public class ChatOutboxEvent {
 
-    public static final String MESSAGE_QUEUED_EVENT_TYPE = "chat.message.queued.v1";
+    public static final String ASSISTANT_DELIVERY_EVENT_TYPE = "chat.assistant.delivery.v1";
 
     private UUID id;
     private String eventType;
@@ -15,8 +15,8 @@ public class ChatOutboxEvent {
     private ChatOutboxEventStatus status;
     private int attemptCount;
     private Instant availableAt;
-    private Instant expiresAt;
     private Instant publishedAt;
+    private Instant readAt;
     private String lastError;
     private Instant createdAt;
     private Instant updatedAt;
@@ -85,20 +85,20 @@ public class ChatOutboxEvent {
         this.availableAt = availableAt;
     }
 
-    public Instant getExpiresAt() {
-        return expiresAt;
-    }
-
-    public void setExpiresAt(Instant expiresAt) {
-        this.expiresAt = expiresAt;
-    }
-
     public Instant getPublishedAt() {
         return publishedAt;
     }
 
     public void setPublishedAt(Instant publishedAt) {
         this.publishedAt = publishedAt;
+    }
+
+    public Instant getReadAt() {
+        return readAt;
+    }
+
+    public void setReadAt(Instant readAt) {
+        this.readAt = readAt;
     }
 
     public String getLastError() {

@@ -94,8 +94,8 @@ final class ChatEntityMapper {
         event.setStatus(entity.getStatus());
         event.setAttemptCount(entity.getAttemptCount());
         event.setAvailableAt(entity.getAvailableAt());
-        event.setExpiresAt(entity.getExpiresAt());
         event.setPublishedAt(entity.getPublishedAt());
+        event.setReadAt(entity.getReadAt());
         event.setLastError(entity.getLastError());
         event.setCreatedAt(entity.getCreatedAt());
         event.setUpdatedAt(entity.getUpdatedAt());
@@ -112,8 +112,8 @@ final class ChatEntityMapper {
         entity.setStatus(domain.getStatus());
         entity.setAttemptCount(domain.getAttemptCount());
         entity.setAvailableAt(domain.getAvailableAt());
-        entity.setExpiresAt(domain.getExpiresAt());
         entity.setPublishedAt(domain.getPublishedAt());
+        entity.setReadAt(domain.getReadAt());
         entity.setLastError(domain.getLastError());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());

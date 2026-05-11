@@ -96,6 +96,8 @@ public class ChatController {
                     content = @Content(schema = @Schema(implementation = ChatSendAcceptedResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "409", description = "Assistant receipt confirmation is still pending",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "403", description = "Forbidden",
@@ -183,6 +185,29 @@ public class ChatController {
         UUID userId = parsePrincipalUserId(principalUserId);
         chatUseCase.rateMessage(userId, messageId, request);
         return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/chat/messages/{messageId}/receipt")
+    @Operation(summary = "Confirm assistant message receipt")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Receipt confirmed"),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Message not found",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<Void> confirmReceipt(
+            @AuthenticationPrincipal String principalUserId,
+            @PathVariable("messageId") UUID messageId
+    ) {
+        UUID userId = parsePrincipalUserId(principalUserId);
+        chatUseCase.confirmAssistantReceipt(userId, messageId);
+        return ResponseEntity.noContent().build();
     }
 
     private UUID parsePrincipalUserId(String principalUserId) {

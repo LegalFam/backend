@@ -42,11 +42,11 @@ public class ChatOutboxEventEntity {
     @Column(name = "available_at", nullable = false)
     private Instant availableAt;
 
-    @Column(name = "expires_at", nullable = false)
-    private Instant expiresAt;
-
     @Column(name = "published_at")
     private Instant publishedAt;
+
+    @Column(name = "read_at")
+    private Instant readAt;
 
     @Column(name = "last_error", columnDefinition = "TEXT")
     private String lastError;
@@ -121,20 +121,20 @@ public class ChatOutboxEventEntity {
         this.availableAt = availableAt;
     }
 
-    public Instant getExpiresAt() {
-        return expiresAt;
-    }
-
-    public void setExpiresAt(Instant expiresAt) {
-        this.expiresAt = expiresAt;
-    }
-
     public Instant getPublishedAt() {
         return publishedAt;
     }
 
     public void setPublishedAt(Instant publishedAt) {
         this.publishedAt = publishedAt;
+    }
+
+    public Instant getReadAt() {
+        return readAt;
+    }
+
+    public void setReadAt(Instant readAt) {
+        this.readAt = readAt;
     }
 
     public String getLastError() {

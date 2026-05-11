@@ -4,7 +4,6 @@ import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -17,8 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChatOutboxCleanupJob {
 
     private static final Logger log = LoggerFactory.getLogger(ChatOutboxCleanupJob.class);
-    private static final Duration PUBLISHED_RETENTION = Duration.ofDays(7);
-    private static final Duration FAILED_RETENTION = Duration.ofDays(30);
+    private static final Duration READ_RETENTION = Duration.ofDays(7);
 
     private final ChatPersistencePort chatPersistencePort;
 
@@ -30,18 +28,13 @@ public class ChatOutboxCleanupJob {
     @Transactional
     public void cleanup() {
         Instant now = Instant.now();
-        long deletedPublished = chatPersistencePort.deleteOutboxEventsByStatusAndPublishedAtBefore(
-                ChatOutboxEventStatus.PUBLISHED,
-                now.minus(PUBLISHED_RETENTION)
-        );
-        long deletedFailedOrDead = chatPersistencePort.deleteOutboxEventsByStatusInAndUpdatedAtBefore(
-                List.of(ChatOutboxEventStatus.FAILED, ChatOutboxEventStatus.DEAD),
-                now.minus(FAILED_RETENTION)
+        long deletedRead = chatPersistencePort.deleteOutboxEventsByStatusAndReadAtBefore(
+                ChatOutboxEventStatus.READ,
+                now.minus(READ_RETENTION)
         );
 
-        if (deletedPublished > 0 || deletedFailedOrDead > 0) {
-            log.info("Cleaned chat outbox events publishedDeleted={} failedOrDeadDeleted={}",
-                    deletedPublished, deletedFailedOrDead);
+        if (deletedRead > 0) {
+            log.info("Cleaned chat outbox events readDeleted={}", deletedRead);
         }
     }
 }

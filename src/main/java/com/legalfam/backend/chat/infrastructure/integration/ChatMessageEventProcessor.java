@@ -79,8 +79,6 @@ public class ChatMessageEventProcessor {
         if (dispatch == null) {
             return;
         }
-
-        chatSseEmitterService.dispatchAssistantMessage(dispatch.userId(), dispatch.chatSessionId(), dispatch.event());
     }
 
     private void persistAndDispatchFailure(

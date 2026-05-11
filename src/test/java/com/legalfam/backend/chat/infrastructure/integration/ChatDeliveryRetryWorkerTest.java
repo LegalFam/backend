@@ -8,8 +8,8 @@ import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
-import com.legalfam.backend.chat.application.port.in.ChatAssistantPersistenceUseCase;
+import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
+import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.port.out.ChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
@@ -26,7 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
-class ChatOutboxRelayTest {
+class ChatDeliveryRetryWorkerTest {
 
     @Mock
     private ChatPersistencePort chatPersistencePort;
@@ -34,95 +34,86 @@ class ChatOutboxRelayTest {
     @Mock
     private ChatEventPublisherPort chatEventPublisherPort;
 
-    @Mock
-    private ChatAssistantPersistenceUseCase chatAssistantPersistenceUseCase;
-
-    private ChatOutboxRelay chatOutboxRelay;
+    private ChatDeliveryRetryWorker chatDeliveryRetryWorker;
 
     @BeforeEach
     void setUp() {
-        chatOutboxRelay = new ChatOutboxRelay(
+        chatDeliveryRetryWorker = new ChatDeliveryRetryWorker(
                 chatPersistencePort,
                 chatEventPublisherPort,
-                chatAssistantPersistenceUseCase,
                 new ObjectMapper(),
-                50
+                50,
+                600000
         );
     }
 
     @Test
     void relayPublishesReadyEventAndMarksItPublished() throws Exception {
+        UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
-        UUID messageId = UUID.randomUUID();
-        ChatOutboxEvent outboxEvent = readyEvent(sessionId, messageId, Instant.now().plusSeconds(3600));
+        UUID assistantMessageId = UUID.randomUUID();
+        ChatOutboxEvent outboxEvent = readyEvent(userId, sessionId, assistantMessageId);
 
         when(chatPersistencePort.lockReadyOutboxEvents(any(Instant.class), eq(50))).thenReturn(List.of(outboxEvent));
         when(chatPersistencePort.saveOutboxEvent(any(ChatOutboxEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        chatOutboxRelay.relayReadyBatch();
+        chatDeliveryRetryWorker.relayReadyEvents();
 
-        verify(chatEventPublisherPort).publishMessageQueued(new ChatMessageQueuedEvent(sessionId, messageId, "hola"));
+        verify(chatEventPublisherPort).publishAssistantDelivery(any(ChatAssistantDeliveryQueuedEvent.class));
         ArgumentCaptor<ChatOutboxEvent> eventCaptor = ArgumentCaptor.forClass(ChatOutboxEvent.class);
         verify(chatPersistencePort).saveOutboxEvent(eventCaptor.capture());
         ChatOutboxEvent savedEvent = eventCaptor.getValue();
-        assertEquals(ChatOutboxEventStatus.PUBLISHED, savedEvent.getStatus());
-        assertEquals(1, savedEvent.getAttemptCount());
-        assertTrue(savedEvent.getPublishedAt() != null);
-    }
-
-    @Test
-    void relaySchedulesRetryWhenPublishFailsBeforeExpiration() throws Exception {
-        UUID sessionId = UUID.randomUUID();
-        UUID messageId = UUID.randomUUID();
-        ChatOutboxEvent outboxEvent = readyEvent(sessionId, messageId, Instant.now().plusSeconds(3600));
-
-        when(chatPersistencePort.lockReadyOutboxEvents(any(Instant.class), eq(50))).thenReturn(List.of(outboxEvent));
-        when(chatPersistencePort.saveOutboxEvent(any(ChatOutboxEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        doThrow(new IllegalStateException("Rabbit unavailable")).when(chatEventPublisherPort)
-                .publishMessageQueued(any(ChatMessageQueuedEvent.class));
-
-        chatOutboxRelay.relayReadyBatch();
-
-        ArgumentCaptor<ChatOutboxEvent> eventCaptor = ArgumentCaptor.forClass(ChatOutboxEvent.class);
-        verify(chatPersistencePort).saveOutboxEvent(eventCaptor.capture());
-        ChatOutboxEvent savedEvent = eventCaptor.getValue();
-        assertEquals(ChatOutboxEventStatus.FAILED, savedEvent.getStatus());
-        assertEquals(1, savedEvent.getAttemptCount());
+        assertEquals(ChatOutboxEventStatus.PENDING, savedEvent.getStatus());
         assertTrue(savedEvent.getAvailableAt().isAfter(savedEvent.getUpdatedAt()));
     }
 
     @Test
-    void relayMarksExpiredEventDeadAndExpiresUserMessage() throws Exception {
+    void relaySchedulesRetryWhenPublishFails() throws Exception {
+        UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
-        UUID messageId = UUID.randomUUID();
-        ChatOutboxEvent outboxEvent = readyEvent(sessionId, messageId, Instant.now().minusSeconds(1));
+        UUID assistantMessageId = UUID.randomUUID();
+        ChatOutboxEvent outboxEvent = readyEvent(userId, sessionId, assistantMessageId);
 
         when(chatPersistencePort.lockReadyOutboxEvents(any(Instant.class), eq(50))).thenReturn(List.of(outboxEvent));
         when(chatPersistencePort.saveOutboxEvent(any(ChatOutboxEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new IllegalStateException("Rabbit unavailable")).when(chatEventPublisherPort)
+                .publishAssistantDelivery(any(ChatAssistantDeliveryQueuedEvent.class));
 
-        chatOutboxRelay.relayReadyBatch();
+        chatDeliveryRetryWorker.relayReadyEvents();
 
         ArgumentCaptor<ChatOutboxEvent> eventCaptor = ArgumentCaptor.forClass(ChatOutboxEvent.class);
         verify(chatPersistencePort).saveOutboxEvent(eventCaptor.capture());
-        assertEquals(ChatOutboxEventStatus.DEAD, eventCaptor.getValue().getStatus());
-        verify(chatAssistantPersistenceUseCase).expireUserMessage(
-                eq(messageId),
-                eq("OUTBOX_EXPIRED"),
-                eq("Chat processing expired before the event could be published.")
-        );
+        ChatOutboxEvent savedEvent = eventCaptor.getValue();
+        assertEquals(ChatOutboxEventStatus.PENDING, savedEvent.getStatus());
+        assertTrue(savedEvent.getAvailableAt().isAfter(savedEvent.getUpdatedAt()));
     }
 
-    private ChatOutboxEvent readyEvent(UUID sessionId, UUID messageId, Instant expiresAt) throws Exception {
+    private ChatOutboxEvent readyEvent(UUID userId, UUID sessionId, UUID assistantMessageId) throws Exception {
+        ChatAssistantMessageEvent assistantMessageEvent = new ChatAssistantMessageEvent(
+                sessionId,
+                assistantMessageId,
+                "hola",
+                Instant.now(),
+                List.of(),
+                "PENDING",
+                true
+        );
+        ChatAssistantDeliveryQueuedEvent deliveryEvent = new ChatAssistantDeliveryQueuedEvent(
+                userId,
+                sessionId,
+                assistantMessageId,
+                assistantMessageEvent
+        );
+
         ChatOutboxEvent event = new ChatOutboxEvent();
         event.setId(UUID.randomUUID());
-        event.setEventType(ChatOutboxEvent.MESSAGE_QUEUED_EVENT_TYPE);
-        event.setAggregateId(messageId);
+        event.setEventType(ChatOutboxEvent.ASSISTANT_DELIVERY_EVENT_TYPE);
+        event.setAggregateId(assistantMessageId);
         event.setChatSessionId(sessionId);
-        event.setPayload(new ObjectMapper().writeValueAsString(new ChatMessageQueuedEvent(sessionId, messageId, "hola")));
+        event.setPayload(new ObjectMapper().writeValueAsString(deliveryEvent));
         event.setStatus(ChatOutboxEventStatus.PENDING);
         event.setAttemptCount(0);
         event.setAvailableAt(Instant.now());
-        event.setExpiresAt(expiresAt);
         event.setCreatedAt(Instant.now());
         event.setUpdatedAt(Instant.now());
         return event;

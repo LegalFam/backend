@@ -6,8 +6,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
-import com.legalfam.backend.chat.application.port.out.ChatOutboxPort;
 import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.ChatUserLookupPort;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
@@ -24,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
@@ -32,19 +33,19 @@ class ChatServiceTest {
     private ChatPersistencePort chatPersistencePort;
 
     @Mock
-    private ChatOutboxPort chatOutboxPort;
-
-    @Mock
     private ChatUserLookupPort chatUserLookupPort;
 
     @Mock
     private PaymentTokenUseCase paymentTokenUseCase;
 
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
+
     @InjectMocks
     private ChatService chatService;
 
     @Test
-    void sendPersistsQueuedMessageConsumesTokenAndEnqueuesOutbox() {
+    void sendPersistsQueuedMessageConsumesTokenAndPublishesLocalAsyncEvent() {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
         UUID userMessageId = UUID.randomUUID();
@@ -55,6 +56,7 @@ class ChatServiceTest {
 
         when(chatUserLookupPort.existsById(userId)).thenReturn(true);
         when(chatPersistencePort.findSessionById(sessionId)).thenReturn(Optional.of(session));
+        when(chatPersistencePort.existsUnreadAssistantMessageBySessionId(sessionId)).thenReturn(false);
         when(chatPersistencePort.saveMessage(any(ChatMessage.class))).thenAnswer(invocation -> {
             ChatMessage message = invocation.getArgument(0);
             message.setId(userMessageId);
@@ -79,7 +81,7 @@ class ChatServiceTest {
         assertEquals(ChatMessageProcessingStatus.QUEUED, processingCaptor.getValue().getStatus());
 
         verify(paymentTokenUseCase).consumeChatToken(userId, userMessageId);
-        verify(chatOutboxPort).enqueueMessageQueued(sessionId, userMessageId, "hola");
+        verify(applicationEventPublisher).publishEvent(new ChatMessageQueuedEvent(sessionId, userMessageId, "hola"));
         assertEquals(sessionId, response.sessionId());
         assertEquals(userMessageId, response.userMessageId());
         assertEquals("PROCESSING", response.status());

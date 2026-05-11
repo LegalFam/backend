@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.legalfam.backend.chat.domain.exception.PendingAssistantMessageException;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import com.legalfam.backend.chat.infrastructure.api.handler.ChatExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,12 +39,29 @@ class ChatExceptionHandlerTest {
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
     }
 
+    @Test
+    void mapsPendingAssistantMessageToConflict() throws Exception {
+        mockMvc.perform(get("/api/v1/chat/errors/pending"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type", is("chat_state_error")))
+                .andExpect(jsonPath("$.code", is("assistant_receipt_pending")))
+                .andExpect(jsonPath("$.message", is("Assistant receipt confirmation is still pending for this session")))
+                .andExpect(jsonPath("$.status", is(409)))
+                .andExpect(jsonPath("$.path", is("/api/v1/chat/errors/pending")))
+                .andExpect(jsonPath("$.timestamp", notNullValue()));
+    }
+
     @RestController
     private static class ThrowingChatController {
 
         @GetMapping("/api/v1/chat/errors/upstream")
         String upstream() {
             throw new ChatUpstreamException("n8n service unavailable");
+        }
+
+        @GetMapping("/api/v1/chat/errors/pending")
+        String pending() {
+            throw new PendingAssistantMessageException("Assistant receipt confirmation is still pending for this session");
         }
     }
 }

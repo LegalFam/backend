@@ -4,6 +4,7 @@ import com.legalfam.backend.chat.domain.exception.ChatAccessDeniedException;
 import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
+import com.legalfam.backend.chat.domain.exception.PendingAssistantMessageException;
 import com.legalfam.backend.common.error.ApiError;
 import com.legalfam.backend.common.error.ApiErrorFactory;
 import jakarta.servlet.http.HttpServletRequest;
@@ -66,6 +67,20 @@ public class ChatExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 "validation_error",
                 "invalid_request",
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(PendingAssistantMessageException.class)
+    public ResponseEntity<ApiError> handlePendingAssistantMessage(
+            PendingAssistantMessageException ex,
+            HttpServletRequest request
+    ) {
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                "chat_state_error",
+                "assistant_receipt_pending",
                 ex.getMessage(),
                 request.getRequestURI()
         );

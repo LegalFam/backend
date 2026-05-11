@@ -38,8 +38,13 @@ Examples:
 
 Examples:
 - `AuthService` uses `UserPort`, `RefreshTokenPort`, `AccessTokenPort`
-- `ChatService` uses `ChatPersistencePort`, `ChatOutboxPort`, `ChatUserLookupPort`
+- `ChatService` uses `ChatPersistencePort`, `ChatUserLookupPort`, and local application events for `n8n` processing
+- `ChatAssistantPersistenceService` uses `ChatPersistencePort` and `ChatOutboxPort`
 - `PaymentService` uses `PaymentPersistencePort`, `PaymentGatewayPort`, `UserPort`
+
+Chat-specific note:
+- `chat` keeps the `USER -> IA` processing asynchronous, but the webhook call to `n8n` should run locally after commit.
+- RabbitMQ is reserved for `IA -> USER` delivery retries and receipt confirmation flow.
 
 ### 3) Domain model isolation
 - Domain classes are plain Java classes in `domain/model`
@@ -173,11 +178,12 @@ src/main/java/com/legalfam/backend
 - `config/AsyncConfig`
 - `config/ChatRabbitConfig`
 - `integration/N8nWebhookClient`
-- `integration/ChatOutboxRelay`
 - `integration/ChatOutboxCleanupJob`
-- `integration/ChatAsyncProcessor`
 - `integration/ChatLocalAsyncProcessor`
 - `integration/ChatMessageEventProcessor`
+- `integration/ChatDeliveryRetryWorker`
+- `integration/ChatDeliveryAsyncProcessor`
+- `integration/ChatDeliveryLocalAsyncProcessor`
 - `sse/ChatSseEmitterService`
 - `persistence/ChatSessionRepository`
 - `persistence/ChatMessageRepository`
@@ -257,6 +263,38 @@ src/main/java/com/legalfam/backend
 - Add new external integrations in `infrastructure` implementing `application/port/out`
 - Keep `common` only for truly cross-module concerns
 - Keep `/api/v1/auth/**` public and all non-auth endpoints protected by JWT
+
+## Chat Module Notes
+
+### Responsibility split
+- `ChatMessageProcessing` models only the `USER -> IA` lifecycle:
+  - `QUEUED`
+  - `PROCESSING`
+  - `COMPLETED`
+  - `FAILED`
+  - `EXPIRED`
+- `ChatOutboxEvent` models only the `IA -> USER` delivery lifecycle.
+
+### Delivery states
+- `ChatOutboxEventStatus` should represent user delivery state:
+  - `PENDING`
+  - `PUBLISHED`
+  - `READ`
+- `PENDING`: assistant response exists but delivery has not been confirmed yet.
+- `PUBLISHED`: assistant response was emitted to the user at least once, but the user has not confirmed receipt.
+- `READ`: user confirmed receipt/read; no more retries should run for that message.
+
+### Async flow
+- `POST /api/v1/chat/send` persists the user message and its processing row, then triggers asynchronous processing toward `n8n`.
+- The `n8n` webhook remains asynchronous, but does not need RabbitMQ by itself.
+- When the assistant response is persisted, the backend creates a `ChatOutboxEvent` for delivery to the user.
+- `ChatDeliveryRetryWorker` periodically revisits `ChatOutboxEvent` rows that are not `READ` and schedules retries every `10` minutes.
+- `ChatDeliveryAsyncProcessor` consumes the delivery event and re-emits the assistant response to the subscribed SSE client.
+
+### Session blocking rule
+- A chat session must reject new `POST /api/v1/chat/send` requests while it has an assistant response with `ChatOutboxEvent.status != READ`.
+- The intended confirmation mechanism is an explicit protected endpoint for assistant receipt, for example:
+  - `PATCH /api/v1/chat/messages/{messageId}/receipt`
 
 ## C4 Model Guide
 
@@ -340,7 +378,7 @@ Do not create a separate C4 component view for `common` or `security` as if they
 - API: `ChatController`, `ChatExceptionHandler`
 - Application: `ChatUseCase`, `ChatService`, `ChatAssistantPersistenceService`
 - Ports: `ChatPersistencePort`, `ChatOutboxPort`, `ChatEventPublisherPort`, `ChatUserLookupPort`, `ChatAssistantPersistenceUseCase`
-- Adapters/infra: `JpaChatPersistenceAdapter`, `TransactionalChatOutboxAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `ChatOutboxRelay`, `ChatOutboxCleanupJob`, `N8nWebhookClient`, `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `ChatSseEmitterService`, `UserIdentityChatLookupAdapter`
+- Adapters/infra: `JpaChatPersistenceAdapter`, `TransactionalChatOutboxAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `ChatDeliveryRetryWorker`, `ChatOutboxCleanupJob`, `N8nWebhookClient`, `ChatDeliveryAsyncProcessor`, `ChatDeliveryLocalAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `ChatSseEmitterService`, `UserIdentityChatLookupAdapter`
 - Domain: `ChatSession`, `ChatMessage`, `ChatMessageProcessing`, `ChatMessageProcessingStatus`, `ChatCitation`, `ChatOutboxEvent`, `ChatOutboxEventStatus`, `ChatMessageRole`, chat exceptions
 
 #### Payment Components
@@ -381,7 +419,7 @@ Instruction for `chat` class diagram:
    - `ChatController`, `ChatUseCase`, `ChatService`, `ChatAssistantPersistenceService`
    - `ChatPersistencePort`, `ChatOutboxPort`, `ChatEventPublisherPort`, `ChatUserLookupPort`, `ChatAssistantPersistenceUseCase`
    - `JpaChatPersistenceAdapter`, `TransactionalChatOutboxAdapter`, `SpringChatEventPublisherAdapter`, `RabbitChatEventPublisherAdapter`, `UserIdentityChatLookupAdapter`
-   - `ChatOutboxRelay`, `ChatOutboxCleanupJob`, `ChatAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `N8nWebhookClient`, `ChatSseEmitterService`
+   - `ChatDeliveryRetryWorker`, `ChatOutboxCleanupJob`, `ChatDeliveryAsyncProcessor`, `ChatDeliveryLocalAsyncProcessor`, `ChatLocalAsyncProcessor`, `ChatMessageEventProcessor`, `N8nWebhookClient`, `ChatSseEmitterService`
    - `ChatSession`, `ChatMessage`, `ChatMessageProcessing`, `ChatMessageProcessingStatus`, `ChatCitation`, `ChatOutboxEvent`, related entities
 3. Show relations:
    - controller depends on `ChatUseCase`
@@ -389,8 +427,8 @@ Instruction for `chat` class diagram:
    - service depends on ports
    - adapters implement ports
    - `ChatService` writes the user message, processing record, and outbox row in one transaction
-   - `ChatOutboxRelay` reads PostgreSQL, publishes to RabbitMQ, and updates outbox state
-   - async processors consume/publish events and call application use cases
+   - `ChatDeliveryRetryWorker` reads PostgreSQL, republishes assistant delivery events, and updates outbox state
+   - async processors consume/publish delivery events and call application use cases
 
 Optional quality constraints for both Level 4 diagrams:
 - Stereotype interfaces as `<<port>>`
@@ -402,11 +440,12 @@ Modeling note for Level 3:
 - This is the right level to show the chat outbox flow explicitly.
 - Example component relationships worth naming:
   - `ChatService -> ChatPersistencePort`: `Persists session/message state`
-  - `ChatService -> ChatOutboxPort`: `Registers queued chat event`
+  - `ChatService -> ApplicationEventPublisher`: `Publishes local USER -> IA processing event`
   - `TransactionalChatOutboxAdapter -> PostgreSQL`: `Stores outbox event`
-  - `ChatOutboxRelay -> ChatEventPublisherPort`: `Publishes ready outbox event`
-  - `RabbitChatEventPublisherAdapter -> RabbitMQ`: `Publishes chat.message.queued.v1`
-  - `ChatAsyncProcessor -> ChatMessageEventProcessor`: `Consumes queued chat event`
+  - `ChatAssistantPersistenceService -> ChatOutboxPort`: `Registers assistant delivery event`
+  - `ChatDeliveryRetryWorker -> ChatEventPublisherPort`: `Publishes ready assistant delivery event`
+  - `RabbitChatEventPublisherAdapter -> RabbitMQ`: `Publishes chat.assistant.delivery.v1`
+  - `ChatDeliveryAsyncProcessor -> ChatSseEmitterService`: `Consumes delivery event and emits SSE`
   - `ChatMessageEventProcessor -> N8nWebhookClient`: `Requests assistant response`
 
 ## Suggested Diagram Set

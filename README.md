@@ -124,6 +124,7 @@ Token response format:
 - `GET /api/v1/chat/sessions`
 - `GET /api/v1/chat/sessions/{sessionId}/messages`
 - `PATCH /api/v1/chat/messages/{messageId}/rating`
+- `PATCH /api/v1/chat/messages/{messageId}/receipt`
 - `GET /api/v1/payments/plans`
 - `GET /api/v1/payments/subscription`
 - `POST /api/v1/payments/checkout-sessions`
@@ -342,12 +343,13 @@ Refresh token rotation is enabled: each successful refresh revokes the old refre
 ## Chat Delivery Model
 
 - `POST /api/v1/chat/send` keeps the public response contract stable and still returns `PROCESSING`.
-- The backend persists the user message, creates a separate internal processing record in state `QUEUED`, consumes one token, updates the session, and writes `chat_outbox_event` atomically in PostgreSQL.
-- `ChatOutboxRelay` polls ready outbox rows every `5s` in batches of `50` using row locking, publishes `chat.message.queued.v1`, and marks rows `PUBLISHED`, `FAILED`, or `DEAD`.
-- Relay retries after `1m`, `5m`, `15m`, `30m`, and `60m`. Outbox rows expire after `3h` by default.
-- When an outbox row expires before publication, the event is marked `DEAD` and the separate processing record becomes `EXPIRED`.
-- RabbitMQ is configured with a durable quorum queue, DLX/DLQ, main-queue TTL of `10800000` ms (`3h`), publisher confirms, and mandatory returns.
-- The consumer is idempotent: if the same `userMessageId` reaches a terminal state (`COMPLETED`, `FAILED`, `EXPIRED`), the duplicate is ignored.
+- The backend persists the user message, creates a separate internal processing record in state `QUEUED`, consumes one token, updates the session, and triggers the `n8n` webhook asynchronously after commit.
+- When the assistant response is persisted, the backend creates a `chat_outbox_event` row for delivery to the user with states `PENDING`, `PUBLISHED`, or `READ`.
+- `ChatDeliveryRetryWorker` polls ready outbox rows every `5s` in batches of `50` using row locking and republishes assistant delivery events.
+- Delivery retries are scheduled every `10` minutes while the assistant message remains unread.
+- RabbitMQ is configured with a durable quorum queue, DLX/DLQ, publisher confirms, and mandatory returns for assistant delivery events.
+- `PATCH /api/v1/chat/messages/{messageId}/receipt` marks the assistant message as `READ`.
+- While a session has an assistant response with outbox state different from `READ`, `POST /api/v1/chat/send` is rejected for that same session.
 
 ## Architecture Docs
 

@@ -37,9 +37,17 @@ public interface ChatPersistencePort {
 
     ChatOutboxEvent saveOutboxEvent(ChatOutboxEvent chatOutboxEvent);
 
+    Optional<ChatOutboxEvent> findOutboxEventByAggregateId(UUID aggregateId);
+
+    Optional<ChatOutboxEvent> findOutboxEventByAggregateIdForUpdate(UUID aggregateId);
+
+    List<ChatOutboxEvent> findOutboxEventsByAggregateIds(List<UUID> aggregateIds);
+
+    boolean existsUnreadAssistantMessageBySessionId(UUID sessionId);
+
     List<ChatOutboxEvent> lockReadyOutboxEvents(Instant now, int batchSize);
 
-    long deleteOutboxEventsByStatusAndPublishedAtBefore(ChatOutboxEventStatus status, Instant threshold);
+    long deleteOutboxEventsByStatusAndReadAtBefore(ChatOutboxEventStatus status, Instant threshold);
 
     long deleteOutboxEventsByStatusInAndUpdatedAtBefore(Collection<ChatOutboxEventStatus> statuses, Instant threshold);
 }

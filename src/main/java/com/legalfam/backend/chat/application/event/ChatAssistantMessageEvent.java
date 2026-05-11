@@ -11,6 +11,8 @@ public record ChatAssistantMessageEvent(
         UUID messageId,
         String message,
         Instant createdAt,
-        List<ChatCitationResponse> citations
+        List<ChatCitationResponse> citations,
+        String receiptStatus,
+        boolean requiresReceipt
 ) {
 }

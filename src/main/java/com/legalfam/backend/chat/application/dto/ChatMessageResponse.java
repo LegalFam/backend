@@ -10,6 +10,8 @@ public record ChatMessageResponse(
         String content,
         Integer rating,
         Instant createdAt,
-        List<ChatCitationResponse> citations
+        List<ChatCitationResponse> citations,
+        String receiptStatus,
+        Instant readAt
 ) {
 }

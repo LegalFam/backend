@@ -117,6 +117,33 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
     }
 
     @Override
+    public Optional<ChatOutboxEvent> findOutboxEventByAggregateId(UUID aggregateId) {
+        return chatOutboxEventRepository.findByAggregateId(aggregateId).map(ChatEntityMapper::toDomain);
+    }
+
+    @Override
+    public Optional<ChatOutboxEvent> findOutboxEventByAggregateIdForUpdate(UUID aggregateId) {
+        return Optional.ofNullable(chatOutboxEventRepository.findByAggregateIdForUpdate(aggregateId))
+                .map(ChatEntityMapper::toDomain);
+    }
+
+    @Override
+    public List<ChatOutboxEvent> findOutboxEventsByAggregateIds(List<UUID> aggregateIds) {
+        if (aggregateIds.isEmpty()) {
+            return List.of();
+        }
+        return chatOutboxEventRepository.findByAggregateIdIn(aggregateIds)
+                .stream()
+                .map(ChatEntityMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public boolean existsUnreadAssistantMessageBySessionId(UUID sessionId) {
+        return chatOutboxEventRepository.existsUnreadAssistantMessageBySessionId(sessionId);
+    }
+
+    @Override
     public List<ChatOutboxEvent> lockReadyOutboxEvents(Instant now, int batchSize) {
         return chatOutboxEventRepository.lockReadyBatch(now, batchSize)
                 .stream()
@@ -125,8 +152,8 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
     }
 
     @Override
-    public long deleteOutboxEventsByStatusAndPublishedAtBefore(ChatOutboxEventStatus status, Instant threshold) {
-        return chatOutboxEventRepository.deleteByStatusAndPublishedAtBefore(status, threshold);
+    public long deleteOutboxEventsByStatusAndReadAtBefore(ChatOutboxEventStatus status, Instant threshold) {
+        return chatOutboxEventRepository.deleteByStatusAndReadAtBefore(status, threshold);
     }
 
     @Override

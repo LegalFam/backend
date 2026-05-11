@@ -18,5 +18,7 @@ public interface ChatUseCase {
 
     void rateMessage(UUID userId, UUID messageId, ChatRateMessageRequest request);
 
+    void confirmAssistantReceipt(UUID userId, UUID messageId);
+
     void assertSessionOwnershipExists(UUID userId, UUID sessionId);
 }
