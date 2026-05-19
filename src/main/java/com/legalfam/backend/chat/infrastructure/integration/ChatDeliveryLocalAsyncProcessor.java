@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.Instant;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
@@ -32,7 +33,7 @@ public class ChatDeliveryLocalAsyncProcessor {
 
     @Async("chatTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void process(ChatAssistantDeliveryQueuedEvent event) {
         ChatOutboxEvent outboxEvent = chatPersistencePort.findOutboxEventByAggregateIdForUpdate(event.assistantMessageId())
                 .orElse(null);
