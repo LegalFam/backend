@@ -46,6 +46,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     private final PaymentPlanCatalogPort paymentPlanCatalogPort;
     private final UserPort userPort;
     private final String defaultCheckoutSuccessUrl;
+    private final String defaultCheckoutCancelUrl;
     private final Clock clock = Clock.systemUTC();
 
     public PaymentService(
@@ -53,23 +54,29 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
             PaymentGatewayPort paymentGatewayPort,
             PaymentPlanCatalogPort paymentPlanCatalogPort,
             UserPort userPort,
-            @Value("${app.payment.mercado-pago.checkout-success-url}") String defaultCheckoutSuccessUrl
+            @Value("${app.payment.mercado-pago.checkout-success-url}") String defaultCheckoutSuccessUrl,
+            @Value("${app.payment.mercado-pago.checkout-cancel-url:http://localhost:3000/billing/cancel}") String defaultCheckoutCancelUrl
     ) {
         this.paymentPersistencePort = paymentPersistencePort;
         this.paymentGatewayPort = paymentGatewayPort;
         this.paymentPlanCatalogPort = paymentPlanCatalogPort;
         this.userPort = userPort;
         this.defaultCheckoutSuccessUrl = defaultCheckoutSuccessUrl;
+        this.defaultCheckoutCancelUrl = defaultCheckoutCancelUrl;
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<PaymentPlanResponse> listPlans(UUID userId) {
-        Subscription subscription = paymentPersistencePort.findSubscriptionByUserId(userId).orElse(null);
-        SubscriptionPlanCode currentPlanCode = subscription == null ? SubscriptionPlanCode.FREE : subscription.getPlanCode();
+        Subscription subscription = userId == null ? null : paymentPersistencePort.findSubscriptionByUserId(userId).orElse(null);
+        SubscriptionPlanCode currentPlanCode = userId == null
+                ? null
+                : subscription == null ? SubscriptionPlanCode.FREE : subscription.getPlanCode();
         return paymentPlanCatalogPort.listPlans().stream()
                 .map(plan -> new PaymentPlanResponse(
                         plan.code().name(),
+                        plan.displayName(),
+                        plan.description(),
                         BILLING_INTERVAL,
                         plan.isFree() ? null : plan.monthlyPriceCents(),
                         plan.currency(),
@@ -104,7 +111,8 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
                 userId,
                 user.getEmail(),
                 plan,
-                firstNonBlank(request.successUrl(), defaultCheckoutSuccessUrl)
+                firstNonBlank(request.successUrl(), defaultCheckoutSuccessUrl),
+                firstNonBlank(request.cancelUrl(), defaultCheckoutCancelUrl)
         );
         return new CreateCheckoutSessionResponse(checkoutUrl);
     }

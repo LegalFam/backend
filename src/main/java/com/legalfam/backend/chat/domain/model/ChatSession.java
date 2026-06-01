@@ -7,6 +7,7 @@ public class ChatSession {
 
     private UUID id;
     private UUID userId;
+    private String title;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -24,6 +25,14 @@ public class ChatSession {
 
     public void setUserId(UUID userId) {
         this.userId = userId;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 
     public Instant getCreatedAt() {

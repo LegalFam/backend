@@ -20,6 +20,7 @@ final class ChatEntityMapper {
         ChatSession session = new ChatSession();
         session.setId(entity.getId());
         session.setUserId(entity.getUserId());
+        session.setTitle(entity.getTitle());
         session.setCreatedAt(entity.getCreatedAt());
         session.setUpdatedAt(entity.getUpdatedAt());
         return session;
@@ -29,6 +30,7 @@ final class ChatEntityMapper {
         ChatSessionEntity entity = new ChatSessionEntity();
         entity.setId(domain.getId());
         entity.setUserId(domain.getUserId());
+        entity.setTitle(domain.getTitle());
         entity.setCreatedAt(domain.getCreatedAt());
         entity.setUpdatedAt(domain.getUpdatedAt());
         return entity;

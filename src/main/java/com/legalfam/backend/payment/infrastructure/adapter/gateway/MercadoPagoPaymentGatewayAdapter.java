@@ -56,7 +56,8 @@ public class MercadoPagoPaymentGatewayAdapter implements PaymentGatewayPort {
             UUID userId,
             String email,
             PaymentPlanDefinition plan,
-            String successUrl
+            String successUrl,
+            String cancelUrl
     ) {
         requireAccessToken();
         if (email == null || email.isBlank()) {

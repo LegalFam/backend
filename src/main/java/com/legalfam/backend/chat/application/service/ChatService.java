@@ -9,6 +9,7 @@ import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
+import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import com.legalfam.backend.chat.domain.exception.ChatAccessDeniedException;
 import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
@@ -39,6 +40,7 @@ public class ChatService implements ChatUseCase {
     private final ChatUserLookupPort chatUserLookupPort;
     private final PaymentTokenUseCase paymentTokenUseCase;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private static final int MAX_SESSION_TITLE_LENGTH = 80;
 
     public ChatService(
             ChatPersistencePort chatPersistencePort,
@@ -98,18 +100,34 @@ public class ChatService implements ChatUseCase {
         session.setCreatedAt(now);
         session.setUpdatedAt(now);
         session = chatPersistencePort.saveSession(session);
-        return new ChatSessionResponse(session.getId(), session.getCreatedAt(), session.getUpdatedAt());
+        return toSessionResponse(session);
+    }
+
+    @Override
+    @Transactional
+    public ChatSessionResponse updateSession(UUID userId, UUID sessionId, ChatUpdateSessionRequest request) {
+        if (request == null || request.title() == null || request.title().isBlank()) {
+            throw new InvalidChatRequestException("Session title is required");
+        }
+
+        ChatSession session = assertSessionOwnership(userId, sessionId);
+        session.setTitle(normalizeSessionTitle(request.title()));
+        session.setUpdatedAt(Instant.now());
+        return toSessionResponse(chatPersistencePort.saveSession(session));
+    }
+
+    @Override
+    @Transactional
+    public void deleteSession(UUID userId, UUID sessionId) {
+        ChatSession session = assertSessionOwnership(userId, sessionId);
+        chatPersistencePort.deleteSessionById(session.getId());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> listSessions(UUID userId) {
         return chatPersistencePort.findSessionsByUserIdOrderByUpdatedAtDesc(userId).stream()
-                .map(session -> new ChatSessionResponse(
-                        session.getId(),
-                        session.getCreatedAt(),
-                        session.getUpdatedAt()
-                ))
+                .map(this::toSessionResponse)
                 .toList();
     }
 
@@ -212,6 +230,23 @@ public class ChatService implements ChatUseCase {
         if (!chatUserLookupPort.existsById(userId)) {
             throw new ChatAccessDeniedException("Authenticated user not found");
         }
+    }
+
+    private ChatSessionResponse toSessionResponse(ChatSession session) {
+        return new ChatSessionResponse(
+                session.getId(),
+                session.getTitle(),
+                session.getCreatedAt(),
+                session.getUpdatedAt()
+        );
+    }
+
+    private String normalizeSessionTitle(String title) {
+        String normalized = title.trim();
+        if (normalized.length() > MAX_SESSION_TITLE_LENGTH) {
+            normalized = normalized.substring(0, MAX_SESSION_TITLE_LENGTH);
+        }
+        return normalized;
     }
 
     private List<ChatCitationResponse> mapCitations(List<ChatCitation> citations) {

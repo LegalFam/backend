@@ -6,6 +6,7 @@ import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
+import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.infrastructure.sse.ChatSseEmitterService;
 import com.legalfam.backend.common.error.ApiError;
@@ -26,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -86,6 +88,51 @@ public class ChatController {
     public ResponseEntity<ChatSessionResponse> createSession(@AuthenticationPrincipal String principalUserId) {
         UUID userId = parsePrincipalUserId(principalUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(chatUseCase.createSession(userId));
+    }
+
+    @PatchMapping("/chat/sessions/{sessionId}")
+    @Operation(summary = "Update a chat session")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Session updated",
+                    content = @Content(schema = @Schema(implementation = ChatSessionResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Session not found",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<ChatSessionResponse> updateSession(
+            @AuthenticationPrincipal String principalUserId,
+            @PathVariable("sessionId") UUID sessionId,
+            @RequestBody(required = false) ChatUpdateSessionRequest request
+    ) {
+        UUID userId = parsePrincipalUserId(principalUserId);
+        return ResponseEntity.ok(chatUseCase.updateSession(userId, sessionId, request));
+    }
+
+    @DeleteMapping("/chat/sessions/{sessionId}")
+    @Operation(summary = "Delete a chat session")
+    @SecurityRequirement(name = "bearerAuth")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Session deleted"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Forbidden",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "404", description = "Session not found",
+                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+    })
+    public ResponseEntity<Void> deleteSession(
+            @AuthenticationPrincipal String principalUserId,
+            @PathVariable("sessionId") UUID sessionId
+    ) {
+        UUID userId = parsePrincipalUserId(principalUserId);
+        chatUseCase.deleteSession(userId, sessionId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/chat/send")

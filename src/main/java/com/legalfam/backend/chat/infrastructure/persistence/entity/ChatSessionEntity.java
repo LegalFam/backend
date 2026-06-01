@@ -20,6 +20,9 @@ public class ChatSessionEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @Column(name = "title", length = 80)
+    private String title;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -40,6 +43,14 @@ public class ChatSessionEntity {
 
     public void setUserId(UUID userId) {
         this.userId = userId;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
     }
 
     public Instant getCreatedAt() {

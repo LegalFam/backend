@@ -17,6 +17,8 @@ public interface ChatPersistencePort {
 
     ChatSession saveSession(ChatSession chatSession);
 
+    void deleteSessionById(UUID sessionId);
+
     List<ChatSession> findSessionsByUserIdOrderByUpdatedAtDesc(UUID userId);
 
     ChatMessage saveMessage(ChatMessage chatMessage);

@@ -66,8 +66,8 @@ class PaymentControllerTest {
         UUID userId = UUID.randomUUID();
         authenticateAs(userId.toString());
         when(paymentService.listPlans(userId)).thenReturn(List.of(
-                new PaymentPlanResponse("FREE", "month", null, "pen", 50, true, true),
-                new PaymentPlanResponse("BASIC", "month", 1499, "pen", 500, false, true)
+                new PaymentPlanResponse("FREE", "Free", "Starter access", "month", null, "pen", 50, true, true),
+                new PaymentPlanResponse("BASIC", "Basic", "Paid access", "month", 1499, "pen", 500, false, true)
         ));
 
         mockMvc.perform(get("/api/v1/payments/plans"))

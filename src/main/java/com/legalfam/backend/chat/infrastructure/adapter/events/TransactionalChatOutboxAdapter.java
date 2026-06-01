@@ -6,6 +6,7 @@ import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Instant;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -14,13 +15,16 @@ public class TransactionalChatOutboxAdapter implements ChatOutboxPort {
 
     private final ChatPersistencePort chatPersistencePort;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public TransactionalChatOutboxAdapter(
             ChatPersistencePort chatPersistencePort,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            ApplicationEventPublisher applicationEventPublisher
     ) {
         this.chatPersistencePort = chatPersistencePort;
         this.objectMapper = objectMapper;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Override
@@ -47,6 +51,7 @@ public class TransactionalChatOutboxAdapter implements ChatOutboxPort {
             }
 
             chatPersistencePort.saveOutboxEvent(event);
+            applicationEventPublisher.publishEvent(deliveryEvent);
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to register assistant delivery in chat outbox", ex);
         }

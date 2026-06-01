@@ -12,6 +12,7 @@ import com.legalfam.backend.chat.infrastructure.persistence.ChatMessageRepositor
 import com.legalfam.backend.chat.infrastructure.persistence.ChatMessageProcessingRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.ChatOutboxEventRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.ChatSessionRepository;
+import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatMessageEntity;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -50,6 +51,21 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
     @Override
     public ChatSession saveSession(ChatSession chatSession) {
         return ChatEntityMapper.toDomain(chatSessionRepository.save(ChatEntityMapper.toEntity(chatSession)));
+    }
+
+    @Override
+    public void deleteSessionById(UUID sessionId) {
+        List<UUID> messageIds = chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(sessionId)
+                .stream()
+                .map(ChatMessageEntity::getId)
+                .toList();
+        if (!messageIds.isEmpty()) {
+            chatCitationRepository.deleteByChatMessageIdIn(messageIds);
+            chatMessageProcessingRepository.deleteByUserMessageIdIn(messageIds);
+        }
+        chatOutboxEventRepository.deleteByChatSessionId(sessionId);
+        chatMessageRepository.deleteByChatSessionId(sessionId);
+        chatSessionRepository.deleteById(sessionId);
     }
 
     @Override

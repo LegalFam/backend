@@ -8,6 +8,7 @@ import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
+import com.legalfam.backend.auth.application.dto.UserResponse;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.domain.model.User;
 import com.legalfam.backend.payment.application.port.in.PaymentProvisioningUseCase;
@@ -108,7 +109,8 @@ public class AuthService implements AuthUseCase {
                 accessToken,
                 refreshToken,
                 "Bearer",
-                accessTokenPort.getAccessTokenExpirationSeconds()
+                accessTokenPort.getAccessTokenExpirationSeconds(),
+                new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone())
         );
     }
 

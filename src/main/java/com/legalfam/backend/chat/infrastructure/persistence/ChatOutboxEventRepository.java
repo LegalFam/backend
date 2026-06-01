@@ -55,5 +55,8 @@ public interface ChatOutboxEventRepository extends JpaRepository<ChatOutboxEvent
     long deleteByStatusAndReadAtBefore(ChatOutboxEventStatus status, Instant threshold);
 
     @Modifying
+    long deleteByChatSessionId(UUID chatSessionId);
+
+    @Modifying
     long deleteByStatusInAndUpdatedAtBefore(Collection<ChatOutboxEventStatus> statuses, Instant threshold);
 }

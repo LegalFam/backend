@@ -24,7 +24,13 @@ Success response `201`:
   "accessToken": "jwt-token",
   "refreshToken": "refresh-token",
   "tokenType": "Bearer",
-  "expiresIn": 900
+  "expiresIn": 900,
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "name": "Juan Perez",
+    "phone": "900000000"
+  }
 }
 ```
 
@@ -75,13 +81,15 @@ Authorization: Bearer <accessToken>
 ## Payments
 
 ### `GET /api/v1/payments/plans`
-Return the available plans for the authenticated user.
+Return the available plans. Authentication is optional; authenticated requests include `currentPlan`.
 
 Success response `200`:
 ```json
 [
   {
     "code": "FREE",
+    "displayName": "Free",
+    "description": "Starter access with a limited monthly token balance.",
     "billingInterval": "month",
     "monthlyPriceCents": null,
     "currency": "pen",
@@ -91,6 +99,8 @@ Success response `200`:
   },
   {
     "code": "BASIC",
+    "displayName": "Basic",
+    "description": "Recurring subscription with 500 monthly chat tokens.",
     "billingInterval": "month",
     "monthlyPriceCents": 1499,
     "currency": "pen",
@@ -100,6 +110,8 @@ Success response `200`:
   },
   {
     "code": "PREMIUM",
+    "displayName": "Premium",
+    "description": "Recurring subscription with 2500 monthly chat tokens.",
     "billingInterval": "month",
     "monthlyPriceCents": 4999,
     "currency": "pen",
@@ -134,7 +146,8 @@ Request body:
 ```json
 {
   "planCode": "BASIC",
-  "successUrl": "http://localhost:3000/billing/success"
+  "successUrl": "http://localhost:3000/billing/success",
+  "cancelUrl": "http://localhost:3000/billing/cancel"
 }
 ```
 
@@ -161,21 +174,6 @@ Common errors:
 Public webhook endpoint for Mercado Pago notifications.
 
 Success response `200` with empty body.
-
-### `GET /api/v1/users`
-Get all users.
-
-Success response `200`:
-```json
-[
-  {
-    "id": "uuid",
-    "email": "user@example.com",
-    "name": "Juan Perez",
-    "phone": "900000000"
-  }
-]
-```
 
 ### `POST /api/v1/chat/send`
 Send user message for asynchronous processing.  
@@ -221,10 +219,36 @@ Success response `201`:
 ```json
 {
   "id": "uuid",
+  "title": null,
   "createdAt": "2026-04-19T10:00:00Z",
   "updatedAt": "2026-04-19T10:00:00Z"
 }
 ```
+
+### `PATCH /api/v1/chat/sessions/{sessionId}`
+Rename a chat session.
+
+Request body:
+```json
+{
+  "title": "Consulta de alimentos"
+}
+```
+
+Success response `200`:
+```json
+{
+  "id": "uuid",
+  "title": "Consulta de alimentos",
+  "createdAt": "2026-04-19T10:00:00Z",
+  "updatedAt": "2026-04-19T10:01:00Z"
+}
+```
+
+### `DELETE /api/v1/chat/sessions/{sessionId}`
+Delete a chat session and its messages.
+
+Success response `204` with empty body.
 
 ### `GET /api/v1/chat/subscribe/{sessionId}`
 Subscribe to assistant events using Server-Sent Events (SSE).
@@ -249,6 +273,7 @@ Success response `200`:
 [
   {
     "id": "uuid",
+    "title": "Consulta de alimentos",
     "createdAt": "2026-04-19T10:00:00Z",
     "updatedAt": "2026-04-19T10:03:00Z"
   }
@@ -275,6 +300,8 @@ Success response `200`:
     "content": "Hola, en que puedo ayudarte?",
     "rating": 5,
     "createdAt": "2026-04-19T10:00:02Z",
+    "receiptStatus": "PUBLISHED",
+    "readAt": null,
     "citations": []
   }
 ]
@@ -304,6 +331,16 @@ Common errors:
 - `400` rating missing or outside `1..5`
 - `403` message belongs to another user
 - `404` message not found
+
+### `PATCH /api/v1/chat/messages/{messageId}/receipt`
+Confirm that an assistant message has been rendered/read by the frontend.
+
+Success response `204` with empty body.
+
+Common errors:
+- `400` message is not an assistant message
+- `403` message belongs to another user
+- `404` message or delivery event not found
 
 ## Standard Error Shape
 

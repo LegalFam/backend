@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat.infrastructure.persistence;
 
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatMessageProcessingEntity;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,4 +17,6 @@ public interface ChatMessageProcessingRepository extends JpaRepository<ChatMessa
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select processing from ChatMessageProcessingEntity processing where processing.userMessageId = :userMessageId")
     ChatMessageProcessingEntity findByUserMessageIdForUpdate(@Param("userMessageId") UUID userMessageId);
+
+    long deleteByUserMessageIdIn(Collection<UUID> userMessageIds);
 }

@@ -10,7 +10,8 @@ public interface PaymentGatewayPort {
             UUID userId,
             String email,
             PaymentPlanDefinition plan,
-            String successUrl
+            String successUrl,
+            String cancelUrl
     );
 
     void cancelSubscription(String subscriptionId);

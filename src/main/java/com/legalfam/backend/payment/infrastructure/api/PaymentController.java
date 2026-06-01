@@ -38,17 +38,15 @@ public class PaymentController {
 
     @GetMapping("/plans")
     @Operation(summary = "List available subscription plans")
-    @SecurityRequirement(name = "bearerAuth")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Plans fetched",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = PaymentPlanResponse.class)))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = PaymentPlanResponse.class))))
     })
     public ResponseEntity<List<PaymentPlanResponse>> listPlans(@AuthenticationPrincipal String principalUserId) {
-        return ResponseEntity.ok(paymentUseCase.listPlans(parsePrincipalUserId(principalUserId)));
+        UUID userId = principalUserId == null || principalUserId.isBlank()
+                ? null
+                : parsePrincipalUserId(principalUserId);
+        return ResponseEntity.ok(paymentUseCase.listPlans(userId));
     }
 
     @GetMapping("/subscription")

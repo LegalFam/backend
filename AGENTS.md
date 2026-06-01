@@ -39,18 +39,20 @@ This document describes how contributors (human or AI agents) should work in thi
 - `POST /api/v1/auth/signup`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
+- `GET /api/v1/payments/plans`
 - `POST /api/v1/payments/webhook/mercado-pago`
 
 ### Protected
 
-- `GET /api/v1/users`
 - `POST /api/v1/chat/sessions`
+- `PATCH /api/v1/chat/sessions/{sessionId}`
+- `DELETE /api/v1/chat/sessions/{sessionId}`
 - `GET /api/v1/chat/subscribe/{sessionId}`
 - `POST /api/v1/chat/send`
 - `GET /api/v1/chat/sessions`
 - `GET /api/v1/chat/sessions/{sessionId}/messages`
 - `PATCH /api/v1/chat/messages/{messageId}/rating`
-- `GET /api/v1/payments/plans`
+- `PATCH /api/v1/chat/messages/{messageId}/receipt`
 - `GET /api/v1/payments/subscription`
 - `POST /api/v1/payments/checkout-sessions`
 - `POST /api/v1/payments/subscription/cancel`
