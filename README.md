@@ -30,6 +30,8 @@ DB_PORT=5432
 DB_NAME=your_db
 DB_USER=your_user
 DB_PASSWORD=your_password
+DB_POOL_MAX_SIZE=10
+DB_POOL_MIN_IDLE=2
 JWT_SECRET=your-very-strong-secret-at-least-32-characters
 CORS_ALLOWED_ORIGINS=*
 N8N_WEBHOOK_URL=http://localhost:5678/webhook/chat-process
@@ -47,6 +49,7 @@ CHAT_RABBIT_ENABLED=true
 Notes:
 - `JWT_SECRET` must be at least 32 characters.
 - 64+ random characters is recommended for production.
+- `DB_POOL_MAX_SIZE` controls the Hikari connection pool size. Keep it at or above expected concurrent HTTP, async chat, RabbitMQ, and scheduled DB work, while staying under your PostgreSQL provider limit.
 - `CORS_ALLOWED_ORIGINS=*` allows all origins (current default behavior).
 - To allow only one origin later, set for example `CORS_ALLOWED_ORIGINS=http://localhost:3000`.
 - For the chat module, endpoint URLs and credentials still come from env (`N8N_*`, `RABBITMQ_*`), while non-secret chat settings live in `src/main/resources/chat/chat.properties`.
