@@ -24,7 +24,7 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("LegalFam")
                         .description("Web-based automated legal advisory system in Family Law, based on agents with RAG and XAI, to facilitate access to justice for low-income people in Peru")
-                        .version("v1")
+                        .version("v1.0.1")
                         .contact(new Contact().name("LegalFam")));
     }
 }
