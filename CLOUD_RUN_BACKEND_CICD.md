@@ -95,9 +95,17 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$DEPLOY_SA" \
   --role="roles/serviceusage.serviceUsageConsumer"
 
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$DEPLOY_SA" \
+  --role="roles/cloudbuild.builds.editor"
+
 gcloud storage buckets add-iam-policy-binding "gs://$CLOUDBUILD_BUCKET" \
   --member="serviceAccount:$DEPLOY_SA" \
   --role="roles/storage.objectAdmin"
+
+gcloud storage buckets add-iam-policy-binding "gs://$CLOUDBUILD_BUCKET" \
+  --member="serviceAccount:$DEPLOY_SA" \
+  --role="roles/storage.legacyBucketReader"
 ```
 
 Grant runtime access to Secret Manager:
