@@ -88,6 +88,18 @@ gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA" \
   --role="roles/iam.serviceAccountUser"
 ```
 
+Grant Cloud Build submit permissions to the deployer service account. This is the service account impersonated by GitHub Actions, so it needs to invoke Cloud Build and upload the source archive to the Cloud Build staging bucket.
+
+```sh
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$DEPLOY_SA" \
+  --role="roles/serviceusage.serviceUsageConsumer"
+
+gcloud storage buckets add-iam-policy-binding "gs://$CLOUDBUILD_BUCKET" \
+  --member="serviceAccount:$DEPLOY_SA" \
+  --role="roles/storage.objectAdmin"
+```
+
 Grant runtime access to Secret Manager:
 
 ```sh
