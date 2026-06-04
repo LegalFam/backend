@@ -380,37 +380,66 @@ VITE_API_BASE_URL=https://replace-with-backend-url/api/v1
 
 This lets GitHub Actions deploy without storing a Google service account key.
 
-```sh
-gcloud iam workload-identity-pools create github-pool \
-  --location="global" \
-  --display-name="GitHub Actions Pool"
+`GITHUB_REPO` must exactly match the repository claim sent by GitHub Actions. In a workflow run, this is the `GITHUB_REPOSITORY` value, for example `owner/repo`.
+
+If `agentic-flow` was already deployed first, the project likely already has:
+
+```text
+github-pool
+github-provider
 ```
 
+Do not recreate them. Reuse the existing provider and update its condition so both `agentic-flow` and `backend` can authenticate from `main`.
+
 ```sh
-gcloud iam workload-identity-pools providers create-oidc github-provider \
+export AGENTIC_FLOW_REPO="LegalFam/agentic-flow"
+export BACKEND_REPO="LegalFam/backend"
+export GITHUB_REPO="$BACKEND_REPO"
+```
+
+Update the provider condition so it accepts both repositories, only from `main`:
+
+```sh
+gcloud iam workload-identity-pools providers update-oidc github-provider \
   --location="global" \
   --workload-identity-pool="github-pool" \
-  --display-name="GitHub Provider" \
-  --issuer-uri="https://token.actions.githubusercontent.com" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
-  --attribute-condition="attribute.repository == '$GITHUB_REPO'"
+  --attribute-condition="(assertion.repository=='$AGENTIC_FLOW_REPO' || assertion.repository=='$BACKEND_REPO') && assertion.ref=='refs/heads/main'"
 ```
 
-Allow that GitHub repo to impersonate the deployer service account:
+Then allow the backend repo to impersonate the backend deployer service account:
 
 ```sh
 gcloud iam service-accounts add-iam-policy-binding "$DEPLOY_SA" \
   --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/$GITHUB_REPO"
+  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/$BACKEND_REPO"
 ```
 
-Get the provider resource name:
+Use this provider resource name for the backend GitHub variable `GCP_WORKLOAD_IDENTITY_PROVIDER`:
 
 ```sh
 gcloud iam workload-identity-pools providers describe github-provider \
   --location="global" \
   --workload-identity-pool="github-pool" \
   --format="value(name)"
+```
+
+### Inspect Existing Providers
+
+List providers:
+
+```sh
+gcloud iam workload-identity-pools providers list \
+  --location="global" \
+  --workload-identity-pool="github-pool"
+```
+
+Inspect the current provider condition:
+
+```sh
+gcloud iam workload-identity-pools providers describe github-provider \
+  --location="global" \
+  --workload-identity-pool="github-pool" \
+  --format="value(attributeCondition)"
 ```
 
 ## 11. Configure GitHub Repository Variables
@@ -626,6 +655,13 @@ If Cloud Build cannot push the image and shows `artifactregistry.repositories.up
 If Cloud Build says it cannot write logs:
 
 - Grant `roles/logging.logWriter` to `$CLOUDBUILD_SA`.
+
+If GitHub Actions fails with `unauthorized_client` and `The given credential is rejected by the attribute condition`:
+
+- Confirm the repository's workflow run uses the same value as `GITHUB_REPO`.
+- In GitHub Actions, the exact value is `GITHUB_REPOSITORY`.
+- Update the Workload Identity provider condition with `gcloud iam workload-identity-pools providers update-oidc`.
+- Confirm the deploy service account IAM binding uses the same repository path in the `principalSet`.
 
 If authentication fails:
 
