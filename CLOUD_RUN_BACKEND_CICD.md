@@ -110,6 +110,10 @@ gcloud storage buckets add-iam-policy-binding "gs://$CLOUDBUILD_BUCKET" \
 gcloud storage buckets add-iam-policy-binding "gs://$CLOUDBUILD_BUCKET" \
   --member="serviceAccount:$DEPLOY_SA" \
   --role="roles/storage.legacyBucketReader"
+
+gcloud iam service-accounts add-iam-policy-binding "$CLOUDBUILD_SA" \
+  --member="serviceAccount:$DEPLOY_SA" \
+  --role="roles/iam.serviceAccountUser"
 ```
 
 Grant runtime access to Secret Manager:
