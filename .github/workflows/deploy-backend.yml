@@ -1,0 +1,71 @@
+name: Deploy backend to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build image with Cloud Build
+        env:
+          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REPOSITORY }}/backend:${{ github.sha }}
+        run: |
+          gcloud builds submit . \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --tag "$IMAGE"
+
+      - name: Deploy to Cloud Run
+        env:
+          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REPOSITORY }}/backend:${{ github.sha }}
+        run: |
+          gcloud run deploy "${{ vars.CLOUD_RUN_SERVICE }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --platform managed \
+            --image "$IMAGE" \
+            --allow-unauthenticated \
+            --service-account "${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}" \
+            --port 8080 \
+            --network "${{ vars.VPC_NETWORK }}" \
+            --subnet "${{ vars.VPC_SUBNET }}" \
+            --vpc-egress "${{ vars.VPC_EGRESS }}" \
+            --set-env-vars DB_HOST="${{ vars.DB_HOST }}" \
+            --set-env-vars DB_PORT="${{ vars.DB_PORT }}" \
+            --set-env-vars DB_NAME="${{ vars.DB_NAME }}" \
+            --set-env-vars DB_USER="${{ vars.DB_USER }}" \
+            --set-env-vars DB_POOL_MAX_SIZE="${{ vars.DB_POOL_MAX_SIZE }}" \
+            --set-env-vars DB_POOL_MIN_IDLE="${{ vars.DB_POOL_MIN_IDLE }}" \
+            --set-env-vars CORS_ALLOWED_ORIGINS="${{ vars.CORS_ALLOWED_ORIGINS }}" \
+            --set-env-vars N8N_WEBHOOK_URL="${{ vars.N8N_WEBHOOK_URL }}" \
+            --set-env-vars N8N_AUTH_HEADER_NAME="${{ vars.N8N_AUTH_HEADER_NAME }}" \
+            --set-env-vars RABBITMQ_HOST="${{ vars.RABBITMQ_HOST }}" \
+            --set-env-vars RABBITMQ_PORT="${{ vars.RABBITMQ_PORT }}" \
+            --set-env-vars RABBITMQ_USER="${{ vars.RABBITMQ_USER }}" \
+            --set-env-vars RABBITMQ_VHOST="${{ vars.RABBITMQ_VHOST }}" \
+            --set-env-vars CHAT_RABBIT_ENABLED="${{ vars.CHAT_RABBIT_ENABLED }}" \
+            --set-secrets DB_PASSWORD="backend-db-password:latest" \
+            --set-secrets JWT_SECRET="backend-jwt-secret:latest" \
+            --set-secrets N8N_AUTH_TOKEN="backend-n8n-auth-token:latest" \
+            --set-secrets MERCADO_PAGO_ACCESS_TOKEN="backend-mercado-pago-access-token:latest" \
+            --set-secrets RABBITMQ_PASSWORD="backend-rabbitmq-password:latest"
