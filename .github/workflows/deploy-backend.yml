@@ -27,18 +27,78 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Build image with Cloud Build
+      - name: Prepare deployment variables
         env:
-          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REPOSITORY }}/backend:${{ github.sha }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY }}
+          CLOUD_RUN_SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+          CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT: ${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}
+          VPC_NETWORK: ${{ vars.VPC_NETWORK }}
+          VPC_SUBNET: ${{ vars.VPC_SUBNET }}
+          VPC_EGRESS: ${{ vars.VPC_EGRESS }}
+          DB_HOST: ${{ vars.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          DB_USER: ${{ vars.DB_USER }}
+          DB_POOL_MAX_SIZE: ${{ vars.DB_POOL_MAX_SIZE }}
+          DB_POOL_MIN_IDLE: ${{ vars.DB_POOL_MIN_IDLE }}
+          CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS }}
+          N8N_WEBHOOK_URL: ${{ vars.N8N_WEBHOOK_URL }}
+          N8N_AUTH_HEADER_NAME: ${{ vars.N8N_AUTH_HEADER_NAME }}
+          RABBITMQ_HOST: ${{ vars.RABBITMQ_HOST }}
+          RABBITMQ_PORT: ${{ vars.RABBITMQ_PORT }}
+          RABBITMQ_USER: ${{ vars.RABBITMQ_USER }}
+          RABBITMQ_VHOST: ${{ vars.RABBITMQ_VHOST }}
+          CHAT_RABBIT_ENABLED: ${{ vars.CHAT_RABBIT_ENABLED }}
         run: |
+          set -euo pipefail
+
+          required_vars=(
+            GCP_REGION
+            GCP_PROJECT_ID
+            ARTIFACT_REPOSITORY
+            CLOUD_RUN_SERVICE
+            CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT
+            VPC_NETWORK
+            VPC_SUBNET
+            VPC_EGRESS
+            DB_HOST
+            DB_PORT
+            DB_NAME
+            DB_USER
+            DB_POOL_MAX_SIZE
+            DB_POOL_MIN_IDLE
+            CORS_ALLOWED_ORIGINS
+            N8N_WEBHOOK_URL
+            N8N_AUTH_HEADER_NAME
+            RABBITMQ_HOST
+            RABBITMQ_PORT
+            RABBITMQ_USER
+            RABBITMQ_VHOST
+            CHAT_RABBIT_ENABLED
+          )
+
+          for var_name in "${required_vars[@]}"; do
+            if [[ -z "${!var_name}" ]]; then
+              echo "::error::Missing GitHub Actions repository variable: ${var_name}"
+              exit 1
+            fi
+          done
+
+          IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPOSITORY}/backend:${GITHUB_SHA}"
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+
+      - name: Build image with Cloud Build
+        run: |
+          set -euo pipefail
           gcloud builds submit . \
             --project "${{ vars.GCP_PROJECT_ID }}" \
             --tag "$IMAGE"
 
       - name: Deploy to Cloud Run
-        env:
-          IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.ARTIFACT_REPOSITORY }}/backend:${{ github.sha }}
         run: |
+          set -euo pipefail
           gcloud run deploy "${{ vars.CLOUD_RUN_SERVICE }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" \
             --region "${{ vars.GCP_REGION }}" \
