@@ -148,7 +148,7 @@ public class ChatMessageEventProcessor {
         if (child == null || child.isNull()) {
             return null;
         }
-        String text = child.toString();
+        String text = child.isTextual() ? child.asText() : child.toString();
         return isBlank(text) ? null : text.trim();
     }
 
