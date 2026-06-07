@@ -1,19 +1,19 @@
 package com.legalfam.backend.chat.infrastructure.integration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
 import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.port.out.ChatEventPublisherPort;
-import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
@@ -29,7 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 class ChatDeliveryRetryWorkerTest {
 
     @Mock
-    private ChatPersistencePort chatPersistencePort;
+    private ChatOutboxRelayTransactionService relayTransactionService;
 
     @Mock
     private ChatEventPublisherPort chatEventPublisherPort;
@@ -39,7 +40,7 @@ class ChatDeliveryRetryWorkerTest {
     @BeforeEach
     void setUp() {
         chatDeliveryRetryWorker = new ChatDeliveryRetryWorker(
-                chatPersistencePort,
+                relayTransactionService,
                 chatEventPublisherPort,
                 new ObjectMapper(),
                 50,
@@ -54,17 +55,19 @@ class ChatDeliveryRetryWorkerTest {
         UUID assistantMessageId = UUID.randomUUID();
         ChatOutboxEvent outboxEvent = readyEvent(userId, sessionId, assistantMessageId);
 
-        when(chatPersistencePort.lockReadyOutboxEvents(any(Instant.class), eq(50))).thenReturn(List.of(outboxEvent));
-        when(chatPersistencePort.saveOutboxEvent(any(ChatOutboxEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(relayTransactionService.claimReadyEvents(any(Instant.class), eq(50), eq(Duration.ofMillis(600000))))
+                .thenReturn(List.of(outboxEvent));
 
         chatDeliveryRetryWorker.relayReadyEvents();
 
-        verify(chatEventPublisherPort).publishAssistantDelivery(any(ChatAssistantDeliveryQueuedEvent.class));
-        ArgumentCaptor<ChatOutboxEvent> eventCaptor = ArgumentCaptor.forClass(ChatOutboxEvent.class);
-        verify(chatPersistencePort).saveOutboxEvent(eventCaptor.capture());
-        ChatOutboxEvent savedEvent = eventCaptor.getValue();
-        assertEquals(ChatOutboxEventStatus.PENDING, savedEvent.getStatus());
-        assertTrue(savedEvent.getAvailableAt().isAfter(savedEvent.getUpdatedAt()));
+        ArgumentCaptor<ChatAssistantDeliveryQueuedEvent> payloadCaptor =
+                ArgumentCaptor.forClass(ChatAssistantDeliveryQueuedEvent.class);
+        InOrder order = inOrder(relayTransactionService, chatEventPublisherPort);
+        order.verify(relayTransactionService).claimReadyEvents(any(Instant.class), eq(50), eq(Duration.ofMillis(600000)));
+        order.verify(chatEventPublisherPort).publishAssistantDelivery(payloadCaptor.capture());
+        order.verify(relayTransactionService).recordPublishSuccess(eq(assistantMessageId), any(Instant.class));
+
+        assertEquals(assistantMessageId, payloadCaptor.getValue().assistantMessageId());
     }
 
     @Test
@@ -74,18 +77,19 @@ class ChatDeliveryRetryWorkerTest {
         UUID assistantMessageId = UUID.randomUUID();
         ChatOutboxEvent outboxEvent = readyEvent(userId, sessionId, assistantMessageId);
 
-        when(chatPersistencePort.lockReadyOutboxEvents(any(Instant.class), eq(50))).thenReturn(List.of(outboxEvent));
-        when(chatPersistencePort.saveOutboxEvent(any(ChatOutboxEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(relayTransactionService.claimReadyEvents(any(Instant.class), eq(50), eq(Duration.ofMillis(600000))))
+                .thenReturn(List.of(outboxEvent));
         doThrow(new IllegalStateException("Rabbit unavailable")).when(chatEventPublisherPort)
                 .publishAssistantDelivery(any(ChatAssistantDeliveryQueuedEvent.class));
 
         chatDeliveryRetryWorker.relayReadyEvents();
 
-        ArgumentCaptor<ChatOutboxEvent> eventCaptor = ArgumentCaptor.forClass(ChatOutboxEvent.class);
-        verify(chatPersistencePort).saveOutboxEvent(eventCaptor.capture());
-        ChatOutboxEvent savedEvent = eventCaptor.getValue();
-        assertEquals(ChatOutboxEventStatus.PENDING, savedEvent.getStatus());
-        assertTrue(savedEvent.getAvailableAt().isAfter(savedEvent.getUpdatedAt()));
+        verify(relayTransactionService).recordPublishFailure(
+                eq(assistantMessageId),
+                any(Instant.class),
+                eq(Duration.ofMillis(600000)),
+                eq("Rabbit unavailable")
+        );
     }
 
     private ChatOutboxEvent readyEvent(UUID userId, UUID sessionId, UUID assistantMessageId) throws Exception {

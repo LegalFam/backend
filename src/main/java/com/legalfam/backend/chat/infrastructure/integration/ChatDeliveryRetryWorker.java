@@ -2,19 +2,18 @@ package com.legalfam.backend.chat.infrastructure.integration;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
 import com.legalfam.backend.chat.application.port.out.ChatEventPublisherPort;
-import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
@@ -23,20 +22,20 @@ public class ChatDeliveryRetryWorker {
 
     private static final Logger log = LoggerFactory.getLogger(ChatDeliveryRetryWorker.class);
 
-    private final ChatPersistencePort chatPersistencePort;
+    private final ChatOutboxRelayTransactionService relayTransactionService;
     private final ChatEventPublisherPort chatEventPublisherPort;
     private final ObjectMapper objectMapper;
     private final int batchSize;
     private final Duration retryDelay;
 
     public ChatDeliveryRetryWorker(
-            ChatPersistencePort chatPersistencePort,
+            ChatOutboxRelayTransactionService relayTransactionService,
             ChatEventPublisherPort chatEventPublisherPort,
             ObjectMapper objectMapper,
             @Value("${app.chat.outbox.relay.batch-size:50}") int batchSize,
             @Value("${app.chat.outbox.relay.retry-delay-ms:600000}") long retryDelayMs
     ) {
-        this.chatPersistencePort = chatPersistencePort;
+        this.relayTransactionService = relayTransactionService;
         this.chatEventPublisherPort = chatEventPublisherPort;
         this.objectMapper = objectMapper;
         this.batchSize = batchSize;
@@ -44,38 +43,31 @@ public class ChatDeliveryRetryWorker {
     }
 
     @Scheduled(fixedDelayString = "${app.chat.outbox.relay.fixed-delay-ms:5000}")
-    @Transactional
     public void relayReadyEvents() {
         Instant now = Instant.now();
-        List<ChatOutboxEvent> events = chatPersistencePort.lockReadyOutboxEvents(now, batchSize);
+        List<ChatOutboxEvent> events = relayTransactionService.claimReadyEvents(now, batchSize, retryDelay);
         for (ChatOutboxEvent event : events) {
-            relaySingleEvent(event, now);
+            relaySingleEvent(event);
         }
     }
 
-    private void relaySingleEvent(ChatOutboxEvent event, Instant now) {
+    private void relaySingleEvent(ChatOutboxEvent event) {
         if (event.getStatus() == ChatOutboxEventStatus.READ) {
             return;
         }
 
+        UUID aggregateId = event.getAggregateId();
+        Instant now = Instant.now();
         try {
             ChatAssistantDeliveryQueuedEvent payload =
                     objectMapper.readValue(event.getPayload(), ChatAssistantDeliveryQueuedEvent.class);
             chatEventPublisherPort.publishAssistantDelivery(payload);
-
-            event.setAvailableAt(now.plus(retryDelay));
-            event.setLastError(null);
-            event.setUpdatedAt(now);
-            chatPersistencePort.saveOutboxEvent(event);
+            relayTransactionService.recordPublishSuccess(aggregateId, now);
         } catch (Exception ex) {
-            event.setStatus(ChatOutboxEventStatus.PENDING);
-            event.setAvailableAt(now.plus(retryDelay));
-            event.setLastError(truncateError(ex.getMessage()));
-            event.setUpdatedAt(now);
-            chatPersistencePort.saveOutboxEvent(event);
-
+            String errorMessage = truncateError(ex.getMessage());
+            relayTransactionService.recordPublishFailure(aggregateId, now, retryDelay, errorMessage);
             log.warn("Failed to publish assistant delivery outbox event id={} aggregateId={} error={}",
-                    event.getId(), event.getAggregateId(), truncateError(ex.getMessage()));
+                    event.getId(), aggregateId, errorMessage);
         }
     }
 
