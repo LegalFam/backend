@@ -39,6 +39,13 @@ CREATE TABLE IF NOT EXISTS chat_message (
     role VARCHAR(32) NOT NULL CHECK (role IN ('USER', 'ASSISTANT', 'SYSTEM')),
     content TEXT NOT NULL,
     rating INTEGER NULL CHECK (rating IS NULL OR rating BETWEEN 1 AND 5),
+    feedback_comment TEXT NULL,
+    feedback_submitted_at TIMESTAMP WITH TIME ZONE NULL,
+    confidence_status VARCHAR(32) NULL CHECK (confidence_status IS NULL OR confidence_status IN ('HIGH', 'MEDIUM', 'LOW')),
+    confidence_reason TEXT NULL,
+    clarifying_questions TEXT NULL,
+    preliminary_actions TEXT NULL,
+    specialist_support_recommended BOOLEAN NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
