@@ -9,8 +9,15 @@ public record ChatMessageResponse(
         String role,
         String content,
         Integer rating,
+        String feedbackComment,
+        Instant feedbackSubmittedAt,
         Instant createdAt,
         List<ChatCitationResponse> citations,
+        String confidenceStatus,
+        String confidenceReason,
+        List<String> clarifyingQuestions,
+        List<String> preliminaryActions,
+        Boolean specialistSupportRecommended,
         String receiptStatus,
         Instant readAt
 ) {

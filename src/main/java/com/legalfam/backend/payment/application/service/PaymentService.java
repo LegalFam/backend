@@ -29,9 +29,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.nio.charset.StandardCharsets;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +51,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     private final UserPort userPort;
     private final String defaultCheckoutSuccessUrl;
     private final String defaultCheckoutCancelUrl;
+    private final String webhookSecret;
     private final Clock clock = Clock.systemUTC();
 
     public PaymentService(
@@ -55,7 +60,8 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
             PaymentPlanCatalogPort paymentPlanCatalogPort,
             UserPort userPort,
             @Value("${app.payment.mercado-pago.checkout-success-url}") String defaultCheckoutSuccessUrl,
-            @Value("${app.payment.mercado-pago.checkout-cancel-url:http://localhost:3000/billing/cancel}") String defaultCheckoutCancelUrl
+            @Value("${app.payment.mercado-pago.checkout-cancel-url:http://localhost:3000/billing/cancel}") String defaultCheckoutCancelUrl,
+            @Value("${app.payment.mercado-pago.webhook-secret:}") String webhookSecret
     ) {
         this.paymentPersistencePort = paymentPersistencePort;
         this.paymentGatewayPort = paymentGatewayPort;
@@ -63,6 +69,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         this.userPort = userPort;
         this.defaultCheckoutSuccessUrl = defaultCheckoutSuccessUrl;
         this.defaultCheckoutCancelUrl = defaultCheckoutCancelUrl;
+        this.webhookSecret = webhookSecret == null ? "" : webhookSecret.trim();
     }
 
     @Override
@@ -139,6 +146,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         if (payload == null || payload.isBlank()) {
             throw new InvalidPaymentRequestException("Webhook payload is required");
         }
+        validateWebhookSignature(payload, signatureHeader);
 
         PaymentWebhookNotification notification = paymentGatewayPort.parseWebhook(payload, signatureHeader);
         if (notification.eventId() != null
@@ -156,7 +164,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         }
 
         if (notification.eventId() != null && !notification.eventId().isBlank()) {
-            paymentPersistencePort.saveProcessedWebhookEvent(notification.eventId(), notification.eventType(), now());
+            saveWebhookEventIdempotently(notification);
         }
     }
 
@@ -495,6 +503,57 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         transaction.setDescription(description);
         transaction.setCreatedAt(now());
         paymentPersistencePort.saveTokenTransaction(transaction);
+    }
+
+    private void saveWebhookEventIdempotently(PaymentWebhookNotification notification) {
+        try {
+            paymentPersistencePort.saveProcessedWebhookEvent(notification.eventId(), notification.eventType(), now());
+        } catch (DataIntegrityViolationException ignored) {
+            // Concurrent duplicate webhook delivery: the unique event_id constraint has already recorded it.
+        }
+    }
+
+    private void validateWebhookSignature(String payload, String signatureHeader) {
+        if (webhookSecret.isBlank()) {
+            return;
+        }
+        if (signatureHeader == null || signatureHeader.isBlank()) {
+            throw new PaymentWebhookException("Webhook signature is required");
+        }
+        String expected = hmacSha256Hex(payload, webhookSecret);
+        for (String part : signatureHeader.split(",")) {
+            String[] pair = part.split("=", 2);
+            if (pair.length == 2 && pair[0].trim().equals("v1") && constantTimeEquals(expected, pair[1].trim())) {
+                return;
+            }
+        }
+        throw new PaymentWebhookException("Webhook signature is invalid");
+    }
+
+    private String hmacSha256Hex(String payload, String secret) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception ex) {
+            throw new PaymentWebhookException("Webhook signature cannot be verified", ex);
+        }
+    }
+
+    private boolean constantTimeEquals(String left, String right) {
+        if (left == null || right == null || left.length() != right.length()) {
+            return false;
+        }
+        int result = 0;
+        for (int i = 0; i < left.length(); i++) {
+            result |= left.charAt(i) ^ right.charAt(i);
+        }
+        return result == 0;
     }
 
     private User getRequiredUser(UUID userId) {

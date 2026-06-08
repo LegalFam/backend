@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat.application.service;
 
 import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
+import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
 import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
@@ -85,7 +86,8 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
             UUID chatSessionId,
             UUID userMessageId,
             String assistantMessageText,
-            List<ChatCitationResponse> citations
+            List<ChatCitationResponse> citations,
+            ChatAssistantMetadata metadata
     ) {
         ChatSession chatSession = chatPersistencePort.findSessionById(chatSessionId).orElse(null);
         if (chatSession == null) {
@@ -98,6 +100,7 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
         assistantMessage.setChatSessionId(chatSession.getId());
         assistantMessage.setRole(ChatMessageRole.ASSISTANT);
         assistantMessage.setContent(assistantMessageText);
+        applyMetadata(assistantMessage, metadata);
         assistantMessage.setCreatedAt(now);
         assistantMessage = chatPersistencePort.saveMessage(assistantMessage);
 
@@ -113,6 +116,11 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
                 assistantMessageText,
                 assistantMessage.getCreatedAt(),
                 citations,
+                assistantMessage.getConfidenceStatus(),
+                assistantMessage.getConfidenceReason(),
+                assistantMessage.getClarifyingQuestions(),
+                assistantMessage.getPreliminaryActions(),
+                assistantMessage.getSpecialistSupportRecommended(),
                 "PENDING",
                 true
         );
@@ -210,6 +218,19 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
 
     private String defaultString(String value) {
         return value == null ? "" : value;
+    }
+
+    private void applyMetadata(ChatMessage assistantMessage, ChatAssistantMetadata metadata) {
+        ChatAssistantMetadata safeMetadata = metadata == null ? ChatAssistantMetadata.empty() : metadata;
+        assistantMessage.setConfidenceStatus(blankToNull(safeMetadata.confidenceStatus()));
+        assistantMessage.setConfidenceReason(blankToNull(safeMetadata.confidenceReason()));
+        assistantMessage.setClarifyingQuestions(safeMetadata.clarifyingQuestions());
+        assistantMessage.setPreliminaryActions(safeMetadata.preliminaryActions());
+        assistantMessage.setSpecialistSupportRecommended(safeMetadata.specialistSupportRecommended());
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private void markUserMessageCompleted(UUID userMessageId, Instant now) {

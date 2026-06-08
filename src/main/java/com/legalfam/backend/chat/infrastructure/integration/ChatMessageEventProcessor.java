@@ -2,6 +2,7 @@ package com.legalfam.backend.chat.infrastructure.integration;
 
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
+import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.port.in.ChatAssistantPersistenceUseCase;
@@ -74,7 +75,8 @@ public class ChatMessageEventProcessor {
                 chatSessionId,
                 userMessageId,
                 message,
-                citations
+                citations,
+                extractMetadata(root)
         );
         if (dispatch == null) {
             return;
@@ -120,6 +122,51 @@ public class ChatMessageEventProcessor {
             }
         }
         return List.of();
+    }
+
+    private ChatAssistantMetadata extractMetadata(JsonNode root) {
+        return new ChatAssistantMetadata(
+                readText(root, "confidenceStatus"),
+                readText(root, "confidenceReason"),
+                readStringArray(root.get("clarifyingQuestions")),
+                readStringArray(root.get("preliminaryActions")),
+                readBoolean(root, "specialistSupportRecommended")
+        );
+    }
+
+    private List<String> readStringArray(JsonNode node) {
+        if (node == null || node.isNull() || !node.isArray()) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : node) {
+            String value = item.isTextual() ? item.asText() : item.toString();
+            if (!isBlank(value)) {
+                values.add(value.trim());
+            }
+        }
+        return values;
+    }
+
+    private Boolean readBoolean(JsonNode node, String key) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        JsonNode child = node.get(key);
+        if (child == null || child.isNull()) {
+            return null;
+        }
+        if (child.isBoolean()) {
+            return child.asBoolean();
+        }
+        String text = child.isTextual() ? child.asText() : child.toString();
+        if ("true".equalsIgnoreCase(text)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(text)) {
+            return false;
+        }
+        return null;
     }
 
     private ChatCitationResponse mapCitation(JsonNode citationNode) {

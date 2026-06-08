@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,14 @@ public class ChatService implements ChatUseCase {
     private final PaymentTokenUseCase paymentTokenUseCase;
     private final ApplicationEventPublisher applicationEventPublisher;
     private static final int MAX_SESSION_TITLE_LENGTH = 80;
+    private static final int MAX_FEEDBACK_COMMENT_LENGTH = 1000;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("\\b[\\w.%+-]+@[\\w.-]+\\.[A-Za-z]{2,}\\b");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("(?<!\\d)(?:\\+?51\\s*)?(?:9\\d{2}|0?1|[2-8]\\d)(?:[\\s.-]*\\d){6,8}(?!\\d)");
+    private static final Pattern DNI_PATTERN = Pattern.compile("(?<!\\d)\\d{8}(?!\\d)");
+    private static final Pattern ADDRESS_PATTERN = Pattern.compile(
+            "\\b(?:av\\.?|avenida|jr\\.?|jiron|calle|pasaje|mz\\.?|manzana|lote)\\b",
+            Pattern.CASE_INSENSITIVE
+    );
 
     public ChatService(
             ChatPersistencePort chatPersistencePort,
@@ -60,6 +69,7 @@ public class ChatService implements ChatUseCase {
         if (sessionId == null) {
             throw new InvalidChatRequestException("Session id is required");
         }
+        validateMessagePrivacy(messageInput);
         assertUserExists(userId);
         ChatSession chatSession = assertSessionOwnership(userId, sessionId);
         if (chatPersistencePort.existsUnreadAssistantMessageBySessionId(chatSession.getId())) {
@@ -155,8 +165,15 @@ public class ChatService implements ChatUseCase {
                         message.getRole().name(),
                         message.getContent(),
                         message.getRating(),
+                        message.getFeedbackComment(),
+                        message.getFeedbackSubmittedAt(),
                         message.getCreatedAt(),
                         mapCitations(citationsByMessageId.getOrDefault(message.getId(), Collections.emptyList())),
+                        message.getConfidenceStatus(),
+                        message.getConfidenceReason(),
+                        message.getClarifyingQuestions(),
+                        message.getPreliminaryActions(),
+                        message.getSpecialistSupportRecommended(),
                         resolveReceiptStatus(message, outboxByMessageId.get(message.getId())),
                         resolveReadAt(message, outboxByMessageId.get(message.getId()))
                 ))
@@ -172,9 +189,13 @@ public class ChatService implements ChatUseCase {
         if (request.rating() < 1 || request.rating() > 5) {
             throw new InvalidChatRequestException("Rating must be between 1 and 5");
         }
+        String comment = normalizeFeedbackComment(request.comment());
 
         ChatMessage message = chatPersistencePort.findMessageById(messageId)
                 .orElseThrow(() -> new ChatNotFoundException("Chat message not found"));
+        if (message.getRole() != ChatMessageRole.ASSISTANT) {
+            throw new InvalidChatRequestException("Only assistant messages can be rated");
+        }
 
         ChatSession messageSession = chatPersistencePort.findSessionById(message.getChatSessionId())
                 .orElseThrow(() -> new ChatNotFoundException("Chat session not found"));
@@ -184,6 +205,8 @@ public class ChatService implements ChatUseCase {
         }
 
         message.setRating(request.rating());
+        message.setFeedbackComment(comment);
+        message.setFeedbackSubmittedAt(Instant.now());
         chatPersistencePort.saveMessage(message);
     }
 
@@ -245,6 +268,31 @@ public class ChatService implements ChatUseCase {
         String normalized = title.trim();
         if (normalized.length() > MAX_SESSION_TITLE_LENGTH) {
             normalized = normalized.substring(0, MAX_SESSION_TITLE_LENGTH);
+        }
+        return normalized;
+    }
+
+    private void validateMessagePrivacy(String messageInput) {
+        if (messageInput == null) {
+            return;
+        }
+        if (EMAIL_PATTERN.matcher(messageInput).find()
+                || PHONE_PATTERN.matcher(messageInput).find()
+                || DNI_PATTERN.matcher(messageInput).find()
+                || ADDRESS_PATTERN.matcher(messageInput).find()) {
+            throw new InvalidChatRequestException(
+                    "Evita enviar datos personales como DNI, telefono, correo o direccion. Describe la situacion de forma general."
+            );
+        }
+    }
+
+    private String normalizeFeedbackComment(String comment) {
+        if (comment == null || comment.isBlank()) {
+            return null;
+        }
+        String normalized = comment.trim();
+        if (normalized.length() > MAX_FEEDBACK_COMMENT_LENGTH) {
+            throw new InvalidChatRequestException("Feedback comment must be at most 1000 characters");
         }
         return normalized;
     }

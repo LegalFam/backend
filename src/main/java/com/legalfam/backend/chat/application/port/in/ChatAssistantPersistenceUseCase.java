@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat.application.port.in;
 
 import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
+import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import java.util.List;
@@ -13,7 +14,8 @@ public interface ChatAssistantPersistenceUseCase {
             UUID chatSessionId,
             UUID userMessageId,
             String assistantMessageText,
-            List<ChatCitationResponse> citations
+            List<ChatCitationResponse> citations,
+            ChatAssistantMetadata metadata
     );
 
     ChatAssistantErrorDispatch persistAssistantFailure(

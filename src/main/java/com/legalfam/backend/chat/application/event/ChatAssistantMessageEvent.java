@@ -12,6 +12,11 @@ public record ChatAssistantMessageEvent(
         String message,
         Instant createdAt,
         List<ChatCitationResponse> citations,
+        String confidenceStatus,
+        String confidenceReason,
+        List<String> clarifyingQuestions,
+        List<String> preliminaryActions,
+        Boolean specialistSupportRecommended,
         String receiptStatus,
         boolean requiresReceipt
 ) {

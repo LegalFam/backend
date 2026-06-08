@@ -99,6 +99,11 @@ class ChatDeliveryRetryWorkerTest {
                 "hola",
                 Instant.now(),
                 List.of(),
+                null,
+                null,
+                List.of(),
+                List.of(),
+                null,
                 "PENDING",
                 true
         );

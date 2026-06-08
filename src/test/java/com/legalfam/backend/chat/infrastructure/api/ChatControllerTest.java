@@ -202,8 +202,15 @@ class ChatControllerTest {
                         "ASSISTANT",
                         "Hola",
                         5,
+                        "util",
+                        Instant.parse("2026-01-01T00:00:01Z"),
                         Instant.parse("2026-01-01T00:00:00Z"),
                         List.of(new ChatCitationResponse("Ley", "Texto", "https://example.com/ley")),
+                        "LOW",
+                        "Faltan datos generales.",
+                        List.of("Indica la edad general del menor."),
+                        List.of("Reune constancias disponibles."),
+                        true,
                         "PUBLISHED",
                         null
                 )));

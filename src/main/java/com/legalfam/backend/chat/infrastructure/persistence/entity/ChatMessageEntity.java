@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -32,6 +33,27 @@ public class ChatMessageEntity {
 
     @Column(nullable = true)
     private Integer rating;
+
+    @Column(name = "feedback_comment", columnDefinition = "TEXT")
+    private String feedbackComment;
+
+    @Column(name = "feedback_submitted_at")
+    private Instant feedbackSubmittedAt;
+
+    @Column(name = "confidence_status")
+    private String confidenceStatus;
+
+    @Column(name = "confidence_reason", columnDefinition = "TEXT")
+    private String confidenceReason;
+
+    @Column(name = "clarifying_questions", columnDefinition = "TEXT")
+    private String clarifyingQuestions;
+
+    @Column(name = "preliminary_actions", columnDefinition = "TEXT")
+    private String preliminaryActions;
+
+    @Column(name = "specialist_support_recommended")
+    private Boolean specialistSupportRecommended;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -74,6 +96,62 @@ public class ChatMessageEntity {
 
     public void setRating(Integer rating) {
         this.rating = rating;
+    }
+
+    public String getFeedbackComment() {
+        return feedbackComment;
+    }
+
+    public void setFeedbackComment(String feedbackComment) {
+        this.feedbackComment = feedbackComment;
+    }
+
+    public Instant getFeedbackSubmittedAt() {
+        return feedbackSubmittedAt;
+    }
+
+    public void setFeedbackSubmittedAt(Instant feedbackSubmittedAt) {
+        this.feedbackSubmittedAt = feedbackSubmittedAt;
+    }
+
+    public String getConfidenceStatus() {
+        return confidenceStatus;
+    }
+
+    public void setConfidenceStatus(String confidenceStatus) {
+        this.confidenceStatus = confidenceStatus;
+    }
+
+    public String getConfidenceReason() {
+        return confidenceReason;
+    }
+
+    public void setConfidenceReason(String confidenceReason) {
+        this.confidenceReason = confidenceReason;
+    }
+
+    public String getClarifyingQuestions() {
+        return clarifyingQuestions;
+    }
+
+    public void setClarifyingQuestions(String clarifyingQuestions) {
+        this.clarifyingQuestions = clarifyingQuestions;
+    }
+
+    public String getPreliminaryActions() {
+        return preliminaryActions;
+    }
+
+    public void setPreliminaryActions(String preliminaryActions) {
+        this.preliminaryActions = preliminaryActions;
+    }
+
+    public Boolean getSpecialistSupportRecommended() {
+        return specialistSupportRecommended;
+    }
+
+    public void setSpecialistSupportRecommended(Boolean specialistSupportRecommended) {
+        this.specialistSupportRecommended = specialistSupportRecommended;
     }
 
     public Instant getCreatedAt() {

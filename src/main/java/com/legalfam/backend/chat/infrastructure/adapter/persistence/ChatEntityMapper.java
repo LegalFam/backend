@@ -10,8 +10,13 @@ import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatMessageEn
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatMessageProcessingEntity;
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatOutboxEventEntity;
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatSessionEntity;
+import java.util.List;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 final class ChatEntityMapper {
+
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
 
     private ChatEntityMapper() {
     }
@@ -43,6 +48,13 @@ final class ChatEntityMapper {
         message.setRole(entity.getRole());
         message.setContent(entity.getContent());
         message.setRating(entity.getRating());
+        message.setFeedbackComment(entity.getFeedbackComment());
+        message.setFeedbackSubmittedAt(entity.getFeedbackSubmittedAt());
+        message.setConfidenceStatus(entity.getConfidenceStatus());
+        message.setConfidenceReason(entity.getConfidenceReason());
+        message.setClarifyingQuestions(readStringList(entity.getClarifyingQuestions()));
+        message.setPreliminaryActions(readStringList(entity.getPreliminaryActions()));
+        message.setSpecialistSupportRecommended(entity.getSpecialistSupportRecommended());
         message.setCreatedAt(entity.getCreatedAt());
         return message;
     }
@@ -54,6 +66,13 @@ final class ChatEntityMapper {
         entity.setRole(domain.getRole());
         entity.setContent(domain.getContent());
         entity.setRating(domain.getRating());
+        entity.setFeedbackComment(domain.getFeedbackComment());
+        entity.setFeedbackSubmittedAt(domain.getFeedbackSubmittedAt());
+        entity.setConfidenceStatus(domain.getConfidenceStatus());
+        entity.setConfidenceReason(domain.getConfidenceReason());
+        entity.setClarifyingQuestions(writeStringList(domain.getClarifyingQuestions()));
+        entity.setPreliminaryActions(writeStringList(domain.getPreliminaryActions()));
+        entity.setSpecialistSupportRecommended(domain.getSpecialistSupportRecommended());
         entity.setCreatedAt(domain.getCreatedAt());
         return entity;
     }
@@ -140,5 +159,30 @@ final class ChatEntityMapper {
         entity.setSourceSnippet(domain.getSourceSnippet());
         entity.setSourceUrl(domain.getSourceUrl());
         return entity;
+    }
+
+    private static List<String> readStringList(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        try {
+            return OBJECT_MAPPER.readValue(
+                    value,
+                    OBJECT_MAPPER.getTypeFactory().constructCollectionType(List.class, String.class)
+            );
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private static String writeStringList(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return "[]";
+        }
+        try {
+            return OBJECT_MAPPER.writeValueAsString(values);
+        } catch (Exception ignored) {
+            return "[]";
+        }
     }
 }
