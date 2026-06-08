@@ -2,6 +2,7 @@ package com.legalfam.backend.security.infrastructure;
 
 import com.legalfam.backend.common.error.ApiError;
 import com.legalfam.backend.common.error.ApiErrorFactory;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Arrays;
@@ -48,8 +49,10 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/health").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/payments/plans").permitAll()
                         .requestMatchers("/api/v1/payments/webhook/mercado-pago").permitAll()
@@ -117,6 +120,10 @@ public class SecurityConfig {
             String message,
             String path
     ) throws IOException {
+        if (response.isCommitted()) {
+            return;
+        }
+
         ApiError error = ApiErrorFactory.build(status, type, code, message, path);
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
