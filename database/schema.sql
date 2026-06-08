@@ -43,8 +43,7 @@ CREATE TABLE IF NOT EXISTS chat_message (
     feedback_submitted_at TIMESTAMP WITH TIME ZONE NULL,
     confidence_status VARCHAR(32) NULL CHECK (confidence_status IS NULL OR confidence_status IN ('HIGH', 'MEDIUM', 'LOW')),
     confidence_reason TEXT NULL,
-    clarifying_questions TEXT NULL,
-    preliminary_actions TEXT NULL,
+    next_steps TEXT NULL,
     specialist_support_recommended BOOLEAN NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );

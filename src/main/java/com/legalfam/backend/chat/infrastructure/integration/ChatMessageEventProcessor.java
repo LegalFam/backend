@@ -128,8 +128,7 @@ public class ChatMessageEventProcessor {
         return new ChatAssistantMetadata(
                 readText(root, "confidenceStatus"),
                 readText(root, "confidenceReason"),
-                readStringArray(root.get("clarifyingQuestions")),
-                readStringArray(root.get("preliminaryActions")),
+                readStringArray(root.get("nextSteps")),
                 readBoolean(root, "specialistSupportRecommended")
         );
     }

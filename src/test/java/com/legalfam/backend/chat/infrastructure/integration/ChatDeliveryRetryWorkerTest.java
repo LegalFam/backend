@@ -102,7 +102,6 @@ class ChatDeliveryRetryWorkerTest {
                 null,
                 null,
                 List.of(),
-                List.of(),
                 null,
                 "PENDING",
                 true

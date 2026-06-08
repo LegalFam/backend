@@ -15,8 +15,7 @@ public class ChatMessage {
     private Instant feedbackSubmittedAt;
     private String confidenceStatus;
     private String confidenceReason;
-    private List<String> clarifyingQuestions = List.of();
-    private List<String> preliminaryActions = List.of();
+    private List<String> nextSteps = List.of();
     private Boolean specialistSupportRecommended;
     private Instant createdAt;
 
@@ -92,20 +91,12 @@ public class ChatMessage {
         this.confidenceReason = confidenceReason;
     }
 
-    public List<String> getClarifyingQuestions() {
-        return clarifyingQuestions;
+    public List<String> getNextSteps() {
+        return nextSteps;
     }
 
-    public void setClarifyingQuestions(List<String> clarifyingQuestions) {
-        this.clarifyingQuestions = clarifyingQuestions == null ? List.of() : clarifyingQuestions;
-    }
-
-    public List<String> getPreliminaryActions() {
-        return preliminaryActions;
-    }
-
-    public void setPreliminaryActions(List<String> preliminaryActions) {
-        this.preliminaryActions = preliminaryActions == null ? List.of() : preliminaryActions;
+    public void setNextSteps(List<String> nextSteps) {
+        this.nextSteps = nextSteps == null ? List.of() : nextSteps;
     }
 
     public Boolean getSpecialistSupportRecommended() {

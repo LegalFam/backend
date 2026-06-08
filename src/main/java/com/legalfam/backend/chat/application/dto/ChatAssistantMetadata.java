@@ -5,11 +5,10 @@ import java.util.List;
 public record ChatAssistantMetadata(
         String confidenceStatus,
         String confidenceReason,
-        List<String> clarifyingQuestions,
-        List<String> preliminaryActions,
+        List<String> nextSteps,
         Boolean specialistSupportRecommended
 ) {
     public static ChatAssistantMetadata empty() {
-        return new ChatAssistantMetadata(null, null, List.of(), List.of(), null);
+        return new ChatAssistantMetadata(null, null, List.of(), null);
     }
 }

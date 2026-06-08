@@ -52,8 +52,7 @@ final class ChatEntityMapper {
         message.setFeedbackSubmittedAt(entity.getFeedbackSubmittedAt());
         message.setConfidenceStatus(entity.getConfidenceStatus());
         message.setConfidenceReason(entity.getConfidenceReason());
-        message.setClarifyingQuestions(readStringList(entity.getClarifyingQuestions()));
-        message.setPreliminaryActions(readStringList(entity.getPreliminaryActions()));
+        message.setNextSteps(readStringList(entity.getNextSteps()));
         message.setSpecialistSupportRecommended(entity.getSpecialistSupportRecommended());
         message.setCreatedAt(entity.getCreatedAt());
         return message;
@@ -70,8 +69,7 @@ final class ChatEntityMapper {
         entity.setFeedbackSubmittedAt(domain.getFeedbackSubmittedAt());
         entity.setConfidenceStatus(domain.getConfidenceStatus());
         entity.setConfidenceReason(domain.getConfidenceReason());
-        entity.setClarifyingQuestions(writeStringList(domain.getClarifyingQuestions()));
-        entity.setPreliminaryActions(writeStringList(domain.getPreliminaryActions()));
+        entity.setNextSteps(writeStringList(domain.getNextSteps()));
         entity.setSpecialistSupportRecommended(domain.getSpecialistSupportRecommended());
         entity.setCreatedAt(domain.getCreatedAt());
         return entity;

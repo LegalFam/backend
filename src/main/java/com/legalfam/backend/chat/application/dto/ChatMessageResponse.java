@@ -15,8 +15,7 @@ public record ChatMessageResponse(
         List<ChatCitationResponse> citations,
         String confidenceStatus,
         String confidenceReason,
-        List<String> clarifyingQuestions,
-        List<String> preliminaryActions,
+        List<String> nextSteps,
         Boolean specialistSupportRecommended,
         String receiptStatus,
         Instant readAt

@@ -11,10 +11,7 @@ ALTER TABLE chat_message
     ADD COLUMN IF NOT EXISTS confidence_reason TEXT NULL;
 
 ALTER TABLE chat_message
-    ADD COLUMN IF NOT EXISTS clarifying_questions TEXT NULL;
-
-ALTER TABLE chat_message
-    ADD COLUMN IF NOT EXISTS preliminary_actions TEXT NULL;
+    ADD COLUMN IF NOT EXISTS next_steps TEXT NULL;
 
 ALTER TABLE chat_message
     ADD COLUMN IF NOT EXISTS specialist_support_recommended BOOLEAN NULL;

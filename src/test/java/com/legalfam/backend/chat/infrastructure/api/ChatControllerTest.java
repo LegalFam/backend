@@ -208,7 +208,6 @@ class ChatControllerTest {
                         List.of(new ChatCitationResponse("Ley", "Texto", "https://example.com/ley")),
                         "LOW",
                         "Faltan datos generales.",
-                        List.of("Indica la edad general del menor."),
                         List.of("Reune constancias disponibles."),
                         true,
                         "PUBLISHED",

@@ -118,8 +118,7 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
                 citations,
                 assistantMessage.getConfidenceStatus(),
                 assistantMessage.getConfidenceReason(),
-                assistantMessage.getClarifyingQuestions(),
-                assistantMessage.getPreliminaryActions(),
+                assistantMessage.getNextSteps(),
                 assistantMessage.getSpecialistSupportRecommended(),
                 "PENDING",
                 true
@@ -224,8 +223,7 @@ public class ChatAssistantPersistenceService implements ChatAssistantPersistence
         ChatAssistantMetadata safeMetadata = metadata == null ? ChatAssistantMetadata.empty() : metadata;
         assistantMessage.setConfidenceStatus(blankToNull(safeMetadata.confidenceStatus()));
         assistantMessage.setConfidenceReason(blankToNull(safeMetadata.confidenceReason()));
-        assistantMessage.setClarifyingQuestions(safeMetadata.clarifyingQuestions());
-        assistantMessage.setPreliminaryActions(safeMetadata.preliminaryActions());
+        assistantMessage.setNextSteps(safeMetadata.nextSteps());
         assistantMessage.setSpecialistSupportRecommended(safeMetadata.specialistSupportRecommended());
     }
 

@@ -171,8 +171,7 @@ public class ChatService implements ChatUseCase {
                         mapCitations(citationsByMessageId.getOrDefault(message.getId(), Collections.emptyList())),
                         message.getConfidenceStatus(),
                         message.getConfidenceReason(),
-                        message.getClarifyingQuestions(),
-                        message.getPreliminaryActions(),
+                        message.getNextSteps(),
                         message.getSpecialistSupportRecommended(),
                         resolveReceiptStatus(message, outboxByMessageId.get(message.getId())),
                         resolveReadAt(message, outboxByMessageId.get(message.getId()))

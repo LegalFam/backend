@@ -46,11 +46,8 @@ public class ChatMessageEntity {
     @Column(name = "confidence_reason", columnDefinition = "TEXT")
     private String confidenceReason;
 
-    @Column(name = "clarifying_questions", columnDefinition = "TEXT")
-    private String clarifyingQuestions;
-
-    @Column(name = "preliminary_actions", columnDefinition = "TEXT")
-    private String preliminaryActions;
+    @Column(name = "next_steps", columnDefinition = "TEXT")
+    private String nextSteps;
 
     @Column(name = "specialist_support_recommended")
     private Boolean specialistSupportRecommended;
@@ -130,20 +127,12 @@ public class ChatMessageEntity {
         this.confidenceReason = confidenceReason;
     }
 
-    public String getClarifyingQuestions() {
-        return clarifyingQuestions;
+    public String getNextSteps() {
+        return nextSteps;
     }
 
-    public void setClarifyingQuestions(String clarifyingQuestions) {
-        this.clarifyingQuestions = clarifyingQuestions;
-    }
-
-    public String getPreliminaryActions() {
-        return preliminaryActions;
-    }
-
-    public void setPreliminaryActions(String preliminaryActions) {
-        this.preliminaryActions = preliminaryActions;
+    public void setNextSteps(String nextSteps) {
+        this.nextSteps = nextSteps;
     }
 
     public Boolean getSpecialistSupportRecommended() {
