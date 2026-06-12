@@ -32,8 +32,8 @@ class ChatExceptionHandlerTest {
         mockMvc.perform(get("/api/v1/chat/errors/upstream"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.type", is("upstream_error")))
-                .andExpect(jsonPath("$.code", is("upstream_service_unavailable")))
-                .andExpect(jsonPath("$.message", is("n8n service unavailable")))
+                .andExpect(jsonPath("$.code", is("UPSTREAM_UNAVAILABLE")))
+                .andExpect(jsonPath("$.message", is("El servicio de respuesta no esta disponible.")))
                 .andExpect(jsonPath("$.status", is(502)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/errors/upstream")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
@@ -56,7 +56,7 @@ class ChatExceptionHandlerTest {
 
         @GetMapping("/api/v1/chat/errors/upstream")
         String upstream() {
-            throw new ChatUpstreamException("n8n service unavailable");
+            throw new ChatUpstreamException("UPSTREAM_UNAVAILABLE", "El servicio de respuesta no esta disponible.");
         }
 
         @GetMapping("/api/v1/chat/errors/pending")

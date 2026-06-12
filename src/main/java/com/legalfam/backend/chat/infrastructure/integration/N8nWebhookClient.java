@@ -59,7 +59,7 @@ public class N8nWebhookClient {
 
         if (webhookUrl == null || webhookUrl.isBlank()) {
             log.warn("Skipping n8n call because app.n8n.webhook-url is empty");
-            throw new ChatUpstreamException("n8n webhook URL is not configured");
+            throw new ChatUpstreamException("UPSTREAM_NOT_CONFIGURED", "El servicio de respuesta no esta configurado.");
         }
 
         validateWebhookUrl(webhookUrl);
@@ -79,16 +79,16 @@ public class N8nWebhookClient {
             }
             int statusCode = ex.getStatusCode().value();
             log.warn("n8n webhook returned non-success status: status={}, body={}", statusCode, bodyPreview);
-            throw new ChatUpstreamException("n8n webhook returned status " + statusCode);
+            throw buildStatusException(statusCode, ex.getResponseBodyAsString());
         } catch (ResourceAccessException ex) {
             if (isTimeout(ex)) {
-                throw new ChatUpstreamException("n8n service timeout");
+                throw new ChatUpstreamException("UPSTREAM_TIMEOUT", "La respuesta esta tardando mas de lo esperado.");
             }
             log.error("Failed to reach n8n webhook", ex);
-            throw new ChatUpstreamException("n8n service unavailable");
+            throw new ChatUpstreamException("UPSTREAM_UNAVAILABLE", "No se pudo conectar con el servicio de respuesta.");
         } catch (RuntimeException ex) {
             log.error("Unexpected error while calling n8n webhook", ex);
-            throw new ChatUpstreamException("n8n service unavailable");
+            throw new ChatUpstreamException("UPSTREAM_UNAVAILABLE", "El servicio de respuesta no esta disponible.");
         }
 
         if (!response.getStatusCode().is2xxSuccessful()) {
@@ -98,7 +98,7 @@ public class N8nWebhookClient {
             }
             int statusCode = response.getStatusCode().value();
             log.warn("n8n webhook returned non-success status: status={}, body={}", statusCode, bodyPreview);
-            throw new ChatUpstreamException("n8n webhook returned status " + statusCode);
+            throw buildStatusException(statusCode, response.getBody());
         }
 
         return parseResponseBody(response.getBody());
@@ -108,7 +108,7 @@ public class N8nWebhookClient {
         try {
             URI.create(url.trim());
         } catch (IllegalArgumentException ex) {
-            throw new ChatUpstreamException("n8n webhook URL is invalid");
+            throw new ChatUpstreamException("UPSTREAM_NOT_CONFIGURED", "El servicio de respuesta esta mal configurado.");
         }
     }
 
@@ -131,13 +131,13 @@ public class N8nWebhookClient {
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (Exception ex) {
-            throw new ChatUpstreamException("Failed to serialize n8n request");
+            throw new ChatUpstreamException("UPSTREAM_REQUEST_INVALID", "No se pudo preparar la consulta para el servicio de respuesta.");
         }
     }
 
     private JsonNode parseResponseBody(String responseBody) {
         if (responseBody == null || responseBody.isBlank()) {
-            throw new ChatUpstreamException("n8n returned an empty response");
+            throw new ChatUpstreamException("UPSTREAM_EMPTY_RESPONSE", "No se recibio una respuesta valida.");
         }
 
         try {
@@ -148,6 +148,63 @@ public class N8nWebhookClient {
             fallback.put("message", responseBody.trim());
             return fallback;
         }
+    }
+
+    private ChatUpstreamException buildStatusException(int statusCode, String responseBody) {
+        UpstreamError upstreamError = parseUpstreamError(responseBody);
+        if (upstreamError != null) {
+            return new ChatUpstreamException(upstreamError.code(), upstreamError.message());
+        }
+        if (statusCode == 408 || statusCode == 504) {
+            return new ChatUpstreamException("UPSTREAM_TIMEOUT", "La respuesta esta tardando mas de lo esperado.");
+        }
+        if (statusCode >= 500) {
+            return new ChatUpstreamException("UPSTREAM_UNAVAILABLE", "El servicio de respuesta no esta disponible.");
+        }
+        if (statusCode == 422) {
+            return new ChatUpstreamException("AGENT_VALIDATION_FAILED", "No se pudo validar la respuesta generada.");
+        }
+        return new ChatUpstreamException("UPSTREAM_ERROR", "No se pudo completar la consulta.");
+    }
+
+    private UpstreamError parseUpstreamError(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode detail = root.get("detail");
+            JsonNode source = detail != null && detail.isObject() ? detail : root;
+            String code = readText(source, "code");
+            String message = readText(source, "message");
+            if (message == null) {
+                message = readText(source, "detail");
+            }
+            if (code == null && message == null) {
+                return null;
+            }
+            return new UpstreamError(
+                    code == null ? "UPSTREAM_ERROR" : code,
+                    message == null ? "No se pudo completar la consulta." : message
+            );
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private String readText(JsonNode node, String key) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        JsonNode child = node.get(key);
+        if (child == null || child.isNull()) {
+            return null;
+        }
+        String value = child.isTextual() ? child.asText() : child.toString();
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private record UpstreamError(String code, String message) {
     }
 
     private RestTemplate buildRestTemplate(int timeoutMs) {

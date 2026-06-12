@@ -24,7 +24,7 @@ public class ChatExceptionHandler {
         return buildResponse(
                 HttpStatus.BAD_GATEWAY,
                 "upstream_error",
-                "upstream_service_unavailable",
+                ex.getCode(),
                 ex.getMessage(),
                 request.getRequestURI()
         );

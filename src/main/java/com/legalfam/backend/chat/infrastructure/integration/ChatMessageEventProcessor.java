@@ -6,6 +6,7 @@ import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.port.in.ChatAssistantPersistenceUseCase;
+import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import com.legalfam.backend.chat.infrastructure.sse.ChatSseEmitterService;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,13 +48,22 @@ public class ChatMessageEventProcessor {
         JsonNode root;
         try {
             root = n8nWebhookClient.sendMessage(userMessageInput, chatSessionId);
+        } catch (ChatUpstreamException ex) {
+            log.warn("n8n webhook call failed for chatSessionId={}: {}", chatSessionId, ex.getMessage());
+            persistAndDispatchFailure(
+                    chatSessionId,
+                    userMessageId,
+                    ex.getCode(),
+                    buildFailureMessage(ex.getCode())
+            );
+            return;
         } catch (RuntimeException ex) {
             log.warn("n8n webhook call failed for chatSessionId={}: {}", chatSessionId, ex.getMessage());
             persistAndDispatchFailure(
                     chatSessionId,
                     userMessageId,
-                    resolveErrorCode(ex.getMessage()),
-                    buildFailureMessage(ex.getMessage())
+                    "UPSTREAM_ERROR",
+                    buildFailureMessage("UPSTREAM_ERROR")
             );
             return;
         }
@@ -65,7 +75,7 @@ public class ChatMessageEventProcessor {
                     chatSessionId,
                     userMessageId,
                     "UPSTREAM_EMPTY_RESPONSE",
-                    "Assistant unavailable. Empty response received from upstream service."
+                    buildFailureMessage("UPSTREAM_EMPTY_RESPONSE")
             );
             return;
         }
@@ -198,27 +208,20 @@ public class ChatMessageEventProcessor {
         return isBlank(text) ? null : text.trim();
     }
 
-    private String buildFailureMessage(String upstreamMessage) {
-        if (isBlank(upstreamMessage)) {
-            return "Assistant unavailable. Upstream service failed.";
+    private String buildFailureMessage(String errorCode) {
+        if ("UPSTREAM_TIMEOUT".equals(errorCode)) {
+            return "No pude preparar la respuesta porque el servicio tardo demasiado. Puedes intentar nuevamente.";
         }
-        return "Assistant unavailable. " + upstreamMessage.trim();
-    }
-
-    private String resolveErrorCode(String upstreamMessage) {
-        if (isBlank(upstreamMessage)) {
-            return "UPSTREAM_ERROR";
+        if ("UPSTREAM_EMPTY_RESPONSE".equals(errorCode) || "UPSTREAM_INVALID_RESPONSE".equals(errorCode)) {
+            return "No pude preparar una respuesta valida. Puedes intentar nuevamente.";
         }
-        if (upstreamMessage.contains("status 404")) {
-            return "UPSTREAM_404";
+        if ("AGENT_VALIDATION_FAILED".equals(errorCode)) {
+            return "No pude validar la respuesta generada. Puedes intentar nuevamente.";
         }
-        if (upstreamMessage.contains("status 5")) {
-            return "UPSTREAM_5XX";
+        if ("UPSTREAM_NOT_CONFIGURED".equals(errorCode)) {
+            return "El servicio de respuesta no esta disponible en este momento.";
         }
-        if (upstreamMessage.contains("timeout")) {
-            return "UPSTREAM_TIMEOUT";
-        }
-        return "UPSTREAM_ERROR";
+        return "No pude preparar la respuesta por un problema temporal. Puedes intentar nuevamente.";
     }
 
     private boolean isBlank(String value) {
