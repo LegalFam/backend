@@ -16,5 +16,5 @@ public interface IPaymentUseCase {
 
     void cancelSubscription(UUID userId);
 
-    void handleWebhook(String payload, String signatureHeader);
+    void handleWebhook(String payload, String signatureHeader, String requestId, String dataId);
 }

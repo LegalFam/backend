@@ -67,6 +67,7 @@ This document describes how contributors (human or AI agents) should work in thi
 - JWT secret must be set through `JWT_SECRET` and be at least 32 characters.
 - Access token is short-lived; refresh token is persisted and revocable.
 - Do not hardcode secrets in source code.
+- Mercado Pago webhook signatures are verified when `MERCADO_PAGO_WEBHOOK_SECRET` is configured.
 
 ## Persistence
 

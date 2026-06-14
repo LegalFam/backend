@@ -207,31 +207,6 @@ class AuthServiceTest {
         assertNotEquals(newToken.getToken(), response.refreshToken());
     }
 
-    @Test
-    void refreshSupportsLegacyRawTokenStorage() {
-        User user = createUser("user@example.com", "stored-hash");
-        String legacyRawToken = "legacy-raw-token";
-        RefreshToken existing = createRefreshToken(legacyRawToken, user, Instant.now().plusSeconds(60), false);
-        when(IRefreshTokenPort.findByToken(hashRefreshToken(legacyRawToken))).thenReturn(Optional.empty());
-        when(IRefreshTokenPort.findByToken(legacyRawToken)).thenReturn(Optional.of(existing));
-        when(IUserPort.findById(user.getId())).thenReturn(Optional.of(user));
-        when(IRefreshTokenPort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(IAccessTokenPort.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("new-access");
-        when(IAccessTokenPort.getAccessTokenExpirationSeconds()).thenReturn(900L);
-
-        TokenResponse response = authService.refresh(legacyRawToken);
-
-        verify(IRefreshTokenPort, times(2)).save(refreshTokenCaptor.capture());
-        List<RefreshToken> savedTokens = refreshTokenCaptor.getAllValues();
-        RefreshToken revokedOldToken = savedTokens.get(0);
-        RefreshToken newToken = savedTokens.get(1);
-
-        assertTrue(revokedOldToken.isRevoked());
-        assertEquals(legacyRawToken, revokedOldToken.getToken());
-        assertEquals(hashRefreshToken(response.refreshToken()), newToken.getToken());
-        assertEquals("new-access", response.accessToken());
-    }
-
     private static User createUser(String email, String password) {
         User user = new User();
         user.setId(UUID.randomUUID());

@@ -16,7 +16,12 @@ public interface IPaymentGatewayPort {
 
     void cancelSubscription(String subscriptionId);
 
-    PaymentWebhookNotification parseWebhook(String payload, String signatureHeader);
+    PaymentWebhookNotification parseVerifiedWebhook(
+            String payload,
+            String signatureHeader,
+            String requestId,
+            String dataId
+    );
 
     PaymentSubscriptionSnapshot fetchSubscriptionSnapshot(String subscriptionId);
 }

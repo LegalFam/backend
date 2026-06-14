@@ -27,8 +27,9 @@ class SecurityConfigTest {
 
         assertNotNull(cors);
         assertEquals(List.of("*"), cors.getAllowedOriginPatterns());
-        assertEquals(List.of("*"), cors.getAllowedMethods());
-        assertEquals(List.of("*"), cors.getAllowedHeaders());
+        assertEquals(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"), cors.getAllowedMethods());
+        assertEquals(List.of("Authorization", "Content-Type", "X-Requested-With", "X-Signature", "X-Request-Id"),
+                cors.getAllowedHeaders());
         assertFalse(Boolean.TRUE.equals(cors.getAllowCredentials()));
     }
 

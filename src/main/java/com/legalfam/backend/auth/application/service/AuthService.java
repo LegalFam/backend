@@ -88,7 +88,6 @@ public class AuthService implements IAuthUseCase {
         String tokenHash = hashRefreshToken(refreshTokenValue);
         RefreshToken refreshToken = IRefreshTokenPort
                 .findByToken(tokenHash)
-                .or(() -> IRefreshTokenPort.findByToken(refreshTokenValue))
                 .orElseThrow(InvalidRefreshTokenException::new);
 
         if (refreshToken.isRevoked() || refreshToken.getExpiresAt().isBefore(Instant.now())) {

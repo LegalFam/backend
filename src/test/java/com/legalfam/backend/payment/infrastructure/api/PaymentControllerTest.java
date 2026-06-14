@@ -157,7 +157,7 @@ class PaymentControllerTest {
     void webhookReturnsBadRequestWhenPayloadIsMissing() throws Exception {
         doThrow(new InvalidPaymentRequestException("Webhook payload is required"))
                 .when(paymentService)
-                .handleWebhook(any(), any());
+                .handleWebhook(any(), any(), any(), any());
 
         mockMvc.perform(post("/api/v1/payments/webhook/mercado-pago")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -170,10 +170,12 @@ class PaymentControllerTest {
         mockMvc.perform(post("/api/v1/payments/webhook/mercado-pago")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("X-Signature", "ts=1,v1=test")
+                        .header("X-Request-Id", "request-123")
+                        .queryParam("data.id", "evt_123")
                         .content("{\"id\":\"evt_123\"}"))
                 .andExpect(status().isOk());
 
-        verify(paymentService).handleWebhook("{\"id\":\"evt_123\"}", "ts=1,v1=test");
+        verify(paymentService).handleWebhook("{\"id\":\"evt_123\"}", "ts=1,v1=test", "request-123", "evt_123");
     }
 
     private void authenticateAs(String principal) {

@@ -11,6 +11,7 @@ import com.legalfam.backend.payment.infrastructure.persistence.entity.PaymentWeb
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -36,8 +37,18 @@ public class JpaPaymentPersistenceAdapter implements IPaymentPersistencePort {
     }
 
     @Override
+    public Optional<Subscription> findSubscriptionByIdForUpdate(UUID subscriptionId) {
+        return ISubscriptionRepository.findByIdForUpdate(subscriptionId).map(PaymentEntityMapper::toDomain);
+    }
+
+    @Override
     public Optional<Subscription> findSubscriptionByUserId(UUID userId) {
         return ISubscriptionRepository.findByUserId(userId).map(PaymentEntityMapper::toDomain);
+    }
+
+    @Override
+    public Optional<Subscription> findSubscriptionByUserIdForUpdate(UUID userId) {
+        return ISubscriptionRepository.findByUserIdForUpdate(userId).map(PaymentEntityMapper::toDomain);
     }
 
     @Override
@@ -78,16 +89,16 @@ public class JpaPaymentPersistenceAdapter implements IPaymentPersistencePort {
     }
 
     @Override
-    public boolean existsProcessedWebhookEvent(String eventId) {
-        return IPaymentWebhookEventRepository.existsByEventId(eventId);
-    }
-
-    @Override
-    public void saveProcessedWebhookEvent(String eventId, String eventType, Instant processedAt) {
+    public boolean tryRecordProcessedWebhookEvent(String eventId, String eventType, Instant processedAt) {
         PaymentWebhookEventEntity entity = new PaymentWebhookEventEntity();
         entity.setEventId(eventId);
         entity.setEventType(eventType);
         entity.setProcessedAt(processedAt);
-        IPaymentWebhookEventRepository.save(entity);
+        try {
+            IPaymentWebhookEventRepository.saveAndFlush(entity);
+            return true;
+        } catch (DataIntegrityViolationException ex) {
+            return false;
+        }
     }
 }

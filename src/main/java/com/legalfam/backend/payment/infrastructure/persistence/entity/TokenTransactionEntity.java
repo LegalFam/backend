@@ -6,11 +6,20 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "token_transactions")
+@Table(
+        name = "token_transactions",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_token_transactions_chat_message_type",
+                        columnNames = {"chat_message_id", "type"}
+                )
+        }
+)
 public class TokenTransactionEntity {
 
     @Id

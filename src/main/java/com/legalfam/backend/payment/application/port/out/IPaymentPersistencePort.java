@@ -10,7 +10,11 @@ import java.util.UUID;
 public interface IPaymentPersistencePort {
     Optional<Subscription> findSubscriptionById(UUID subscriptionId);
 
+    Optional<Subscription> findSubscriptionByIdForUpdate(UUID subscriptionId);
+
     Optional<Subscription> findSubscriptionByUserId(UUID userId);
+
+    Optional<Subscription> findSubscriptionByUserIdForUpdate(UUID userId);
 
     Optional<Subscription> findSubscriptionByGatewayCustomerId(String gatewayCustomerId);
 
@@ -24,7 +28,5 @@ public interface IPaymentPersistencePort {
 
     boolean existsTokenTransactionByChatMessageIdAndType(UUID chatMessageId, TokenTransactionType type);
 
-    boolean existsProcessedWebhookEvent(String eventId);
-
-    void saveProcessedWebhookEvent(String eventId, String eventType, Instant processedAt);
+    boolean tryRecordProcessedWebhookEvent(String eventId, String eventType, Instant processedAt);
 }

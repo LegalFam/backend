@@ -7,12 +7,16 @@ import com.legalfam.backend.payment.application.port.out.IPaymentGatewayPort;
 import com.legalfam.backend.payment.domain.exception.PaymentGatewayException;
 import com.legalfam.backend.payment.domain.exception.PaymentWebhookException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Locale;
 import java.util.UUID;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -37,17 +41,20 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
     private final RestTemplate restTemplate;
     private final String accessToken;
     private final String apiBaseUrl;
+    private final String webhookSecret;
 
     public MercadoPagoPaymentGatewayAdapter(
             ObjectMapper objectMapper,
             @Value("${app.payment.mercado-pago.access-token:}") String accessToken,
-            @Value("${app.payment.mercado-pago.api-base-url:https://api.mercadopago.com}") String apiBaseUrl
+            @Value("${app.payment.mercado-pago.api-base-url:https://api.mercadopago.com}") String apiBaseUrl,
+            @Value("${app.payment.mercado-pago.webhook-secret:}") String webhookSecret
     ) {
         this.objectMapper = objectMapper;
         this.accessToken = accessToken == null ? "" : accessToken.trim();
         this.apiBaseUrl = apiBaseUrl == null || apiBaseUrl.isBlank()
                 ? "https://api.mercadopago.com"
                 : apiBaseUrl.trim().replaceAll("/+$", "");
+        this.webhookSecret = webhookSecret == null ? "" : webhookSecret.trim();
         this.restTemplate = buildRestTemplate();
     }
 
@@ -98,8 +105,14 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
     }
 
     @Override
-    public PaymentWebhookNotification parseWebhook(String payload, String signatureHeader) {
+    public PaymentWebhookNotification parseVerifiedWebhook(
+            String payload,
+            String signatureHeader,
+            String requestId,
+            String dataId
+    ) {
         requireAccessToken();
+        verifyWebhookSignature(signatureHeader, requestId, dataId);
         JsonNode root = readTree(payload);
         String eventId = firstNonBlank(readText(root, "id"), readText(root, "action"));
         String eventType = firstNonBlank(readText(root, "type"), readText(root, "action"));
@@ -328,6 +341,84 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
         }
     }
 
+    private void verifyWebhookSignature(String signatureHeader, String requestId, String dataId) {
+        if (webhookSecret.isBlank()) {
+            return;
+        }
+        SignatureParts signatureParts = parseSignature(signatureHeader);
+        if (requestId == null || requestId.isBlank()) {
+            throw new PaymentWebhookException("Mercado Pago request id is required");
+        }
+        if (dataId == null || dataId.isBlank()) {
+            throw new PaymentWebhookException("Mercado Pago data id is required");
+        }
+
+        String manifest = "id:" + normalizeDataId(dataId)
+                + ";request-id:" + requestId.trim()
+                + ";ts:" + signatureParts.timestamp()
+                + ";";
+        String expectedSignature = hmacSha256Hex(manifest, webhookSecret);
+        if (!constantTimeEquals(expectedSignature, signatureParts.signature())) {
+            throw new PaymentWebhookException("Webhook signature is invalid");
+        }
+    }
+
+    private SignatureParts parseSignature(String signatureHeader) {
+        if (signatureHeader == null || signatureHeader.isBlank()) {
+            throw new PaymentWebhookException("Webhook signature is required");
+        }
+        String timestamp = null;
+        String signature = null;
+        for (String part : signatureHeader.split(",")) {
+            String[] pair = part.split("=", 2);
+            if (pair.length != 2) {
+                continue;
+            }
+            String key = pair[0].trim();
+            String value = pair[1].trim();
+            if ("ts".equals(key)) {
+                timestamp = value;
+            }
+            if ("v1".equals(key)) {
+                signature = value;
+            }
+        }
+        if (timestamp == null || timestamp.isBlank() || signature == null || signature.isBlank()) {
+            throw new PaymentWebhookException("Webhook signature is invalid");
+        }
+        return new SignatureParts(timestamp, signature);
+    }
+
+    private String normalizeDataId(String dataId) {
+        String normalized = dataId.trim();
+        return normalized.matches("[A-Za-z0-9]+") ? normalized.toLowerCase(Locale.ROOT) : normalized;
+    }
+
+    private String hmacSha256Hex(String value, String secret) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception ex) {
+            throw new PaymentWebhookException("Webhook signature cannot be verified", ex);
+        }
+    }
+
+    private boolean constantTimeEquals(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                left.getBytes(StandardCharsets.UTF_8),
+                right.getBytes(StandardCharsets.UTF_8)
+        );
+    }
+
     private RestTemplate buildRestTemplate() {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(TIMEOUT_MS);
@@ -336,5 +427,8 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
     }
 
     private record ParsedExternalReference(UUID userId, String planCode) {
+    }
+
+    private record SignatureParts(String timestamp, String signature) {
     }
 }
