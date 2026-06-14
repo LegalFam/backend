@@ -16,14 +16,17 @@ This document describes how contributors (human or AI agents) should work in thi
   - `application/**` for use cases, ports, DTOs/events, and application services.
   - `application/port/in/**` for inbound use case contracts.
   - `application/port/out/**` for outbound dependency contracts.
-  - `infrastructure/**` for controllers, handlers, adapters, repository interfaces, integrations, and module-level config.
+  - `infrastructure/**` for controllers, handlers, adapters, repository interfaces, external clients, and module-level config.
 - Classify infrastructure adapters by hexagonal direction:
-  - `infrastructure/adapter/in/**` for inbound adapters that trigger application behavior, such as controllers, message/event processors, scheduled workers, and listeners.
+  - `infrastructure/adapter/in/**` for inbound adapters that trigger application behavior through technical mechanisms, such as event handlers and message listeners.
   - `infrastructure/adapter/out/**` for outbound adapters that implement application ports, such as persistence adapters, external API clients, event publishers, catalog adapters, and gateway adapters.
 - Keep non-adapter infrastructure in explicit folders:
+  - `infrastructure/api/**` for REST controllers.
+  - `infrastructure/worker/**` for scheduled/background workers.
+  - `infrastructure/delivery/**` for client delivery infrastructure such as SSE emitter registries.
   - `infrastructure/persistence/**` for Spring Data repositories and JPA entities.
   - `infrastructure/config/**` for module-level Spring configuration/properties.
-  - `infrastructure/api/handler/**` for module-specific API exception handlers when controllers still live under `infrastructure/api`.
+  - `infrastructure/api/handler/**` for module-specific API exception handlers.
 - Avoid vague catch-all packages such as `integration` for new code. Use adapter direction (`adapter/in` or `adapter/out`) unless the class is not an adapter.
 - Place cross-domain concerns in `common/**`:
   - `common/config/**` for shared configuration.
@@ -93,8 +96,10 @@ Current relevant tables:
 - Keep responses explicit with proper HTTP status codes.
 - Avoid leaking internal exceptions/messages to clients.
 - Application services should depend on project-owned ports, not concrete infrastructure implementations.
-- If an infrastructure processor depends only on application abstractions and reacts to a technical trigger, place it as an inbound adapter.
+- Prefer trigger-specific names such as `Listener`, `Handler`, `Worker`, or `Job` over generic `Processor` names for inbound adapters.
+- If an infrastructure handler/listener depends only on application abstractions and reacts to a technical trigger, place it as an inbound adapter.
 - If a class implements an application abstraction using a concrete external system or framework, place it as an outbound adapter.
+- In infrastructure, Spring stereotypes such as `@Service` or `@Component` are bean registration details, not architecture labels. Prefer role-based names such as `Adapter`, `Client`, `Gateway`, `Listener`, `Handler`, `Worker`, `Job`, or `Registry` when the class is not an application service.
 - Do not inject Spring `ApplicationEventPublisher`, HTTP clients, RabbitMQ clients, repositories, or SSE services directly into application services unless there is a deliberate architectural exception.
 
 ## Change Checklist
@@ -102,7 +107,7 @@ Current relevant tables:
 When adding or changing endpoints:
 
 1. Update controller + service + DTOs.
-2. Add/update `application` ports if new use cases/integrations are needed.
+2. Add/update `application` ports if new use cases or external dependencies are needed.
 3. Add/update infrastructure adapters for outbound ports.
 4. Add or update a domain-scoped exception handler (`@RestControllerAdvice(basePackages = "<domain-package>")`) for domain-specific errors (same pattern as `auth` and `chat`).
 5. Update security rules in `SecurityConfig`.
@@ -115,11 +120,22 @@ When adding or changing endpoints:
 When changing architecture/package structure:
 
 1. Keep port packages split only by `in` and `out`.
-2. Keep adapter implementations under `infrastructure/adapter/in` or `infrastructure/adapter/out`.
+2. Keep listener/handler adapter implementations under `infrastructure/adapter/in` or outbound adapter implementations under `infrastructure/adapter/out`.
 3. Keep persistence repositories/entities under `infrastructure/persistence`.
 4. Keep configuration under `infrastructure/config` or `common/config`.
-5. Update `ArchitectureRulesTest` when a package convention or module boundary becomes a rule.
-6. Update `ARCHITECTURE_CODE_REVIEW.md` if the change resolves or changes a listed issue.
+5. Keep REST controllers under `infrastructure/api`.
+6. Keep scheduled/background workers under `infrastructure/worker`.
+7. Use responsibility-based names for non-adapter infrastructure folders, such as `delivery`, instead of technology-only names such as `sse`.
+8. Update `ArchitectureRulesTest` when a package convention or module boundary becomes a rule.
+9. Update `ARCHITECTURE_CODE_REVIEW.md` if the change resolves or changes a listed issue.
+
+When completing a fixing badge/stage:
+
+1. Re-read every related issue's description and recommended solution.
+2. Treat each concrete point in those issue descriptions as acceptance criteria, not just the stage title.
+3. Verify package placement, dependency direction, naming, and documentation updates with targeted searches.
+4. State which related issues are fully resolved and which are only partially addressed or intentionally deferred.
+5. Do not mark a badge complete if any related issue description still has an unaddressed requirement.
 
 ## Local Run
 

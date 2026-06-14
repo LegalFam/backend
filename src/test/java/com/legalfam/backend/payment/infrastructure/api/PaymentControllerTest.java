@@ -20,6 +20,8 @@ import com.legalfam.backend.payment.application.dto.PaymentSubscriptionResponse;
 import com.legalfam.backend.payment.application.service.PaymentService;
 import com.legalfam.backend.payment.domain.exception.InsufficientTokensException;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
+import com.legalfam.backend.payment.infrastructure.api.PaymentController;
+import com.legalfam.backend.payment.infrastructure.api.PaymentWebhookController;
 import com.legalfam.backend.payment.infrastructure.api.handler.PaymentExceptionHandler;
 import java.time.Instant;
 import java.util.List;

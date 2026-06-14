@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import com.legalfam.backend.chat.infrastructure.integration.ChatOutboxRelayTransactionService;
+import com.legalfam.backend.chat.infrastructure.adapter.out.ChatOutboxRelayTransactionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

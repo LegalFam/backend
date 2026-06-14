@@ -14,6 +14,7 @@ import com.legalfam.backend.auth.application.service.AuthService;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
+import com.legalfam.backend.auth.infrastructure.api.AuthController;
 import com.legalfam.backend.auth.infrastructure.api.handler.AuthExceptionHandler;
 import com.legalfam.backend.common.error.handler.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;

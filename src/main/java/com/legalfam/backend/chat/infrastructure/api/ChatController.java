@@ -8,7 +8,7 @@ import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
-import com.legalfam.backend.chat.infrastructure.sse.ChatSseEmitterService;
+import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
 import com.legalfam.backend.common.error.ApiError;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -45,11 +45,11 @@ public class ChatController {
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
     private final IChatUseCase IChatUseCase;
-    private final ChatSseEmitterService chatSseEmitterService;
+    private final ChatSseEmitterRegistry chatSseEmitterRegistry;
 
-    public ChatController(IChatUseCase IChatUseCase, ChatSseEmitterService chatSseEmitterService) {
+    public ChatController(IChatUseCase IChatUseCase, ChatSseEmitterRegistry chatSseEmitterRegistry) {
         this.IChatUseCase = IChatUseCase;
-        this.chatSseEmitterService = chatSseEmitterService;
+        this.chatSseEmitterRegistry = chatSseEmitterRegistry;
     }
 
     @GetMapping(value = "/chat/subscribe/{sessionId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -70,7 +70,7 @@ public class ChatController {
     ) {
         UUID userId = parsePrincipalUserId(principalUserId);
         IChatUseCase.assertSessionOwnershipExists(userId, sessionId);
-        SseEmitter emitter = chatSseEmitterService.subscribe(userId, sessionId);
+        SseEmitter emitter = chatSseEmitterRegistry.subscribe(userId, sessionId);
         return ResponseEntity.ok(emitter);
     }
 

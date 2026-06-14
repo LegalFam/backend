@@ -27,8 +27,11 @@ The backend is organized as a modular hexagonal Spring Boot application under `s
   - `application/port/in` for use cases called by inbound adapters.
   - `application/port/out` for dependencies implemented by outbound adapters.
 - Infrastructure adapters should be classified by direction:
-  - `infrastructure/adapter/in` for controllers, event processors, listeners, and scheduled workers that trigger application behavior.
+  - `infrastructure/adapter/in` for event handlers and message listeners that trigger application behavior.
   - `infrastructure/adapter/out` for persistence adapters, external clients, event publishers, catalogs, and gateway implementations.
+- REST controllers live under `infrastructure/api`.
+- Scheduled/background workers live under `infrastructure/worker`.
+- Client event delivery support lives under responsibility-based infrastructure folders such as `infrastructure/delivery`.
 - Spring Data repositories and JPA entities remain under `infrastructure/persistence`.
 - Spring configuration remains under `infrastructure/config` or `common/config`.
 
