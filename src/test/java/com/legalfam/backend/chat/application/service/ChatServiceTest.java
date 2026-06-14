@@ -10,13 +10,13 @@ import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
 import com.legalfam.backend.chat.application.port.out.IChatUserLookupPort;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
-import com.legalfam.backend.payment.application.port.in.IPaymentTokenUseCase;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,7 @@ class ChatServiceTest {
     private IChatUserLookupPort IChatUserLookupPort;
 
     @Mock
-    private IPaymentTokenUseCase IPaymentTokenUseCase;
+    private IChatTokenPort IChatTokenPort;
 
     @Mock
     private IChatEventPublisherPort IChatEventPublisherPort;
@@ -80,7 +80,7 @@ class ChatServiceTest {
         assertEquals(userMessageId, processingCaptor.getValue().getUserMessageId());
         assertEquals(ChatMessageProcessingStatus.QUEUED, processingCaptor.getValue().getStatus());
 
-        verify(IPaymentTokenUseCase).consumeChatToken(userId, userMessageId);
+        verify(IChatTokenPort).consumeChatToken(userId, userMessageId);
         verify(IChatEventPublisherPort).publishMessageQueued(new ChatMessageQueuedEvent(sessionId, userMessageId, "hola"));
         assertEquals(sessionId, response.sessionId());
         assertEquals(userMessageId, response.userMessageId());

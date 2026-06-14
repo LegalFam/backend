@@ -14,15 +14,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.legalfam.backend.auth.application.port.out.IAccessTokenPort;
+import com.legalfam.backend.auth.application.port.out.IAuthEventPublisherPort;
 import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.auth.application.port.out.IRefreshTokenPort;
+import com.legalfam.backend.common.event.UserRegisteredEvent;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.domain.model.User;
-import com.legalfam.backend.payment.application.port.in.IPaymentProvisioningUseCase;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -54,7 +55,7 @@ class AuthServiceTest {
     @Mock
     private IAccessTokenPort IAccessTokenPort;
     @Mock
-    private IPaymentProvisioningUseCase IPaymentProvisioningUseCase;
+    private IAuthEventPublisherPort IAuthEventPublisherPort;
 
     @Captor
     private ArgumentCaptor<User> userCaptor;
@@ -70,7 +71,7 @@ class AuthServiceTest {
                 IRefreshTokenPort,
                 passwordEncoder,
                 IAccessTokenPort,
-                IPaymentProvisioningUseCase,
+                IAuthEventPublisherPort,
                 new AuthTokenProperties(REFRESH_EXPIRATION_MS)
         );
     }
@@ -108,7 +109,7 @@ class AuthServiceTest {
         assertEquals("hashed-password", savedUser.getPassword());
         assertEquals("Juan", savedUser.getName());
         assertEquals("900000000", savedUser.getPhone());
-        verify(IPaymentProvisioningUseCase).provisionFreeSubscription(savedUser.getId());
+        verify(IAuthEventPublisherPort).publishUserRegistered(new UserRegisteredEvent(savedUser.getId()));
 
         verify(IRefreshTokenPort).save(refreshTokenCaptor.capture());
         RefreshToken refreshToken = refreshTokenCaptor.getValue();

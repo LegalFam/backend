@@ -30,6 +30,33 @@ class ArchitectureRulesTest {
             .should().dependOnClassesThat().resideInAPackage("..infrastructure..");
 
     @ArchTest
+    static final ArchRule auth_application_must_not_depend_on_other_applications = noClasses()
+            .that().resideInAPackage("com.legalfam.backend.auth.application..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.legalfam.backend.chat.application..",
+                    "com.legalfam.backend.payment.application..",
+                    "com.legalfam.backend.user.application.."
+            );
+
+    @ArchTest
+    static final ArchRule chat_application_must_not_depend_on_other_applications = noClasses()
+            .that().resideInAPackage("com.legalfam.backend.chat.application..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.legalfam.backend.auth.application..",
+                    "com.legalfam.backend.payment.application..",
+                    "com.legalfam.backend.user.application.."
+            );
+
+    @ArchTest
+    static final ArchRule payment_application_must_not_depend_on_other_applications = noClasses()
+            .that().resideInAPackage("com.legalfam.backend.payment.application..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "com.legalfam.backend.auth.application..",
+                    "com.legalfam.backend.chat.application..",
+                    "com.legalfam.backend.user.application.."
+            );
+
+    @ArchTest
     static final ArchRule common_must_not_depend_on_feature_infrastructure = noClasses()
             .that().resideInAPackage("com.legalfam.backend.common..")
             .should().dependOnClassesThat().resideInAnyPackage(

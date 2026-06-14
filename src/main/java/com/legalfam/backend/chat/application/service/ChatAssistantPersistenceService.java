@@ -10,13 +10,13 @@ import com.legalfam.backend.chat.application.event.ChatAssistantErrorEvent;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.port.in.IChatAssistantPersistenceUseCase;
 import com.legalfam.backend.chat.application.port.out.IChatOutboxPort;
+import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
-import com.legalfam.backend.payment.application.port.in.IPaymentTokenUseCase;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -32,16 +32,16 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
 
     private final IChatPersistencePort IChatPersistencePort;
     private final IChatOutboxPort IChatOutboxPort;
-    private final IPaymentTokenUseCase IPaymentTokenUseCase;
+    private final IChatTokenPort IChatTokenPort;
 
     public ChatAssistantPersistenceService(
             IChatPersistencePort IChatPersistencePort,
             IChatOutboxPort IChatOutboxPort,
-            IPaymentTokenUseCase IPaymentTokenUseCase
+            IChatTokenPort IChatTokenPort
     ) {
         this.IChatPersistencePort = IChatPersistencePort;
         this.IChatOutboxPort = IChatOutboxPort;
-        this.IPaymentTokenUseCase = IPaymentTokenUseCase;
+        this.IChatTokenPort = IChatTokenPort;
     }
 
     @Transactional
@@ -162,7 +162,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
 
         chatSession.setUpdatedAt(now);
         IChatPersistencePort.saveSession(chatSession);
-        IPaymentTokenUseCase.refundChatToken(userMessageId);
+        IChatTokenPort.refundChatToken(userMessageId);
 
         return new ChatAssistantErrorDispatch(
                 chatSession.getUserId(),

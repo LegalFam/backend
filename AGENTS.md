@@ -30,6 +30,8 @@ This document describes how contributors (human or AI agents) should work in thi
 - Avoid vague catch-all packages such as `integration` for new code. Use adapter direction (`adapter/in` or `adapter/out`) unless the class is not an adapter.
 - Place cross-domain concerns in `common/**`:
   - `common/config/**` for shared configuration.
+  - `common/event/**` for cross-module application events.
+  - `common/identity/**` for neutral identity contracts and DTOs shared by modules.
   - `common/error/**` for shared API error models/factories/exceptions/handlers.
 - Mirror main packages in `src/test/java/com/legalfam/backend/**`.
 - Do not place business/domain logic in `common/config/**`.
@@ -96,6 +98,7 @@ Current relevant tables:
 - Keep responses explicit with proper HTTP status codes.
 - Avoid leaking internal exceptions/messages to clients.
 - Application services should depend on project-owned ports, not concrete infrastructure implementations.
+- Avoid direct application-layer dependencies between business modules. Prefer common events or neutral common/module-owned ports for cross-module collaboration.
 - Prefer trigger-specific names such as `Listener`, `Handler`, `Worker`, or `Job` over generic `Processor` names for inbound adapters.
 - If an infrastructure handler/listener depends only on application abstractions and reacts to a technical trigger, place it as an inbound adapter.
 - If a class implements an application abstraction using a concrete external system or framework, place it as an outbound adapter.

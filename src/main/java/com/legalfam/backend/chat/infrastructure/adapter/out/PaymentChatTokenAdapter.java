@@ -1,0 +1,26 @@
+package com.legalfam.backend.chat.infrastructure.adapter.out;
+
+import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
+import com.legalfam.backend.payment.application.port.in.IPaymentTokenUseCase;
+import java.util.UUID;
+import org.springframework.stereotype.Component;
+
+@Component
+public class PaymentChatTokenAdapter implements IChatTokenPort {
+
+    private final IPaymentTokenUseCase IPaymentTokenUseCase;
+
+    public PaymentChatTokenAdapter(IPaymentTokenUseCase IPaymentTokenUseCase) {
+        this.IPaymentTokenUseCase = IPaymentTokenUseCase;
+    }
+
+    @Override
+    public void consumeChatToken(UUID userId, UUID chatMessageId) {
+        IPaymentTokenUseCase.consumeChatToken(userId, chatMessageId);
+    }
+
+    @Override
+    public void refundChatToken(UUID chatMessageId) {
+        IPaymentTokenUseCase.refundChatToken(chatMessageId);
+    }
+}

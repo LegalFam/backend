@@ -3,12 +3,14 @@ package com.legalfam.backend.auth.infrastructure.adapter.out;
 import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.auth.domain.model.User;
 import com.legalfam.backend.auth.infrastructure.persistence.IUserRepository;
+import com.legalfam.backend.common.identity.UserIdentity;
+import com.legalfam.backend.common.identity.application.port.out.IUserIdentityPort;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
-public class JpaUserAdapter implements IUserPort {
+public class JpaUserAdapter implements IUserPort, IUserIdentityPort {
 
     private final IUserRepository IUserRepository;
 
@@ -29,6 +31,12 @@ public class JpaUserAdapter implements IUserPort {
     @Override
     public Optional<User> findById(UUID userId) {
         return IUserRepository.findById(userId).map(UserEntityMapper::toDomain);
+    }
+
+    @Override
+    public Optional<UserIdentity> findUserIdentityById(UUID userId) {
+        return IUserRepository.findById(userId)
+                .map(user -> new UserIdentity(user.getId(), user.getEmail()));
     }
 
     @Override

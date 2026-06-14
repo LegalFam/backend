@@ -2,8 +2,10 @@ package com.legalfam.backend.auth.application.service;
 
 import com.legalfam.backend.auth.application.port.in.IAuthUseCase;
 import com.legalfam.backend.auth.application.port.out.IAccessTokenPort;
+import com.legalfam.backend.auth.application.port.out.IAuthEventPublisherPort;
 import com.legalfam.backend.auth.application.port.out.IRefreshTokenPort;
 import com.legalfam.backend.auth.application.port.out.IUserPort;
+import com.legalfam.backend.common.event.UserRegisteredEvent;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
@@ -11,7 +13,6 @@ import com.legalfam.backend.auth.application.dto.TokenResponse;
 import com.legalfam.backend.auth.application.dto.UserResponse;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.domain.model.User;
-import com.legalfam.backend.payment.application.port.in.IPaymentProvisioningUseCase;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -29,7 +30,7 @@ public class AuthService implements IAuthUseCase {
     private final IRefreshTokenPort IRefreshTokenPort;
     private final PasswordEncoder passwordEncoder;
     private final IAccessTokenPort IAccessTokenPort;
-    private final IPaymentProvisioningUseCase IPaymentProvisioningUseCase;
+    private final IAuthEventPublisherPort IAuthEventPublisherPort;
     private final long refreshTokenExpirationMs;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -38,14 +39,14 @@ public class AuthService implements IAuthUseCase {
             IRefreshTokenPort IRefreshTokenPort,
             PasswordEncoder passwordEncoder,
             IAccessTokenPort IAccessTokenPort,
-            IPaymentProvisioningUseCase IPaymentProvisioningUseCase,
+            IAuthEventPublisherPort IAuthEventPublisherPort,
             AuthTokenProperties authTokenProperties
     ) {
         this.IUserPort = IUserPort;
         this.IRefreshTokenPort = IRefreshTokenPort;
         this.passwordEncoder = passwordEncoder;
         this.IAccessTokenPort = IAccessTokenPort;
-        this.IPaymentProvisioningUseCase = IPaymentProvisioningUseCase;
+        this.IAuthEventPublisherPort = IAuthEventPublisherPort;
         this.refreshTokenExpirationMs = authTokenProperties.refreshTokenExpirationMs();
     }
 
@@ -63,7 +64,7 @@ public class AuthService implements IAuthUseCase {
         user.setPhone(phone);
 
         User savedUser = IUserPort.save(user);
-        IPaymentProvisioningUseCase.provisionFreeSubscription(savedUser.getId());
+        IAuthEventPublisherPort.publishUserRegistered(new UserRegisteredEvent(savedUser.getId()));
         return issueTokens(savedUser);
     }
 

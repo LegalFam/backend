@@ -1,7 +1,7 @@
 package com.legalfam.backend.payment.application.service;
 
-import com.legalfam.backend.auth.application.port.out.IUserPort;
-import com.legalfam.backend.auth.domain.model.User;
+import com.legalfam.backend.common.identity.UserIdentity;
+import com.legalfam.backend.common.identity.application.port.out.IUserIdentityPort;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionRequest;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionResponse;
 import com.legalfam.backend.payment.application.dto.PaymentPlanDefinition;
@@ -48,7 +48,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     private final IPaymentPersistencePort IPaymentPersistencePort;
     private final IPaymentGatewayPort IPaymentGatewayPort;
     private final IPaymentPlanCatalogPort IPaymentPlanCatalogPort;
-    private final IUserPort IUserPort;
+    private final IUserIdentityPort IUserIdentityPort;
     private final String defaultCheckoutSuccessUrl;
     private final String defaultCheckoutCancelUrl;
     private final String webhookSecret;
@@ -58,7 +58,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             IPaymentPersistencePort IPaymentPersistencePort,
             IPaymentGatewayPort IPaymentGatewayPort,
             IPaymentPlanCatalogPort IPaymentPlanCatalogPort,
-            IUserPort IUserPort,
+            IUserIdentityPort IUserIdentityPort,
             @Value("${app.payment.mercado-pago.checkout-success-url}") String defaultCheckoutSuccessUrl,
             @Value("${app.payment.mercado-pago.checkout-cancel-url:http://localhost:3000/billing/cancel}") String defaultCheckoutCancelUrl,
             @Value("${app.payment.mercado-pago.webhook-secret:}") String webhookSecret
@@ -66,7 +66,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         this.IPaymentPersistencePort = IPaymentPersistencePort;
         this.IPaymentGatewayPort = IPaymentGatewayPort;
         this.IPaymentPlanCatalogPort = IPaymentPlanCatalogPort;
-        this.IUserPort = IUserPort;
+        this.IUserIdentityPort = IUserIdentityPort;
         this.defaultCheckoutSuccessUrl = defaultCheckoutSuccessUrl;
         this.defaultCheckoutCancelUrl = defaultCheckoutCancelUrl;
         this.webhookSecret = webhookSecret == null ? "" : webhookSecret.trim();
@@ -109,14 +109,14 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             throw new InvalidPaymentRequestException("Checkout request is required");
         }
         PaymentPlanDefinition plan = IPaymentPlanCatalogPort.getPaidPlanOrThrow(request.planCode());
-        User user = getRequiredUser(userId);
+        UserIdentity user = getRequiredUser(userId);
         Subscription subscription = getOrCreateSubscription(userId);
         refreshFreeSubscriptionIfNeeded(subscription);
         ensureCheckoutAllowed(subscription, plan);
 
         String checkoutUrl = IPaymentGatewayPort.createCheckoutSession(
                 userId,
-                user.getEmail(),
+                user.email(),
                 plan,
                 firstNonBlank(request.successUrl(), defaultCheckoutSuccessUrl),
                 firstNonBlank(request.cancelUrl(), defaultCheckoutCancelUrl)
@@ -174,8 +174,8 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         if (IPaymentPersistencePort.findSubscriptionByUserId(userId).isPresent()) {
             return;
         }
-        User user = getRequiredUser(userId);
-        createFreeSubscription(user.getId(), now());
+        UserIdentity user = getRequiredUser(userId);
+        createFreeSubscription(user.id(), now());
     }
 
     @Override
@@ -267,8 +267,8 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
                     return existing;
                 })
                 .orElseGet(() -> {
-                    User user = getRequiredUser(userId);
-                    return createFreeSubscription(user.getId(), now());
+                    UserIdentity user = getRequiredUser(userId);
+                    return createFreeSubscription(user.id(), now());
                 });
     }
 
@@ -556,8 +556,8 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         return result == 0;
     }
 
-    private User getRequiredUser(UUID userId) {
-        return IUserPort.findById(userId)
+    private UserIdentity getRequiredUser(UUID userId) {
+        return IUserIdentityPort.findUserIdentityById(userId)
                 .orElseThrow(() -> new SubscriptionNotFoundException("Authenticated user not found"));
     }
 

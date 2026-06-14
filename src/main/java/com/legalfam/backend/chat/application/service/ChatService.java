@@ -4,6 +4,7 @@ import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.port.in.IChatUseCase;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
 import com.legalfam.backend.chat.application.port.out.IChatUserLookupPort;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
@@ -23,7 +24,6 @@ import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatSession;
-import com.legalfam.backend.payment.application.port.in.IPaymentTokenUseCase;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -39,7 +39,7 @@ public class ChatService implements IChatUseCase {
 
     private final IChatPersistencePort IChatPersistencePort;
     private final IChatUserLookupPort IChatUserLookupPort;
-    private final IPaymentTokenUseCase IPaymentTokenUseCase;
+    private final IChatTokenPort IChatTokenPort;
     private final IChatEventPublisherPort IChatEventPublisherPort;
     private static final int MAX_SESSION_TITLE_LENGTH = 80;
     private static final int MAX_FEEDBACK_COMMENT_LENGTH = 1000;
@@ -54,12 +54,12 @@ public class ChatService implements IChatUseCase {
     public ChatService(
             IChatPersistencePort IChatPersistencePort,
             IChatUserLookupPort IChatUserLookupPort,
-            IPaymentTokenUseCase IPaymentTokenUseCase,
+            IChatTokenPort IChatTokenPort,
             IChatEventPublisherPort IChatEventPublisherPort
     ) {
         this.IChatPersistencePort = IChatPersistencePort;
         this.IChatUserLookupPort = IChatUserLookupPort;
-        this.IPaymentTokenUseCase = IPaymentTokenUseCase;
+        this.IChatTokenPort = IChatTokenPort;
         this.IChatEventPublisherPort = IChatEventPublisherPort;
     }
 
@@ -91,7 +91,7 @@ public class ChatService implements IChatUseCase {
         messageProcessing.setUpdatedAt(now);
         IChatPersistencePort.saveMessageProcessing(messageProcessing);
 
-        IPaymentTokenUseCase.consumeChatToken(userId, userMessage.getId());
+        IChatTokenPort.consumeChatToken(userId, userMessage.getId());
 
         chatSession.setUpdatedAt(now);
         IChatPersistencePort.saveSession(chatSession);
