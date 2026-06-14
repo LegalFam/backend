@@ -1,6 +1,6 @@
 package com.legalfam.backend.security.infrastructure;
 
-import com.legalfam.backend.auth.application.port.out.TokenValidationPort;
+import com.legalfam.backend.auth.application.port.out.ITokenValidationPort;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,10 +20,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
-    private final TokenValidationPort tokenValidationPort;
+    private final ITokenValidationPort ITokenValidationPort;
 
-    public JwtAuthenticationFilter(TokenValidationPort tokenValidationPort) {
-        this.tokenValidationPort = tokenValidationPort;
+    public JwtAuthenticationFilter(ITokenValidationPort ITokenValidationPort) {
+        this.ITokenValidationPort = ITokenValidationPort;
     }
 
     @Override
@@ -35,9 +35,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String header = request.getHeader(AUTHORIZATION_HEADER);
         if (header != null && header.startsWith(BEARER_PREFIX)) {
             String token = header.substring(BEARER_PREFIX.length()).trim();
-            if (!token.isEmpty() && tokenValidationPort.isTokenValid(token)) {
+            if (!token.isEmpty() && ITokenValidationPort.isTokenValid(token)) {
                 try {
-                    UUID userId = tokenValidationPort.extractUserId(token);
+                    UUID userId = ITokenValidationPort.extractUserId(token);
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(userId.toString(), null, List.of());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

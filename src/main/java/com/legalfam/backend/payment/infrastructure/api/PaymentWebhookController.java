@@ -1,6 +1,6 @@
 package com.legalfam.backend.payment.infrastructure.api;
 
-import com.legalfam.backend.payment.application.port.in.PaymentUseCase;
+import com.legalfam.backend.payment.application.port.in.IPaymentUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
@@ -15,10 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Payments")
 public class PaymentWebhookController {
 
-    private final PaymentUseCase paymentUseCase;
+    private final IPaymentUseCase IPaymentUseCase;
 
-    public PaymentWebhookController(PaymentUseCase paymentUseCase) {
-        this.paymentUseCase = paymentUseCase;
+    public PaymentWebhookController(IPaymentUseCase IPaymentUseCase) {
+        this.IPaymentUseCase = IPaymentUseCase;
     }
 
     @PostMapping("/mercado-pago")
@@ -27,7 +27,7 @@ public class PaymentWebhookController {
             @RequestBody(required = false) String payload,
             @RequestHeader(name = "X-Signature", required = false) String signatureHeader
     ) {
-        paymentUseCase.handleWebhook(payload, signatureHeader);
+        IPaymentUseCase.handleWebhook(payload, signatureHeader);
         return ResponseEntity.ok().build();
     }
 }

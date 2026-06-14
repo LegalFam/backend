@@ -8,7 +8,7 @@ import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import java.util.List;
 import java.util.UUID;
 
-public interface ChatUseCase {
+public interface IChatUseCase {
     ChatSendAcceptedResponse send(UUID userId, String messageInput, UUID sessionId);
 
     ChatSessionResponse createSession(UUID userId);

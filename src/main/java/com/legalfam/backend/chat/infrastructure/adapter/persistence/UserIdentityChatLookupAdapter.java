@@ -1,21 +1,21 @@
 package com.legalfam.backend.chat.infrastructure.adapter.persistence;
 
-import com.legalfam.backend.auth.application.port.out.UserPort;
-import com.legalfam.backend.chat.application.port.out.ChatUserLookupPort;
+import com.legalfam.backend.auth.application.port.out.IUserPort;
+import com.legalfam.backend.chat.application.port.out.IChatUserLookupPort;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
-public class UserIdentityChatLookupAdapter implements ChatUserLookupPort {
+public class UserIdentityChatLookupAdapter implements IChatUserLookupPort {
 
-    private final UserPort userPort;
+    private final IUserPort IUserPort;
 
-    public UserIdentityChatLookupAdapter(UserPort userPort) {
-        this.userPort = userPort;
+    public UserIdentityChatLookupAdapter(IUserPort IUserPort) {
+        this.IUserPort = IUserPort;
     }
 
     @Override
     public boolean existsById(UUID userId) {
-        return userPort.findById(userId).isPresent();
+        return IUserPort.findById(userId).isPresent();
     }
 }

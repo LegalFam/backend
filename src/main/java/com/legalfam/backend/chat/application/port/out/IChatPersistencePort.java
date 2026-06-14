@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface ChatPersistencePort {
+public interface IChatPersistencePort {
     Optional<ChatSession> findSessionById(UUID sessionId);
 
     ChatSession saveSession(ChatSession chatSession);

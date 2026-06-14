@@ -1,6 +1,6 @@
 package com.legalfam.backend.chat.infrastructure.integration;
 
-import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Duration;
@@ -13,15 +13,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ChatOutboxRelayTransactionService {
 
-    private final ChatPersistencePort chatPersistencePort;
+    private final IChatPersistencePort IChatPersistencePort;
 
-    public ChatOutboxRelayTransactionService(ChatPersistencePort chatPersistencePort) {
-        this.chatPersistencePort = chatPersistencePort;
+    public ChatOutboxRelayTransactionService(IChatPersistencePort IChatPersistencePort) {
+        this.IChatPersistencePort = IChatPersistencePort;
     }
 
     @Transactional
     public List<ChatOutboxEvent> claimReadyEvents(Instant now, int batchSize, Duration retryDelay) {
-        List<ChatOutboxEvent> events = chatPersistencePort.lockReadyOutboxEvents(now, batchSize);
+        List<ChatOutboxEvent> events = IChatPersistencePort.lockReadyOutboxEvents(now, batchSize);
         Instant nextAvailableAt = now.plus(retryDelay);
         for (ChatOutboxEvent event : events) {
             if (event.getStatus() == ChatOutboxEventStatus.READ) {
@@ -29,32 +29,32 @@ public class ChatOutboxRelayTransactionService {
             }
             event.setAvailableAt(nextAvailableAt);
             event.setUpdatedAt(now);
-            chatPersistencePort.saveOutboxEvent(event);
+            IChatPersistencePort.saveOutboxEvent(event);
         }
         return events;
     }
 
     @Transactional
     public void recordPublishSuccess(UUID aggregateId, Instant now) {
-        chatPersistencePort.findOutboxEventByAggregateIdForUpdate(aggregateId)
+        IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(aggregateId)
                 .filter(event -> event.getStatus() != ChatOutboxEventStatus.READ)
                 .ifPresent(event -> {
                     event.setLastError(null);
                     event.setUpdatedAt(now);
-                    chatPersistencePort.saveOutboxEvent(event);
+                    IChatPersistencePort.saveOutboxEvent(event);
                 });
     }
 
     @Transactional
     public void recordPublishFailure(UUID aggregateId, Instant now, Duration retryDelay, String errorMessage) {
-        chatPersistencePort.findOutboxEventByAggregateIdForUpdate(aggregateId)
+        IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(aggregateId)
                 .filter(event -> event.getStatus() != ChatOutboxEventStatus.READ)
                 .ifPresent(event -> {
                     event.setStatus(ChatOutboxEventStatus.PENDING);
                     event.setAvailableAt(now.plus(retryDelay));
                     event.setLastError(errorMessage);
                     event.setUpdatedAt(now);
-                    chatPersistencePort.saveOutboxEvent(event);
+                    IChatPersistencePort.saveOutboxEvent(event);
                 });
     }
 }

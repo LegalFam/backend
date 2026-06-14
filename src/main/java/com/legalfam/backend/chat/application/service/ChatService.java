@@ -1,9 +1,9 @@
 package com.legalfam.backend.chat.application.service;
 
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
-import com.legalfam.backend.chat.application.port.in.ChatUseCase;
-import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
-import com.legalfam.backend.chat.application.port.out.ChatUserLookupPort;
+import com.legalfam.backend.chat.application.port.in.IChatUseCase;
+import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.IChatUserLookupPort;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
@@ -22,7 +22,7 @@ import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatSession;
-import com.legalfam.backend.payment.application.port.in.PaymentTokenUseCase;
+import com.legalfam.backend.payment.application.port.in.IPaymentTokenUseCase;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -35,11 +35,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class ChatService implements ChatUseCase {
+public class ChatService implements IChatUseCase {
 
-    private final ChatPersistencePort chatPersistencePort;
-    private final ChatUserLookupPort chatUserLookupPort;
-    private final PaymentTokenUseCase paymentTokenUseCase;
+    private final IChatPersistencePort IChatPersistencePort;
+    private final IChatUserLookupPort IChatUserLookupPort;
+    private final IPaymentTokenUseCase IPaymentTokenUseCase;
     private final ApplicationEventPublisher applicationEventPublisher;
     private static final int MAX_SESSION_TITLE_LENGTH = 80;
     private static final int MAX_FEEDBACK_COMMENT_LENGTH = 1000;
@@ -52,14 +52,14 @@ public class ChatService implements ChatUseCase {
     );
 
     public ChatService(
-            ChatPersistencePort chatPersistencePort,
-            ChatUserLookupPort chatUserLookupPort,
-            PaymentTokenUseCase paymentTokenUseCase,
+            IChatPersistencePort IChatPersistencePort,
+            IChatUserLookupPort IChatUserLookupPort,
+            IPaymentTokenUseCase IPaymentTokenUseCase,
             ApplicationEventPublisher applicationEventPublisher
     ) {
-        this.chatPersistencePort = chatPersistencePort;
-        this.chatUserLookupPort = chatUserLookupPort;
-        this.paymentTokenUseCase = paymentTokenUseCase;
+        this.IChatPersistencePort = IChatPersistencePort;
+        this.IChatUserLookupPort = IChatUserLookupPort;
+        this.IPaymentTokenUseCase = IPaymentTokenUseCase;
         this.applicationEventPublisher = applicationEventPublisher;
     }
 
@@ -72,7 +72,7 @@ public class ChatService implements ChatUseCase {
         validateMessagePrivacy(messageInput);
         assertUserExists(userId);
         ChatSession chatSession = assertSessionOwnership(userId, sessionId);
-        if (chatPersistencePort.existsUnreadAssistantMessageBySessionId(chatSession.getId())) {
+        if (IChatPersistencePort.existsUnreadAssistantMessageBySessionId(chatSession.getId())) {
             throw new PendingAssistantMessageException("Assistant receipt confirmation is still pending for this session");
         }
         Instant now = Instant.now();
@@ -82,19 +82,19 @@ public class ChatService implements ChatUseCase {
         userMessage.setRole(ChatMessageRole.USER);
         userMessage.setContent(messageInput);
         userMessage.setCreatedAt(now);
-        userMessage = chatPersistencePort.saveMessage(userMessage);
+        userMessage = IChatPersistencePort.saveMessage(userMessage);
 
         ChatMessageProcessing messageProcessing = new ChatMessageProcessing();
         messageProcessing.setUserMessageId(userMessage.getId());
         messageProcessing.setStatus(ChatMessageProcessingStatus.QUEUED);
         messageProcessing.setCreatedAt(now);
         messageProcessing.setUpdatedAt(now);
-        chatPersistencePort.saveMessageProcessing(messageProcessing);
+        IChatPersistencePort.saveMessageProcessing(messageProcessing);
 
-        paymentTokenUseCase.consumeChatToken(userId, userMessage.getId());
+        IPaymentTokenUseCase.consumeChatToken(userId, userMessage.getId());
 
         chatSession.setUpdatedAt(now);
-        chatPersistencePort.saveSession(chatSession);
+        IChatPersistencePort.saveSession(chatSession);
         applicationEventPublisher.publishEvent(new ChatMessageQueuedEvent(chatSession.getId(), userMessage.getId(), messageInput));
 
         return new ChatSendAcceptedResponse(chatSession.getId(), userMessage.getId(), "PROCESSING");
@@ -109,7 +109,7 @@ public class ChatService implements ChatUseCase {
         session.setUserId(userId);
         session.setCreatedAt(now);
         session.setUpdatedAt(now);
-        session = chatPersistencePort.saveSession(session);
+        session = IChatPersistencePort.saveSession(session);
         return toSessionResponse(session);
     }
 
@@ -123,20 +123,20 @@ public class ChatService implements ChatUseCase {
         ChatSession session = assertSessionOwnership(userId, sessionId);
         session.setTitle(normalizeSessionTitle(request.title()));
         session.setUpdatedAt(Instant.now());
-        return toSessionResponse(chatPersistencePort.saveSession(session));
+        return toSessionResponse(IChatPersistencePort.saveSession(session));
     }
 
     @Override
     @Transactional
     public void deleteSession(UUID userId, UUID sessionId) {
         ChatSession session = assertSessionOwnership(userId, sessionId);
-        chatPersistencePort.deleteSessionById(session.getId());
+        IChatPersistencePort.deleteSessionById(session.getId());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ChatSessionResponse> listSessions(UUID userId) {
-        return chatPersistencePort.findSessionsByUserIdOrderByUpdatedAtDesc(userId).stream()
+        return IChatPersistencePort.findSessionsByUserIdOrderByUpdatedAtDesc(userId).stream()
                 .map(this::toSessionResponse)
                 .toList();
     }
@@ -145,17 +145,17 @@ public class ChatService implements ChatUseCase {
     @Transactional(readOnly = true)
     public List<ChatMessageResponse> listMessages(UUID userId, UUID sessionId) {
         ChatSession session = assertSessionOwnership(userId, sessionId);
-        List<ChatMessage> messages = chatPersistencePort.findMessagesBySessionIdOrderByCreatedAtAsc(session.getId());
+        List<ChatMessage> messages = IChatPersistencePort.findMessagesBySessionIdOrderByCreatedAtAsc(session.getId());
         if (messages.isEmpty()) {
             return List.of();
         }
 
         List<UUID> messageIds = messages.stream().map(ChatMessage::getId).toList();
-        Map<UUID, List<ChatCitation>> citationsByMessageId = chatPersistencePort
+        Map<UUID, List<ChatCitation>> citationsByMessageId = IChatPersistencePort
                 .findCitationsByMessageIdsOrderByMessageIdAndId(messageIds)
                 .stream()
                 .collect(Collectors.groupingBy(ChatCitation::getChatMessageId));
-        Map<UUID, ChatOutboxEvent> outboxByMessageId = chatPersistencePort.findOutboxEventsByAggregateIds(messageIds)
+        Map<UUID, ChatOutboxEvent> outboxByMessageId = IChatPersistencePort.findOutboxEventsByAggregateIds(messageIds)
                 .stream()
                 .collect(Collectors.toMap(ChatOutboxEvent::getAggregateId, event -> event));
 
@@ -190,13 +190,13 @@ public class ChatService implements ChatUseCase {
         }
         String comment = normalizeFeedbackComment(request.comment());
 
-        ChatMessage message = chatPersistencePort.findMessageById(messageId)
+        ChatMessage message = IChatPersistencePort.findMessageById(messageId)
                 .orElseThrow(() -> new ChatNotFoundException("Chat message not found"));
         if (message.getRole() != ChatMessageRole.ASSISTANT) {
             throw new InvalidChatRequestException("Only assistant messages can be rated");
         }
 
-        ChatSession messageSession = chatPersistencePort.findSessionById(message.getChatSessionId())
+        ChatSession messageSession = IChatPersistencePort.findSessionById(message.getChatSessionId())
                 .orElseThrow(() -> new ChatNotFoundException("Chat session not found"));
         UUID ownerId = messageSession.getUserId();
         if (!ownerId.equals(userId)) {
@@ -206,30 +206,30 @@ public class ChatService implements ChatUseCase {
         message.setRating(request.rating());
         message.setFeedbackComment(comment);
         message.setFeedbackSubmittedAt(Instant.now());
-        chatPersistencePort.saveMessage(message);
+        IChatPersistencePort.saveMessage(message);
     }
 
     @Override
     @Transactional
     public void confirmAssistantReceipt(UUID userId, UUID messageId) {
-        ChatMessage message = chatPersistencePort.findMessageById(messageId)
+        ChatMessage message = IChatPersistencePort.findMessageById(messageId)
                 .orElseThrow(() -> new ChatNotFoundException("Chat message not found"));
         if (message.getRole() != ChatMessageRole.ASSISTANT) {
             throw new InvalidChatRequestException("Receipt can only be confirmed for assistant messages");
         }
 
         ChatSession messageSession = assertSessionOwnership(userId, message.getChatSessionId());
-        ChatOutboxEvent outboxEvent = chatPersistencePort.findOutboxEventByAggregateIdForUpdate(messageId)
+        ChatOutboxEvent outboxEvent = IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(messageId)
                 .orElseThrow(() -> new ChatNotFoundException("Assistant delivery event not found"));
 
         Instant now = Instant.now();
         outboxEvent.setStatus(ChatOutboxEventStatus.READ);
         outboxEvent.setReadAt(now);
         outboxEvent.setUpdatedAt(now);
-        chatPersistencePort.saveOutboxEvent(outboxEvent);
+        IChatPersistencePort.saveOutboxEvent(outboxEvent);
 
         messageSession.setUpdatedAt(now);
-        chatPersistencePort.saveSession(messageSession);
+        IChatPersistencePort.saveSession(messageSession);
     }
 
     @Override
@@ -239,7 +239,7 @@ public class ChatService implements ChatUseCase {
     }
 
     private ChatSession assertSessionOwnership(UUID userId, UUID sessionId) {
-        ChatSession session = chatPersistencePort.findSessionById(sessionId)
+        ChatSession session = IChatPersistencePort.findSessionById(sessionId)
                 .orElseThrow(() -> new ChatNotFoundException("Chat session not found"));
 
         if (!session.getUserId().equals(userId)) {
@@ -249,7 +249,7 @@ public class ChatService implements ChatUseCase {
     }
 
     private void assertUserExists(UUID userId) {
-        if (!chatUserLookupPort.existsById(userId)) {
+        if (!IChatUserLookupPort.existsById(userId)) {
             throw new ChatAccessDeniedException("Authenticated user not found");
         }
     }

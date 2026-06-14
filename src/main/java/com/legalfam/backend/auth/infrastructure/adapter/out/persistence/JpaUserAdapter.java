@@ -1,38 +1,38 @@
 package com.legalfam.backend.auth.infrastructure.adapter.out.persistence;
 
-import com.legalfam.backend.auth.application.port.out.UserPort;
+import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.auth.domain.model.User;
-import com.legalfam.backend.auth.infrastructure.persistence.UserRepository;
+import com.legalfam.backend.auth.infrastructure.persistence.IUserRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
-public class JpaUserAdapter implements UserPort {
+public class JpaUserAdapter implements IUserPort {
 
-    private final UserRepository userRepository;
+    private final IUserRepository IUserRepository;
 
-    public JpaUserAdapter(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public JpaUserAdapter(IUserRepository IUserRepository) {
+        this.IUserRepository = IUserRepository;
     }
 
     @Override
     public boolean existsByEmail(String email) {
-        return userRepository.existsByEmail(email);
+        return IUserRepository.existsByEmail(email);
     }
 
     @Override
     public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email).map(UserEntityMapper::toDomain);
+        return IUserRepository.findByEmail(email).map(UserEntityMapper::toDomain);
     }
 
     @Override
     public Optional<User> findById(UUID userId) {
-        return userRepository.findById(userId).map(UserEntityMapper::toDomain);
+        return IUserRepository.findById(userId).map(UserEntityMapper::toDomain);
     }
 
     @Override
     public User save(User user) {
-        return UserEntityMapper.toDomain(userRepository.save(UserEntityMapper.toEntity(user)));
+        return UserEntityMapper.toDomain(IUserRepository.save(UserEntityMapper.toEntity(user)));
     }
 }

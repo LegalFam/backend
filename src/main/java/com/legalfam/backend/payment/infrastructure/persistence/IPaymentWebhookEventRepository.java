@@ -4,6 +4,6 @@ import com.legalfam.backend.payment.infrastructure.persistence.entity.PaymentWeb
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface PaymentWebhookEventRepository extends JpaRepository<PaymentWebhookEventEntity, UUID> {
+public interface IPaymentWebhookEventRepository extends JpaRepository<PaymentWebhookEventEntity, UUID> {
     boolean existsByEventId(String eventId);
 }

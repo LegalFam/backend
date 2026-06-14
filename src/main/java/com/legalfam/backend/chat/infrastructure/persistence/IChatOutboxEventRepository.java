@@ -14,7 +14,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface ChatOutboxEventRepository extends JpaRepository<ChatOutboxEventEntity, UUID> {
+public interface IChatOutboxEventRepository extends JpaRepository<ChatOutboxEventEntity, UUID> {
 
     Optional<ChatOutboxEventEntity> findByAggregateId(UUID aggregateId);
 

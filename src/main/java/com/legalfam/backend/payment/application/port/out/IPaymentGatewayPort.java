@@ -5,7 +5,7 @@ import com.legalfam.backend.payment.application.dto.PaymentSubscriptionSnapshot;
 import com.legalfam.backend.payment.application.dto.PaymentWebhookNotification;
 import java.util.UUID;
 
-public interface PaymentGatewayPort {
+public interface IPaymentGatewayPort {
     String createCheckoutSession(
             UUID userId,
             String email,

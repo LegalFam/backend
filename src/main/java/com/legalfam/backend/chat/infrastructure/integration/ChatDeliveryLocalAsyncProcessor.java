@@ -1,7 +1,7 @@
 package com.legalfam.backend.chat.infrastructure.integration;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
-import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Duration;
@@ -20,14 +20,14 @@ public class ChatDeliveryLocalAsyncProcessor {
 
     private static final Duration RETRY_DELAY = Duration.ofMinutes(10);
 
-    private final ChatPersistencePort chatPersistencePort;
+    private final IChatPersistencePort IChatPersistencePort;
     private final com.legalfam.backend.chat.infrastructure.sse.ChatSseEmitterService chatSseEmitterService;
 
     public ChatDeliveryLocalAsyncProcessor(
-            ChatPersistencePort chatPersistencePort,
+            IChatPersistencePort IChatPersistencePort,
             com.legalfam.backend.chat.infrastructure.sse.ChatSseEmitterService chatSseEmitterService
     ) {
-        this.chatPersistencePort = chatPersistencePort;
+        this.IChatPersistencePort = IChatPersistencePort;
         this.chatSseEmitterService = chatSseEmitterService;
     }
 
@@ -35,7 +35,7 @@ public class ChatDeliveryLocalAsyncProcessor {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void process(ChatAssistantDeliveryQueuedEvent event) {
-        ChatOutboxEvent outboxEvent = chatPersistencePort.findOutboxEventByAggregateIdForUpdate(event.assistantMessageId())
+        ChatOutboxEvent outboxEvent = IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(event.assistantMessageId())
                 .orElse(null);
         if (outboxEvent == null || outboxEvent.getStatus() == ChatOutboxEventStatus.READ) {
             return;
@@ -49,6 +49,6 @@ public class ChatDeliveryLocalAsyncProcessor {
         outboxEvent.setPublishedAt(delivered ? now : outboxEvent.getPublishedAt());
         outboxEvent.setLastError(delivered ? null : "No active SSE subscriber available");
         outboxEvent.setUpdatedAt(now);
-        chatPersistencePort.saveOutboxEvent(outboxEvent);
+        IChatPersistencePort.saveOutboxEvent(outboxEvent);
     }
 }

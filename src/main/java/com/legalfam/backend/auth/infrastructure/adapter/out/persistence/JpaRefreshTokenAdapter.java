@@ -1,29 +1,29 @@
 package com.legalfam.backend.auth.infrastructure.adapter.out.persistence;
 
-import com.legalfam.backend.auth.application.port.out.RefreshTokenPort;
+import com.legalfam.backend.auth.application.port.out.IRefreshTokenPort;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
-import com.legalfam.backend.auth.infrastructure.persistence.RefreshTokenRepository;
+import com.legalfam.backend.auth.infrastructure.persistence.IRefreshTokenRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 @Component
-public class JpaRefreshTokenAdapter implements RefreshTokenPort {
+public class JpaRefreshTokenAdapter implements IRefreshTokenPort {
 
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final IRefreshTokenRepository IRefreshTokenRepository;
 
-    public JpaRefreshTokenAdapter(RefreshTokenRepository refreshTokenRepository) {
-        this.refreshTokenRepository = refreshTokenRepository;
+    public JpaRefreshTokenAdapter(IRefreshTokenRepository IRefreshTokenRepository) {
+        this.IRefreshTokenRepository = IRefreshTokenRepository;
     }
 
     @Override
     public Optional<RefreshToken> findByToken(String token) {
-        return refreshTokenRepository.findByToken(token).map(RefreshTokenEntityMapper::toDomain);
+        return IRefreshTokenRepository.findByToken(token).map(RefreshTokenEntityMapper::toDomain);
     }
 
     @Override
     public RefreshToken save(RefreshToken refreshToken) {
         return RefreshTokenEntityMapper.toDomain(
-                refreshTokenRepository.save(RefreshTokenEntityMapper.toEntity(refreshToken))
+                IRefreshTokenRepository.save(RefreshTokenEntityMapper.toEntity(refreshToken))
         );
     }
 }

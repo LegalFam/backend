@@ -1,8 +1,8 @@
 package com.legalfam.backend.chat.infrastructure.adapter.events;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
-import com.legalfam.backend.chat.application.port.out.ChatOutboxPort;
-import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.IChatOutboxPort;
+import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Instant;
@@ -11,18 +11,18 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-public class TransactionalChatOutboxAdapter implements ChatOutboxPort {
+public class TransactionalChatOutboxAdapter implements IChatOutboxPort {
 
-    private final ChatPersistencePort chatPersistencePort;
+    private final IChatPersistencePort IChatPersistencePort;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     public TransactionalChatOutboxAdapter(
-            ChatPersistencePort chatPersistencePort,
+            IChatPersistencePort IChatPersistencePort,
             ObjectMapper objectMapper,
             ApplicationEventPublisher applicationEventPublisher
     ) {
-        this.chatPersistencePort = chatPersistencePort;
+        this.IChatPersistencePort = IChatPersistencePort;
         this.objectMapper = objectMapper;
         this.applicationEventPublisher = applicationEventPublisher;
     }
@@ -32,7 +32,7 @@ public class TransactionalChatOutboxAdapter implements ChatOutboxPort {
         try {
             Instant now = Instant.now();
 
-            ChatOutboxEvent event = chatPersistencePort.findOutboxEventByAggregateId(deliveryEvent.assistantMessageId())
+            ChatOutboxEvent event = IChatPersistencePort.findOutboxEventByAggregateId(deliveryEvent.assistantMessageId())
                     .orElseGet(ChatOutboxEvent::new);
             event.setEventType(ChatOutboxEvent.ASSISTANT_DELIVERY_EVENT_TYPE);
             event.setAggregateId(deliveryEvent.assistantMessageId());
@@ -50,7 +50,7 @@ public class TransactionalChatOutboxAdapter implements ChatOutboxPort {
                 event.setAttemptCount(0);
             }
 
-            chatPersistencePort.saveOutboxEvent(event);
+            IChatPersistencePort.saveOutboxEvent(event);
             applicationEventPublisher.publishEvent(deliveryEvent);
         } catch (Exception ex) {
             throw new IllegalStateException("Failed to register assistant delivery in chat outbox", ex);

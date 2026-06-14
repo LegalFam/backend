@@ -1,6 +1,6 @@
 package com.legalfam.backend.auth.infrastructure.api;
 
-import com.legalfam.backend.auth.application.port.in.AuthUseCase;
+import com.legalfam.backend.auth.application.port.in.IAuthUseCase;
 import com.legalfam.backend.auth.application.dto.LoginRequest;
 import com.legalfam.backend.auth.application.dto.RefreshTokenRequest;
 import com.legalfam.backend.auth.application.dto.SignupRequest;
@@ -29,10 +29,10 @@ public class AuthController {
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
-    private final AuthUseCase authUseCase;
+    private final IAuthUseCase IAuthUseCase;
 
-    public AuthController(AuthUseCase authUseCase) {
-        this.authUseCase = authUseCase;
+    public AuthController(IAuthUseCase IAuthUseCase) {
+        this.IAuthUseCase = IAuthUseCase;
     }
 
     @Operation(summary = "Signup with email, password, name and phone")
@@ -54,7 +54,7 @@ public class AuthController {
             throw new InvalidAuthRequestException("Valid email is required");
         }
 
-        TokenResponse tokens = authUseCase.signup(
+        TokenResponse tokens = IAuthUseCase.signup(
                 request.email().trim(),
                 request.password(),
                 request.name().trim(),
@@ -81,7 +81,7 @@ public class AuthController {
             throw new InvalidAuthRequestException("Valid email is required");
         }
 
-        TokenResponse tokens = authUseCase.login(request.email().trim(), request.password());
+        TokenResponse tokens = IAuthUseCase.login(request.email().trim(), request.password());
         return ResponseEntity.ok(tokens);
     }
 
@@ -100,7 +100,7 @@ public class AuthController {
             throw new InvalidAuthRequestException("Refresh token is required");
         }
 
-        TokenResponse tokens = authUseCase.refresh(request.refreshToken().trim());
+        TokenResponse tokens = IAuthUseCase.refresh(request.refreshToken().trim());
         return ResponseEntity.ok(tokens);
     }
 

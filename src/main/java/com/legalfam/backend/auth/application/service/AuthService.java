@@ -1,9 +1,9 @@
 package com.legalfam.backend.auth.application.service;
 
-import com.legalfam.backend.auth.application.port.in.AuthUseCase;
-import com.legalfam.backend.auth.application.port.out.AccessTokenPort;
-import com.legalfam.backend.auth.application.port.out.RefreshTokenPort;
-import com.legalfam.backend.auth.application.port.out.UserPort;
+import com.legalfam.backend.auth.application.port.in.IAuthUseCase;
+import com.legalfam.backend.auth.application.port.out.IAccessTokenPort;
+import com.legalfam.backend.auth.application.port.out.IRefreshTokenPort;
+import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
@@ -11,7 +11,7 @@ import com.legalfam.backend.auth.application.dto.TokenResponse;
 import com.legalfam.backend.auth.application.dto.UserResponse;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.domain.model.User;
-import com.legalfam.backend.payment.application.port.in.PaymentProvisioningUseCase;
+import com.legalfam.backend.payment.application.port.in.IPaymentProvisioningUseCase;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -23,36 +23,36 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class AuthService implements AuthUseCase {
+public class AuthService implements IAuthUseCase {
 
-    private final UserPort userPort;
-    private final RefreshTokenPort refreshTokenPort;
+    private final IUserPort IUserPort;
+    private final IRefreshTokenPort IRefreshTokenPort;
     private final PasswordEncoder passwordEncoder;
-    private final AccessTokenPort accessTokenPort;
-    private final PaymentProvisioningUseCase paymentProvisioningUseCase;
+    private final IAccessTokenPort IAccessTokenPort;
+    private final IPaymentProvisioningUseCase IPaymentProvisioningUseCase;
     private final long refreshTokenExpirationMs;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(
-            UserPort userPort,
-            RefreshTokenPort refreshTokenPort,
+            IUserPort IUserPort,
+            IRefreshTokenPort IRefreshTokenPort,
             PasswordEncoder passwordEncoder,
-            AccessTokenPort accessTokenPort,
-            PaymentProvisioningUseCase paymentProvisioningUseCase,
+            IAccessTokenPort IAccessTokenPort,
+            IPaymentProvisioningUseCase IPaymentProvisioningUseCase,
             AuthTokenProperties authTokenProperties
     ) {
-        this.userPort = userPort;
-        this.refreshTokenPort = refreshTokenPort;
+        this.IUserPort = IUserPort;
+        this.IRefreshTokenPort = IRefreshTokenPort;
         this.passwordEncoder = passwordEncoder;
-        this.accessTokenPort = accessTokenPort;
-        this.paymentProvisioningUseCase = paymentProvisioningUseCase;
+        this.IAccessTokenPort = IAccessTokenPort;
+        this.IPaymentProvisioningUseCase = IPaymentProvisioningUseCase;
         this.refreshTokenExpirationMs = authTokenProperties.refreshTokenExpirationMs();
     }
 
     @Override
     @Transactional
     public TokenResponse signup(String email, String rawPassword, String name, String phone) {
-        if (userPort.existsByEmail(email)) {
+        if (IUserPort.existsByEmail(email)) {
             throw new EmailAlreadyExistsException(email);
         }
 
@@ -62,15 +62,15 @@ public class AuthService implements AuthUseCase {
         user.setName(name);
         user.setPhone(phone);
 
-        User savedUser = userPort.save(user);
-        paymentProvisioningUseCase.provisionFreeSubscription(savedUser.getId());
+        User savedUser = IUserPort.save(user);
+        IPaymentProvisioningUseCase.provisionFreeSubscription(savedUser.getId());
         return issueTokens(savedUser);
     }
 
     @Override
     @Transactional
     public TokenResponse login(String email, String rawPassword) {
-        User user = userPort
+        User user = IUserPort
                 .findByEmail(email)
                 .orElseThrow(InvalidCredentialsException::new);
 
@@ -85,9 +85,9 @@ public class AuthService implements AuthUseCase {
     @Transactional
     public TokenResponse refresh(String refreshTokenValue) {
         String tokenHash = hashRefreshToken(refreshTokenValue);
-        RefreshToken refreshToken = refreshTokenPort
+        RefreshToken refreshToken = IRefreshTokenPort
                 .findByToken(tokenHash)
-                .or(() -> refreshTokenPort.findByToken(refreshTokenValue))
+                .or(() -> IRefreshTokenPort.findByToken(refreshTokenValue))
                 .orElseThrow(InvalidRefreshTokenException::new);
 
         if (refreshToken.isRevoked() || refreshToken.getExpiresAt().isBefore(Instant.now())) {
@@ -95,21 +95,21 @@ public class AuthService implements AuthUseCase {
         }
 
         refreshToken.setRevoked(true);
-        refreshTokenPort.save(refreshToken);
+        IRefreshTokenPort.save(refreshToken);
 
-        User user = userPort.findById(refreshToken.getUserId())
+        User user = IUserPort.findById(refreshToken.getUserId())
                 .orElseThrow(InvalidRefreshTokenException::new);
         return issueTokens(user);
     }
 
     private TokenResponse issueTokens(User user) {
-        String accessToken = accessTokenPort.generateAccessToken(user.getId(), user.getEmail());
+        String accessToken = IAccessTokenPort.generateAccessToken(user.getId(), user.getEmail());
         String refreshToken = createRefreshToken(user);
         return new TokenResponse(
                 accessToken,
                 refreshToken,
                 "Bearer",
-                accessTokenPort.getAccessTokenExpirationSeconds(),
+                IAccessTokenPort.getAccessTokenExpirationSeconds(),
                 new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone())
         );
     }
@@ -126,7 +126,7 @@ public class AuthService implements AuthUseCase {
         refreshToken.setExpiresAt(Instant.now().plusMillis(refreshTokenExpirationMs));
         refreshToken.setUserId(user.getId());
 
-        refreshTokenPort.save(refreshToken);
+        IRefreshTokenPort.save(refreshToken);
         return tokenValue;
     }
 

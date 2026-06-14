@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface PaymentPersistencePort {
+public interface IPaymentPersistencePort {
     Optional<Subscription> findSubscriptionById(UUID subscriptionId);
 
     Optional<Subscription> findSubscriptionByUserId(UUID userId);

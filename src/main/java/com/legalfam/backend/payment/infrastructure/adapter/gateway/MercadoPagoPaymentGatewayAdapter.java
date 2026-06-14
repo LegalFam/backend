@@ -3,7 +3,7 @@ package com.legalfam.backend.payment.infrastructure.adapter.gateway;
 import com.legalfam.backend.payment.application.dto.PaymentPlanDefinition;
 import com.legalfam.backend.payment.application.dto.PaymentSubscriptionSnapshot;
 import com.legalfam.backend.payment.application.dto.PaymentWebhookNotification;
-import com.legalfam.backend.payment.application.port.out.PaymentGatewayPort;
+import com.legalfam.backend.payment.application.port.out.IPaymentGatewayPort;
 import com.legalfam.backend.payment.domain.exception.PaymentGatewayException;
 import com.legalfam.backend.payment.domain.exception.PaymentWebhookException;
 import java.math.BigDecimal;
@@ -29,7 +29,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @Component
-public class MercadoPagoPaymentGatewayAdapter implements PaymentGatewayPort {
+public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
 
     private static final int TIMEOUT_MS = 15000;
 

@@ -1,6 +1,6 @@
 package com.legalfam.backend.chat.infrastructure.integration;
 
-import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Duration;
 import java.time.Instant;
@@ -18,17 +18,17 @@ public class ChatOutboxCleanupJob {
     private static final Logger log = LoggerFactory.getLogger(ChatOutboxCleanupJob.class);
     private static final Duration READ_RETENTION = Duration.ofDays(7);
 
-    private final ChatPersistencePort chatPersistencePort;
+    private final IChatPersistencePort IChatPersistencePort;
 
-    public ChatOutboxCleanupJob(ChatPersistencePort chatPersistencePort) {
-        this.chatPersistencePort = chatPersistencePort;
+    public ChatOutboxCleanupJob(IChatPersistencePort IChatPersistencePort) {
+        this.IChatPersistencePort = IChatPersistencePort;
     }
 
     @Scheduled(cron = "${app.chat.outbox.cleanup.cron:0 0 * * * *}")
     @Transactional
     public void cleanup() {
         Instant now = Instant.now();
-        long deletedRead = chatPersistencePort.deleteOutboxEventsByStatusAndReadAtBefore(
+        long deletedRead = IChatPersistencePort.deleteOutboxEventsByStatusAndReadAtBefore(
                 ChatOutboxEventStatus.READ,
                 now.minus(READ_RETENTION)
         );

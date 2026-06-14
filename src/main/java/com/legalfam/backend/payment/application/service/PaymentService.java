@@ -1,6 +1,6 @@
 package com.legalfam.backend.payment.application.service;
 
-import com.legalfam.backend.auth.application.port.out.UserPort;
+import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.auth.domain.model.User;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionRequest;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionResponse;
@@ -8,12 +8,12 @@ import com.legalfam.backend.payment.application.dto.PaymentPlanDefinition;
 import com.legalfam.backend.payment.application.dto.PaymentPlanResponse;
 import com.legalfam.backend.payment.application.dto.PaymentSubscriptionResponse;
 import com.legalfam.backend.payment.application.dto.PaymentWebhookNotification;
-import com.legalfam.backend.payment.application.port.in.PaymentProvisioningUseCase;
-import com.legalfam.backend.payment.application.port.in.PaymentTokenUseCase;
-import com.legalfam.backend.payment.application.port.in.PaymentUseCase;
-import com.legalfam.backend.payment.application.port.out.PaymentGatewayPort;
-import com.legalfam.backend.payment.application.port.out.PaymentPlanCatalogPort;
-import com.legalfam.backend.payment.application.port.out.PaymentPersistencePort;
+import com.legalfam.backend.payment.application.port.in.IPaymentProvisioningUseCase;
+import com.legalfam.backend.payment.application.port.in.IPaymentTokenUseCase;
+import com.legalfam.backend.payment.application.port.in.IPaymentUseCase;
+import com.legalfam.backend.payment.application.port.out.IPaymentGatewayPort;
+import com.legalfam.backend.payment.application.port.out.IPaymentPlanCatalogPort;
+import com.legalfam.backend.payment.application.port.out.IPaymentPersistencePort;
 import com.legalfam.backend.payment.domain.exception.InsufficientTokensException;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import com.legalfam.backend.payment.domain.exception.PaymentWebhookException;
@@ -41,32 +41,32 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCase, PaymentTokenUseCase {
+public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseCase, IPaymentTokenUseCase {
 
     private static final String BILLING_INTERVAL = "month";
 
-    private final PaymentPersistencePort paymentPersistencePort;
-    private final PaymentGatewayPort paymentGatewayPort;
-    private final PaymentPlanCatalogPort paymentPlanCatalogPort;
-    private final UserPort userPort;
+    private final IPaymentPersistencePort IPaymentPersistencePort;
+    private final IPaymentGatewayPort IPaymentGatewayPort;
+    private final IPaymentPlanCatalogPort IPaymentPlanCatalogPort;
+    private final IUserPort IUserPort;
     private final String defaultCheckoutSuccessUrl;
     private final String defaultCheckoutCancelUrl;
     private final String webhookSecret;
     private final Clock clock = Clock.systemUTC();
 
     public PaymentService(
-            PaymentPersistencePort paymentPersistencePort,
-            PaymentGatewayPort paymentGatewayPort,
-            PaymentPlanCatalogPort paymentPlanCatalogPort,
-            UserPort userPort,
+            IPaymentPersistencePort IPaymentPersistencePort,
+            IPaymentGatewayPort IPaymentGatewayPort,
+            IPaymentPlanCatalogPort IPaymentPlanCatalogPort,
+            IUserPort IUserPort,
             @Value("${app.payment.mercado-pago.checkout-success-url}") String defaultCheckoutSuccessUrl,
             @Value("${app.payment.mercado-pago.checkout-cancel-url:http://localhost:3000/billing/cancel}") String defaultCheckoutCancelUrl,
             @Value("${app.payment.mercado-pago.webhook-secret:}") String webhookSecret
     ) {
-        this.paymentPersistencePort = paymentPersistencePort;
-        this.paymentGatewayPort = paymentGatewayPort;
-        this.paymentPlanCatalogPort = paymentPlanCatalogPort;
-        this.userPort = userPort;
+        this.IPaymentPersistencePort = IPaymentPersistencePort;
+        this.IPaymentGatewayPort = IPaymentGatewayPort;
+        this.IPaymentPlanCatalogPort = IPaymentPlanCatalogPort;
+        this.IUserPort = IUserPort;
         this.defaultCheckoutSuccessUrl = defaultCheckoutSuccessUrl;
         this.defaultCheckoutCancelUrl = defaultCheckoutCancelUrl;
         this.webhookSecret = webhookSecret == null ? "" : webhookSecret.trim();
@@ -75,11 +75,11 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     @Override
     @Transactional(readOnly = true)
     public List<PaymentPlanResponse> listPlans(UUID userId) {
-        Subscription subscription = userId == null ? null : paymentPersistencePort.findSubscriptionByUserId(userId).orElse(null);
+        Subscription subscription = userId == null ? null : IPaymentPersistencePort.findSubscriptionByUserId(userId).orElse(null);
         SubscriptionPlanCode currentPlanCode = userId == null
                 ? null
                 : subscription == null ? SubscriptionPlanCode.FREE : subscription.getPlanCode();
-        return paymentPlanCatalogPort.listPlans().stream()
+        return IPaymentPlanCatalogPort.listPlans().stream()
                 .map(plan -> new PaymentPlanResponse(
                         plan.code().name(),
                         plan.displayName(),
@@ -108,13 +108,13 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         if (request == null) {
             throw new InvalidPaymentRequestException("Checkout request is required");
         }
-        PaymentPlanDefinition plan = paymentPlanCatalogPort.getPaidPlanOrThrow(request.planCode());
+        PaymentPlanDefinition plan = IPaymentPlanCatalogPort.getPaidPlanOrThrow(request.planCode());
         User user = getRequiredUser(userId);
         Subscription subscription = getOrCreateSubscription(userId);
         refreshFreeSubscriptionIfNeeded(subscription);
         ensureCheckoutAllowed(subscription, plan);
 
-        String checkoutUrl = paymentGatewayPort.createCheckoutSession(
+        String checkoutUrl = IPaymentGatewayPort.createCheckoutSession(
                 userId,
                 user.getEmail(),
                 plan,
@@ -136,7 +136,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
             throw new InvalidPaymentRequestException("No Mercado Pago subscription is available to cancel");
         }
 
-        paymentGatewayPort.cancelSubscription(subscription.getGatewaySubscriptionId());
+        IPaymentGatewayPort.cancelSubscription(subscription.getGatewaySubscriptionId());
         downgradeToFreePlan(subscription, "Allocated tokens after Mercado Pago subscription cancellation");
     }
 
@@ -148,10 +148,10 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         }
         validateWebhookSignature(payload, signatureHeader);
 
-        PaymentWebhookNotification notification = paymentGatewayPort.parseWebhook(payload, signatureHeader);
+        PaymentWebhookNotification notification = IPaymentGatewayPort.parseWebhook(payload, signatureHeader);
         if (notification.eventId() != null
                 && !notification.eventId().isBlank()
-                && paymentPersistencePort.existsProcessedWebhookEvent(notification.eventId())) {
+                && IPaymentPersistencePort.existsProcessedWebhookEvent(notification.eventId())) {
             return;
         }
 
@@ -171,7 +171,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     @Override
     @Transactional
     public void provisionFreeSubscription(UUID userId) {
-        if (paymentPersistencePort.findSubscriptionByUserId(userId).isPresent()) {
+        if (IPaymentPersistencePort.findSubscriptionByUserId(userId).isPresent()) {
             return;
         }
         User user = getRequiredUser(userId);
@@ -184,7 +184,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         if (chatMessageId == null) {
             throw new InvalidPaymentRequestException("Chat message id is required");
         }
-        if (paymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(
+        if (IPaymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(
                 chatMessageId,
                 TokenTransactionType.CHAT_CONSUMPTION
         )) {
@@ -200,7 +200,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
 
         subscription.setRemainingTokens(subscription.getRemainingTokens() - 1);
         subscription.setUpdatedAt(now());
-        subscription = paymentPersistencePort.saveSubscription(subscription);
+        subscription = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(
                 subscription,
                 chatMessageId,
@@ -216,11 +216,11 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         if (chatMessageId == null) {
             return;
         }
-        if (paymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(chatMessageId, TokenTransactionType.CHAT_REFUND)) {
+        if (IPaymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(chatMessageId, TokenTransactionType.CHAT_REFUND)) {
             return;
         }
 
-        TokenTransaction consumption = paymentPersistencePort.findTokenTransactionByChatMessageIdAndType(
+        TokenTransaction consumption = IPaymentPersistencePort.findTokenTransactionByChatMessageIdAndType(
                 chatMessageId,
                 TokenTransactionType.CHAT_CONSUMPTION
         ).orElse(null);
@@ -228,7 +228,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
             return;
         }
 
-        Subscription subscription = paymentPersistencePort.findSubscriptionById(consumption.getSubscriptionId()).orElse(null);
+        Subscription subscription = IPaymentPersistencePort.findSubscriptionById(consumption.getSubscriptionId()).orElse(null);
         if (subscription == null) {
             return;
         }
@@ -237,7 +237,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         int delta = nextRemainingTokens - subscription.getRemainingTokens();
         subscription.setRemainingTokens(nextRemainingTokens);
         subscription.setUpdatedAt(now());
-        subscription = paymentPersistencePort.saveSubscription(subscription);
+        subscription = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(
                 subscription,
                 chatMessageId,
@@ -261,7 +261,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     }
 
     private Subscription getOrCreateSubscription(UUID userId) {
-        return paymentPersistencePort.findSubscriptionByUserId(userId)
+        return IPaymentPersistencePort.findSubscriptionByUserId(userId)
                 .map(existing -> {
                     refreshFreeSubscriptionIfNeeded(existing);
                     return existing;
@@ -273,7 +273,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     }
 
     private Subscription createFreeSubscription(UUID userId, Instant anchor) {
-        PaymentPlanDefinition freePlan = paymentPlanCatalogPort.getFreePlan();
+        PaymentPlanDefinition freePlan = IPaymentPlanCatalogPort.getFreePlan();
         Subscription subscription = new Subscription();
         subscription.setUserId(userId);
         subscription.setPlanCode(freePlan.code());
@@ -288,7 +288,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         subscription.setRemainingTokens(freePlan.monthlyTokenLimit());
         subscription.setCreatedAt(anchor);
         subscription.setUpdatedAt(anchor);
-        subscription = paymentPersistencePort.saveSubscription(subscription);
+        subscription = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(subscription, null, TokenTransactionType.PERIOD_ALLOCATION,
                 freePlan.monthlyTokenLimit(), "Allocated monthly tokens for free plan");
         return subscription;
@@ -320,7 +320,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         subscription.setRemainingTokens(subscription.getMonthlyTokenLimit());
         subscription.setStatus(SubscriptionStatus.ACTIVE);
         subscription.setUpdatedAt(now);
-        Subscription saved = paymentPersistencePort.saveSubscription(subscription);
+        Subscription saved = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(saved, null, TokenTransactionType.PERIOD_ALLOCATION, delta,
                 "Allocated monthly tokens for new free-plan period");
     }
@@ -352,7 +352,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
             return;
         }
 
-        PaymentPlanDefinition plan = paymentPlanCatalogPort.getPaidPlanOrThrow(notification.planCode());
+        PaymentPlanDefinition plan = IPaymentPlanCatalogPort.getPaidPlanOrThrow(notification.planCode());
         Subscription subscription = resolveGatewayBackedSubscription(notification);
         SubscriptionPlanCode previousPlan = subscription.getPlanCode();
         Instant previousPeriodStart = subscription.getCurrentPeriodStart();
@@ -393,7 +393,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
             subscription.setRemainingTokens(Math.max(plan.monthlyTokenLimit() - usedTokens, 0));
         }
         subscription.setUpdatedAt(now());
-        Subscription saved = paymentPersistencePort.saveSubscription(subscription);
+        Subscription saved = IPaymentPersistencePort.saveSubscription(subscription);
 
         if (forcePeriodAllocation || periodChanged) {
             saveTokenTransaction(
@@ -420,7 +420,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     }
 
     private void downgradeToFreePlan(Subscription subscription, String description) {
-        PaymentPlanDefinition freePlan = paymentPlanCatalogPort.getFreePlan();
+        PaymentPlanDefinition freePlan = IPaymentPlanCatalogPort.getFreePlan();
         int previousRemainingTokens = subscription.getRemainingTokens();
         Instant anchor = now();
 
@@ -435,7 +435,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         subscription.setMonthlyTokenLimit(freePlan.monthlyTokenLimit());
         subscription.setRemainingTokens(freePlan.monthlyTokenLimit());
         subscription.setUpdatedAt(anchor);
-        Subscription saved = paymentPersistencePort.saveSubscription(subscription);
+        Subscription saved = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(
                 saved,
                 null,
@@ -448,15 +448,15 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     private Subscription resolveGatewayBackedSubscription(PaymentWebhookNotification notification) {
         Subscription subscription = null;
         if (notification.subscriptionId() != null && !notification.subscriptionId().isBlank()) {
-            subscription = paymentPersistencePort.findSubscriptionByGatewaySubscriptionId(notification.subscriptionId())
+            subscription = IPaymentPersistencePort.findSubscriptionByGatewaySubscriptionId(notification.subscriptionId())
                     .orElse(null);
         }
         if (subscription == null && notification.customerId() != null && !notification.customerId().isBlank()) {
-            subscription = paymentPersistencePort.findSubscriptionByGatewayCustomerId(notification.customerId())
+            subscription = IPaymentPersistencePort.findSubscriptionByGatewayCustomerId(notification.customerId())
                     .orElse(null);
         }
         if (subscription == null && notification.userId() != null) {
-            subscription = paymentPersistencePort.findSubscriptionByUserId(notification.userId()).orElse(null);
+            subscription = IPaymentPersistencePort.findSubscriptionByUserId(notification.userId()).orElse(null);
         }
         if (subscription == null) {
             if (notification.userId() == null) {
@@ -502,12 +502,12 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
         transaction.setTokenDelta(tokenDelta);
         transaction.setDescription(description);
         transaction.setCreatedAt(now());
-        paymentPersistencePort.saveTokenTransaction(transaction);
+        IPaymentPersistencePort.saveTokenTransaction(transaction);
     }
 
     private void saveWebhookEventIdempotently(PaymentWebhookNotification notification) {
         try {
-            paymentPersistencePort.saveProcessedWebhookEvent(notification.eventId(), notification.eventType(), now());
+            IPaymentPersistencePort.saveProcessedWebhookEvent(notification.eventId(), notification.eventType(), now());
         } catch (DataIntegrityViolationException ignored) {
             // Concurrent duplicate webhook delivery: the unique event_id constraint has already recorded it.
         }
@@ -557,7 +557,7 @@ public class PaymentService implements PaymentUseCase, PaymentProvisioningUseCas
     }
 
     private User getRequiredUser(UUID userId) {
-        return userPort.findById(userId)
+        return IUserPort.findById(userId)
                 .orElseThrow(() -> new SubscriptionNotFoundException("Authenticated user not found"));
     }
 

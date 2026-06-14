@@ -1,6 +1,6 @@
 package com.legalfam.backend.chat.infrastructure.api;
 
-import com.legalfam.backend.chat.application.port.in.ChatUseCase;
+import com.legalfam.backend.chat.application.port.in.IChatUseCase;
 import com.legalfam.backend.chat.application.dto.ChatAskRequest;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
@@ -44,11 +44,11 @@ public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
-    private final ChatUseCase chatUseCase;
+    private final IChatUseCase IChatUseCase;
     private final ChatSseEmitterService chatSseEmitterService;
 
-    public ChatController(ChatUseCase chatUseCase, ChatSseEmitterService chatSseEmitterService) {
-        this.chatUseCase = chatUseCase;
+    public ChatController(IChatUseCase IChatUseCase, ChatSseEmitterService chatSseEmitterService) {
+        this.IChatUseCase = IChatUseCase;
         this.chatSseEmitterService = chatSseEmitterService;
     }
 
@@ -69,7 +69,7 @@ public class ChatController {
             @PathVariable("sessionId") UUID sessionId
     ) {
         UUID userId = parsePrincipalUserId(principalUserId);
-        chatUseCase.assertSessionOwnershipExists(userId, sessionId);
+        IChatUseCase.assertSessionOwnershipExists(userId, sessionId);
         SseEmitter emitter = chatSseEmitterService.subscribe(userId, sessionId);
         return ResponseEntity.ok(emitter);
     }
@@ -87,7 +87,7 @@ public class ChatController {
     })
     public ResponseEntity<ChatSessionResponse> createSession(@AuthenticationPrincipal String principalUserId) {
         UUID userId = parsePrincipalUserId(principalUserId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(chatUseCase.createSession(userId));
+        return ResponseEntity.status(HttpStatus.CREATED).body(IChatUseCase.createSession(userId));
     }
 
     @PatchMapping("/chat/sessions/{sessionId}")
@@ -111,7 +111,7 @@ public class ChatController {
             @RequestBody(required = false) ChatUpdateSessionRequest request
     ) {
         UUID userId = parsePrincipalUserId(principalUserId);
-        return ResponseEntity.ok(chatUseCase.updateSession(userId, sessionId, request));
+        return ResponseEntity.ok(IChatUseCase.updateSession(userId, sessionId, request));
     }
 
     @DeleteMapping("/chat/sessions/{sessionId}")
@@ -131,7 +131,7 @@ public class ChatController {
             @PathVariable("sessionId") UUID sessionId
     ) {
         UUID userId = parsePrincipalUserId(principalUserId);
-        chatUseCase.deleteSession(userId, sessionId);
+        IChatUseCase.deleteSession(userId, sessionId);
         return ResponseEntity.noContent().build();
     }
 
@@ -165,7 +165,7 @@ public class ChatController {
 
         UUID userId = parsePrincipalUserId(principalUserId);
         log.info("Chat request accepted: messageLength={}", request.message().trim().length());
-        ChatSendAcceptedResponse response = chatUseCase.send(
+        ChatSendAcceptedResponse response = IChatUseCase.send(
                 userId,
                 request.message().trim(),
                 request.sessionId()
@@ -186,7 +186,7 @@ public class ChatController {
     })
     public ResponseEntity<List<ChatSessionResponse>> listSessions(@AuthenticationPrincipal String principalUserId) {
         UUID userId = parsePrincipalUserId(principalUserId);
-        return ResponseEntity.ok(chatUseCase.listSessions(userId));
+        return ResponseEntity.ok(IChatUseCase.listSessions(userId));
     }
 
     @GetMapping("/chat/sessions/{sessionId}/messages")
@@ -207,7 +207,7 @@ public class ChatController {
             @PathVariable("sessionId") @Parameter(description = "Chat session id") UUID sessionId
     ) {
         UUID userId = parsePrincipalUserId(principalUserId);
-        return ResponseEntity.ok(chatUseCase.listMessages(userId, sessionId));
+        return ResponseEntity.ok(IChatUseCase.listMessages(userId, sessionId));
     }
 
     @PatchMapping("/chat/messages/{messageId}/rating")
@@ -230,7 +230,7 @@ public class ChatController {
             @RequestBody(required = false) ChatRateMessageRequest request
     ) {
         UUID userId = parsePrincipalUserId(principalUserId);
-        chatUseCase.rateMessage(userId, messageId, request);
+        IChatUseCase.rateMessage(userId, messageId, request);
         return ResponseEntity.ok().build();
     }
 
@@ -253,7 +253,7 @@ public class ChatController {
             @PathVariable("messageId") UUID messageId
     ) {
         UUID userId = parsePrincipalUserId(principalUserId);
-        chatUseCase.confirmAssistantReceipt(userId, messageId);
+        IChatUseCase.confirmAssistantReceipt(userId, messageId);
         return ResponseEntity.noContent().build();
     }
 

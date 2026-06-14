@@ -1,17 +1,17 @@
 package com.legalfam.backend.chat.infrastructure.adapter.persistence;
 
-import com.legalfam.backend.chat.application.port.out.ChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatSession;
-import com.legalfam.backend.chat.infrastructure.persistence.ChatCitationRepository;
-import com.legalfam.backend.chat.infrastructure.persistence.ChatMessageRepository;
-import com.legalfam.backend.chat.infrastructure.persistence.ChatMessageProcessingRepository;
-import com.legalfam.backend.chat.infrastructure.persistence.ChatOutboxEventRepository;
-import com.legalfam.backend.chat.infrastructure.persistence.ChatSessionRepository;
+import com.legalfam.backend.chat.infrastructure.persistence.IChatCitationRepository;
+import com.legalfam.backend.chat.infrastructure.persistence.IChatMessageRepository;
+import com.legalfam.backend.chat.infrastructure.persistence.IChatMessageProcessingRepository;
+import com.legalfam.backend.chat.infrastructure.persistence.IChatOutboxEventRepository;
+import com.legalfam.backend.chat.infrastructure.persistence.IChatSessionRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatMessageEntity;
 import java.time.Instant;
 import java.util.Collection;
@@ -21,56 +21,56 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
-public class JpaChatPersistenceAdapter implements ChatPersistencePort {
+public class JpaChatPersistenceAdapter implements IChatPersistencePort {
 
-    private final ChatSessionRepository chatSessionRepository;
-    private final ChatMessageRepository chatMessageRepository;
-    private final ChatCitationRepository chatCitationRepository;
-    private final ChatMessageProcessingRepository chatMessageProcessingRepository;
-    private final ChatOutboxEventRepository chatOutboxEventRepository;
+    private final IChatSessionRepository IChatSessionRepository;
+    private final IChatMessageRepository IChatMessageRepository;
+    private final IChatCitationRepository IChatCitationRepository;
+    private final IChatMessageProcessingRepository IChatMessageProcessingRepository;
+    private final IChatOutboxEventRepository IChatOutboxEventRepository;
 
     public JpaChatPersistenceAdapter(
-            ChatSessionRepository chatSessionRepository,
-            ChatMessageRepository chatMessageRepository,
-            ChatCitationRepository chatCitationRepository,
-            ChatMessageProcessingRepository chatMessageProcessingRepository,
-            ChatOutboxEventRepository chatOutboxEventRepository
+            IChatSessionRepository IChatSessionRepository,
+            IChatMessageRepository IChatMessageRepository,
+            IChatCitationRepository IChatCitationRepository,
+            IChatMessageProcessingRepository IChatMessageProcessingRepository,
+            IChatOutboxEventRepository IChatOutboxEventRepository
     ) {
-        this.chatSessionRepository = chatSessionRepository;
-        this.chatMessageRepository = chatMessageRepository;
-        this.chatCitationRepository = chatCitationRepository;
-        this.chatMessageProcessingRepository = chatMessageProcessingRepository;
-        this.chatOutboxEventRepository = chatOutboxEventRepository;
+        this.IChatSessionRepository = IChatSessionRepository;
+        this.IChatMessageRepository = IChatMessageRepository;
+        this.IChatCitationRepository = IChatCitationRepository;
+        this.IChatMessageProcessingRepository = IChatMessageProcessingRepository;
+        this.IChatOutboxEventRepository = IChatOutboxEventRepository;
     }
 
     @Override
     public Optional<ChatSession> findSessionById(UUID sessionId) {
-        return chatSessionRepository.findById(sessionId).map(ChatEntityMapper::toDomain);
+        return IChatSessionRepository.findById(sessionId).map(ChatEntityMapper::toDomain);
     }
 
     @Override
     public ChatSession saveSession(ChatSession chatSession) {
-        return ChatEntityMapper.toDomain(chatSessionRepository.save(ChatEntityMapper.toEntity(chatSession)));
+        return ChatEntityMapper.toDomain(IChatSessionRepository.save(ChatEntityMapper.toEntity(chatSession)));
     }
 
     @Override
     public void deleteSessionById(UUID sessionId) {
-        List<UUID> messageIds = chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(sessionId)
+        List<UUID> messageIds = IChatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(sessionId)
                 .stream()
                 .map(ChatMessageEntity::getId)
                 .toList();
         if (!messageIds.isEmpty()) {
-            chatCitationRepository.deleteByChatMessageIdIn(messageIds);
-            chatMessageProcessingRepository.deleteByUserMessageIdIn(messageIds);
+            IChatCitationRepository.deleteByChatMessageIdIn(messageIds);
+            IChatMessageProcessingRepository.deleteByUserMessageIdIn(messageIds);
         }
-        chatOutboxEventRepository.deleteByChatSessionId(sessionId);
-        chatMessageRepository.deleteByChatSessionId(sessionId);
-        chatSessionRepository.deleteById(sessionId);
+        IChatOutboxEventRepository.deleteByChatSessionId(sessionId);
+        IChatMessageRepository.deleteByChatSessionId(sessionId);
+        IChatSessionRepository.deleteById(sessionId);
     }
 
     @Override
     public List<ChatSession> findSessionsByUserIdOrderByUpdatedAtDesc(UUID userId) {
-        return chatSessionRepository.findByUserIdOrderByUpdatedAtDesc(userId)
+        return IChatSessionRepository.findByUserIdOrderByUpdatedAtDesc(userId)
                 .stream()
                 .map(ChatEntityMapper::toDomain)
                 .toList();
@@ -78,17 +78,17 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
 
     @Override
     public ChatMessage saveMessage(ChatMessage chatMessage) {
-        return ChatEntityMapper.toDomain(chatMessageRepository.save(ChatEntityMapper.toEntity(chatMessage)));
+        return ChatEntityMapper.toDomain(IChatMessageRepository.save(ChatEntityMapper.toEntity(chatMessage)));
     }
 
     @Override
     public Optional<ChatMessage> findMessageById(UUID messageId) {
-        return chatMessageRepository.findById(messageId).map(ChatEntityMapper::toDomain);
+        return IChatMessageRepository.findById(messageId).map(ChatEntityMapper::toDomain);
     }
 
     @Override
     public List<ChatMessage> findMessagesBySessionIdOrderByCreatedAtAsc(UUID sessionId) {
-        return chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(sessionId)
+        return IChatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(sessionId)
                 .stream()
                 .map(ChatEntityMapper::toDomain)
                 .toList();
@@ -96,7 +96,7 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
 
     @Override
     public List<ChatCitation> findCitationsByMessageIdsOrderByMessageIdAndId(List<UUID> messageIds) {
-        return chatCitationRepository.findByChatMessageIdInOrderByChatMessageIdAscIdAsc(messageIds)
+        return IChatCitationRepository.findByChatMessageIdInOrderByChatMessageIdAscIdAsc(messageIds)
                 .stream()
                 .map(ChatEntityMapper::toDomain)
                 .toList();
@@ -104,42 +104,42 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
 
     @Override
     public ChatCitation saveCitation(ChatCitation chatCitation) {
-        return ChatEntityMapper.toDomain(chatCitationRepository.save(ChatEntityMapper.toEntity(chatCitation)));
+        return ChatEntityMapper.toDomain(IChatCitationRepository.save(ChatEntityMapper.toEntity(chatCitation)));
     }
 
     @Override
     public ChatMessageProcessing saveMessageProcessing(ChatMessageProcessing chatMessageProcessing) {
         return ChatEntityMapper.toDomain(
-                chatMessageProcessingRepository.save(ChatEntityMapper.toEntity(chatMessageProcessing))
+                IChatMessageProcessingRepository.save(ChatEntityMapper.toEntity(chatMessageProcessing))
         );
     }
 
     @Override
     public Optional<ChatMessageProcessing> findMessageProcessingByUserMessageId(UUID userMessageId) {
-        return chatMessageProcessingRepository.findByUserMessageId(userMessageId).map(ChatEntityMapper::toDomain);
+        return IChatMessageProcessingRepository.findByUserMessageId(userMessageId).map(ChatEntityMapper::toDomain);
     }
 
     @Override
     public Optional<ChatMessageProcessing> findMessageProcessingByUserMessageIdForUpdate(UUID userMessageId) {
-        return Optional.ofNullable(chatMessageProcessingRepository.findByUserMessageIdForUpdate(userMessageId))
+        return Optional.ofNullable(IChatMessageProcessingRepository.findByUserMessageIdForUpdate(userMessageId))
                 .map(ChatEntityMapper::toDomain);
     }
 
     @Override
     public ChatOutboxEvent saveOutboxEvent(ChatOutboxEvent chatOutboxEvent) {
         return ChatEntityMapper.toDomain(
-                chatOutboxEventRepository.save(ChatEntityMapper.toEntity(chatOutboxEvent))
+                IChatOutboxEventRepository.save(ChatEntityMapper.toEntity(chatOutboxEvent))
         );
     }
 
     @Override
     public Optional<ChatOutboxEvent> findOutboxEventByAggregateId(UUID aggregateId) {
-        return chatOutboxEventRepository.findByAggregateId(aggregateId).map(ChatEntityMapper::toDomain);
+        return IChatOutboxEventRepository.findByAggregateId(aggregateId).map(ChatEntityMapper::toDomain);
     }
 
     @Override
     public Optional<ChatOutboxEvent> findOutboxEventByAggregateIdForUpdate(UUID aggregateId) {
-        return Optional.ofNullable(chatOutboxEventRepository.findByAggregateIdForUpdate(aggregateId))
+        return Optional.ofNullable(IChatOutboxEventRepository.findByAggregateIdForUpdate(aggregateId))
                 .map(ChatEntityMapper::toDomain);
     }
 
@@ -148,7 +148,7 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
         if (aggregateIds.isEmpty()) {
             return List.of();
         }
-        return chatOutboxEventRepository.findByAggregateIdIn(aggregateIds)
+        return IChatOutboxEventRepository.findByAggregateIdIn(aggregateIds)
                 .stream()
                 .map(ChatEntityMapper::toDomain)
                 .toList();
@@ -156,12 +156,12 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
 
     @Override
     public boolean existsUnreadAssistantMessageBySessionId(UUID sessionId) {
-        return chatOutboxEventRepository.existsUnreadAssistantMessageBySessionId(sessionId);
+        return IChatOutboxEventRepository.existsUnreadAssistantMessageBySessionId(sessionId);
     }
 
     @Override
     public List<ChatOutboxEvent> lockReadyOutboxEvents(Instant now, int batchSize) {
-        return chatOutboxEventRepository.lockReadyBatch(now, batchSize)
+        return IChatOutboxEventRepository.lockReadyBatch(now, batchSize)
                 .stream()
                 .map(ChatEntityMapper::toDomain)
                 .toList();
@@ -169,7 +169,7 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
 
     @Override
     public long deleteOutboxEventsByStatusAndReadAtBefore(ChatOutboxEventStatus status, Instant threshold) {
-        return chatOutboxEventRepository.deleteByStatusAndReadAtBefore(status, threshold);
+        return IChatOutboxEventRepository.deleteByStatusAndReadAtBefore(status, threshold);
     }
 
     @Override
@@ -177,6 +177,6 @@ public class JpaChatPersistenceAdapter implements ChatPersistencePort {
             Collection<ChatOutboxEventStatus> statuses,
             Instant threshold
     ) {
-        return chatOutboxEventRepository.deleteByStatusInAndUpdatedAtBefore(statuses, threshold);
+        return IChatOutboxEventRepository.deleteByStatusInAndUpdatedAtBefore(statuses, threshold);
     }
 }

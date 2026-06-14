@@ -1,13 +1,15 @@
-package com.legalfam.backend.chat.infrastructure.integration;
+package com.legalfam.backend.chat.infrastructure.worker;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
-import com.legalfam.backend.chat.application.port.out.ChatEventPublisherPort;
+import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import com.legalfam.backend.chat.infrastructure.integration.ChatOutboxRelayTransactionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,20 +25,20 @@ public class ChatDeliveryRetryWorker {
     private static final Logger log = LoggerFactory.getLogger(ChatDeliveryRetryWorker.class);
 
     private final ChatOutboxRelayTransactionService relayTransactionService;
-    private final ChatEventPublisherPort chatEventPublisherPort;
+    private final IChatEventPublisherPort IChatEventPublisherPort;
     private final ObjectMapper objectMapper;
     private final int batchSize;
     private final Duration retryDelay;
 
     public ChatDeliveryRetryWorker(
             ChatOutboxRelayTransactionService relayTransactionService,
-            ChatEventPublisherPort chatEventPublisherPort,
+            IChatEventPublisherPort IChatEventPublisherPort,
             ObjectMapper objectMapper,
             @Value("${app.chat.outbox.relay.batch-size:50}") int batchSize,
             @Value("${app.chat.outbox.relay.retry-delay-ms:600000}") long retryDelayMs
     ) {
         this.relayTransactionService = relayTransactionService;
-        this.chatEventPublisherPort = chatEventPublisherPort;
+        this.IChatEventPublisherPort = IChatEventPublisherPort;
         this.objectMapper = objectMapper;
         this.batchSize = batchSize;
         this.retryDelay = Duration.ofMillis(retryDelayMs);
@@ -61,7 +63,7 @@ public class ChatDeliveryRetryWorker {
         try {
             ChatAssistantDeliveryQueuedEvent payload =
                     objectMapper.readValue(event.getPayload(), ChatAssistantDeliveryQueuedEvent.class);
-            chatEventPublisherPort.publishAssistantDelivery(payload);
+            IChatEventPublisherPort.publishAssistantDelivery(payload);
             relayTransactionService.recordPublishSuccess(aggregateId, now);
         } catch (Exception ex) {
             String errorMessage = truncateError(ex.getMessage());

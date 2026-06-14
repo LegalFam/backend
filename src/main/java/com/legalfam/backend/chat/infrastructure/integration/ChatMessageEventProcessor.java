@@ -5,7 +5,7 @@ import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
-import com.legalfam.backend.chat.application.port.in.ChatAssistantPersistenceUseCase;
+import com.legalfam.backend.chat.application.port.in.IChatAssistantPersistenceUseCase;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import com.legalfam.backend.chat.infrastructure.sse.ChatSseEmitterService;
 import java.util.ArrayList;
@@ -22,16 +22,16 @@ public class ChatMessageEventProcessor {
     private static final Logger log = LoggerFactory.getLogger(ChatMessageEventProcessor.class);
 
     private final N8nWebhookClient n8nWebhookClient;
-    private final ChatAssistantPersistenceUseCase chatAssistantPersistenceUseCase;
+    private final IChatAssistantPersistenceUseCase IChatAssistantPersistenceUseCase;
     private final ChatSseEmitterService chatSseEmitterService;
 
     public ChatMessageEventProcessor(
             N8nWebhookClient n8nWebhookClient,
-            ChatAssistantPersistenceUseCase chatAssistantPersistenceUseCase,
+            IChatAssistantPersistenceUseCase IChatAssistantPersistenceUseCase,
             ChatSseEmitterService chatSseEmitterService
     ) {
         this.n8nWebhookClient = n8nWebhookClient;
-        this.chatAssistantPersistenceUseCase = chatAssistantPersistenceUseCase;
+        this.IChatAssistantPersistenceUseCase = IChatAssistantPersistenceUseCase;
         this.chatSseEmitterService = chatSseEmitterService;
     }
 
@@ -40,7 +40,7 @@ public class ChatMessageEventProcessor {
         UUID userMessageId = event.userMessageId();
         String userMessageInput = event.userMessageInput();
 
-        if (!chatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)) {
+        if (!IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)) {
             log.debug("Ignoring duplicate or terminal chat event userMessageId={}", userMessageId);
             return;
         }
@@ -81,7 +81,7 @@ public class ChatMessageEventProcessor {
         }
 
         List<ChatCitationResponse> citations = extractCitations(root.get("citations"));
-        ChatAssistantMessageDispatch dispatch = chatAssistantPersistenceUseCase.persistAssistantMessage(
+        ChatAssistantMessageDispatch dispatch = IChatAssistantPersistenceUseCase.persistAssistantMessage(
                 chatSessionId,
                 userMessageId,
                 message,
@@ -99,7 +99,7 @@ public class ChatMessageEventProcessor {
             String errorCode,
             String errorMessage
     ) {
-        ChatAssistantErrorDispatch dispatch = chatAssistantPersistenceUseCase.persistAssistantFailure(
+        ChatAssistantErrorDispatch dispatch = IChatAssistantPersistenceUseCase.persistAssistantFailure(
                 chatSessionId,
                 userMessageId,
                 errorCode,

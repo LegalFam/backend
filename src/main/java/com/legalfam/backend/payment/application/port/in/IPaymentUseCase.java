@@ -7,7 +7,7 @@ import com.legalfam.backend.payment.application.dto.PaymentSubscriptionResponse;
 import java.util.List;
 import java.util.UUID;
 
-public interface PaymentUseCase {
+public interface IPaymentUseCase {
     List<PaymentPlanResponse> listPlans(UUID userId);
 
     PaymentSubscriptionResponse getSubscription(UUID userId);

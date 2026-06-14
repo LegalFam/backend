@@ -1,7 +1,7 @@
 package com.legalfam.backend.auth.infrastructure.security;
 
-import com.legalfam.backend.auth.application.port.out.AccessTokenPort;
-import com.legalfam.backend.auth.application.port.out.TokenValidationPort;
+import com.legalfam.backend.auth.application.port.out.IAccessTokenPort;
+import com.legalfam.backend.auth.application.port.out.ITokenValidationPort;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.Keys;
@@ -13,7 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
-public class JwtService implements AccessTokenPort, TokenValidationPort {
+public class JwtService implements IAccessTokenPort, ITokenValidationPort {
 
     private final SecretKey signingKey;
     private final long accessTokenExpirationMs;

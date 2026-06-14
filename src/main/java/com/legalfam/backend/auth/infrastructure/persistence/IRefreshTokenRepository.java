@@ -6,6 +6,6 @@ import java.util.UUID;
 import com.legalfam.backend.auth.infrastructure.persistence.entity.RefreshTokenEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface RefreshTokenRepository extends JpaRepository<RefreshTokenEntity, UUID> {
+public interface IRefreshTokenRepository extends JpaRepository<RefreshTokenEntity, UUID> {
     Optional<RefreshTokenEntity> findByToken(String token);
 }

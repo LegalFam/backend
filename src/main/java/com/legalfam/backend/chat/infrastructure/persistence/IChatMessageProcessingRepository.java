@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
-public interface ChatMessageProcessingRepository extends JpaRepository<ChatMessageProcessingEntity, UUID> {
+public interface IChatMessageProcessingRepository extends JpaRepository<ChatMessageProcessingEntity, UUID> {
 
     Optional<ChatMessageProcessingEntity> findByUserMessageId(UUID userMessageId);
 

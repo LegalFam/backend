@@ -7,7 +7,7 @@ import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import java.util.List;
 import java.util.UUID;
 
-public interface ChatAssistantPersistenceUseCase {
+public interface IChatAssistantPersistenceUseCase {
     boolean markUserMessageProcessing(UUID userMessageId);
 
     ChatAssistantMessageDispatch persistAssistantMessage(

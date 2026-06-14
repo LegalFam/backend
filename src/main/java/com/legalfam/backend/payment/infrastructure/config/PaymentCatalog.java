@@ -1,7 +1,7 @@
 package com.legalfam.backend.payment.infrastructure.config;
 
 import com.legalfam.backend.payment.application.dto.PaymentPlanDefinition;
-import com.legalfam.backend.payment.application.port.out.PaymentPlanCatalogPort;
+import com.legalfam.backend.payment.application.port.out.IPaymentPlanCatalogPort;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import com.legalfam.backend.payment.domain.model.SubscriptionPlanCode;
 import java.util.List;
@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
-public class PaymentCatalog implements PaymentPlanCatalogPort {
+public class PaymentCatalog implements IPaymentPlanCatalogPort {
 
     private final List<PaymentPlanDefinition> plans;
     private final Map<SubscriptionPlanCode, PaymentPlanDefinition> plansByCode;

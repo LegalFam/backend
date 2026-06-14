@@ -1,7 +1,7 @@
 package com.legalfam.backend.chat.infrastructure.adapter.events;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
-import com.legalfam.backend.chat.application.port.out.ChatEventPublisherPort;
+import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +15,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 @ConditionalOnProperty(name = "app.chat.messaging.rabbit.enabled", havingValue = "true", matchIfMissing = true)
-public class RabbitChatEventPublisherAdapter implements ChatEventPublisherPort {
+public class RabbitChatEventPublisherAdapter implements IChatEventPublisherPort {
 
     private static final Logger log = LoggerFactory.getLogger(RabbitChatEventPublisherAdapter.class);
 

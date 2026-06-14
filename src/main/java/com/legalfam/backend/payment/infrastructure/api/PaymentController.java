@@ -5,7 +5,7 @@ import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionRequest
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionResponse;
 import com.legalfam.backend.payment.application.dto.PaymentPlanResponse;
 import com.legalfam.backend.payment.application.dto.PaymentSubscriptionResponse;
-import com.legalfam.backend.payment.application.port.in.PaymentUseCase;
+import com.legalfam.backend.payment.application.port.in.IPaymentUseCase;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -30,10 +30,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Payments")
 public class PaymentController {
 
-    private final PaymentUseCase paymentUseCase;
+    private final IPaymentUseCase IPaymentUseCase;
 
-    public PaymentController(PaymentUseCase paymentUseCase) {
-        this.paymentUseCase = paymentUseCase;
+    public PaymentController(IPaymentUseCase IPaymentUseCase) {
+        this.IPaymentUseCase = IPaymentUseCase;
     }
 
     @GetMapping("/plans")
@@ -46,7 +46,7 @@ public class PaymentController {
         UUID userId = principalUserId == null || principalUserId.isBlank()
                 ? null
                 : parsePrincipalUserId(principalUserId);
-        return ResponseEntity.ok(paymentUseCase.listPlans(userId));
+        return ResponseEntity.ok(IPaymentUseCase.listPlans(userId));
     }
 
     @GetMapping("/subscription")
@@ -63,7 +63,7 @@ public class PaymentController {
     public ResponseEntity<PaymentSubscriptionResponse> getSubscription(
             @AuthenticationPrincipal String principalUserId
     ) {
-        return ResponseEntity.ok(paymentUseCase.getSubscription(parsePrincipalUserId(principalUserId)));
+        return ResponseEntity.ok(IPaymentUseCase.getSubscription(parsePrincipalUserId(principalUserId)));
     }
 
     @PostMapping("/checkout-sessions")
@@ -86,7 +86,7 @@ public class PaymentController {
         if (request == null) {
             throw new InvalidPaymentRequestException("Checkout request is required");
         }
-        return ResponseEntity.ok(paymentUseCase.createCheckoutSession(parsePrincipalUserId(principalUserId), request));
+        return ResponseEntity.ok(IPaymentUseCase.createCheckoutSession(parsePrincipalUserId(principalUserId), request));
     }
 
     @PostMapping("/subscription/cancel")
@@ -102,7 +102,7 @@ public class PaymentController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<Void> cancelSubscription(@AuthenticationPrincipal String principalUserId) {
-        paymentUseCase.cancelSubscription(parsePrincipalUserId(principalUserId));
+        IPaymentUseCase.cancelSubscription(parsePrincipalUserId(principalUserId));
         return ResponseEntity.noContent().build();
     }
 
