@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
+import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.IChatUserLookupPort;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
@@ -24,7 +25,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
@@ -39,7 +39,7 @@ class ChatServiceTest {
     private IPaymentTokenUseCase IPaymentTokenUseCase;
 
     @Mock
-    private ApplicationEventPublisher applicationEventPublisher;
+    private IChatEventPublisherPort IChatEventPublisherPort;
 
     @InjectMocks
     private ChatService chatService;
@@ -81,7 +81,7 @@ class ChatServiceTest {
         assertEquals(ChatMessageProcessingStatus.QUEUED, processingCaptor.getValue().getStatus());
 
         verify(IPaymentTokenUseCase).consumeChatToken(userId, userMessageId);
-        verify(applicationEventPublisher).publishEvent(new ChatMessageQueuedEvent(sessionId, userMessageId, "hola"));
+        verify(IChatEventPublisherPort).publishMessageQueued(new ChatMessageQueuedEvent(sessionId, userMessageId, "hola"));
         assertEquals(sessionId, response.sessionId());
         assertEquals(userMessageId, response.userMessageId());
         assertEquals("PROCESSING", response.status());

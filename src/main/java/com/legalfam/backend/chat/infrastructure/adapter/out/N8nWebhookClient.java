@@ -1,5 +1,9 @@
 package com.legalfam.backend.chat.infrastructure.adapter.out;
 
+import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
+import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
+import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
+import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,11 +24,12 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.net.URI;
 import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 @Component
-public class N8nWebhookClient {
+public class N8nWebhookClient implements IChatAssistantGatewayPort {
 
     private static final Logger log = LoggerFactory.getLogger(N8nWebhookClient.class);
     private static final int MIN_TIMEOUT_MS = 1000;
@@ -52,7 +57,8 @@ public class N8nWebhookClient {
         this.restTemplate = buildRestTemplate(this.timeoutMs);
     }
 
-    public JsonNode sendMessage(String message, UUID sessionId) {
+    @Override
+    public ChatAssistantGatewayResponse sendMessage(String message, UUID sessionId) {
         log.info("Preparing n8n webhook call: configuredUrl={}, timeoutMs={}",
                 webhookUrl == null || webhookUrl.isBlank() ? "<empty>" : webhookUrl,
                 timeoutMs);
@@ -101,7 +107,7 @@ public class N8nWebhookClient {
             throw buildStatusException(statusCode, response.getBody());
         }
 
-        return parseResponseBody(response.getBody());
+        return mapResponse(parseResponseBody(response.getBody()));
     }
 
     private void validateWebhookUrl(String url) {
@@ -148,6 +154,101 @@ public class N8nWebhookClient {
             fallback.put("message", responseBody.trim());
             return fallback;
         }
+    }
+
+    private ChatAssistantGatewayResponse mapResponse(JsonNode root) {
+        return new ChatAssistantGatewayResponse(
+                readText(root, "message"),
+                extractCitations(root.get("citations")),
+                extractMetadata(root)
+        );
+    }
+
+    private List<ChatCitationResponse> extractCitations(JsonNode citationsNode) {
+        if (citationsNode == null || citationsNode.isNull()) {
+            return List.of();
+        }
+        if (citationsNode.isArray()) {
+            List<ChatCitationResponse> citations = new ArrayList<>();
+            for (JsonNode citationNode : citationsNode) {
+                ChatCitationResponse citation = mapCitation(citationNode);
+                if (citation != null) {
+                    citations.add(citation);
+                }
+            }
+            return citations;
+        }
+        if (citationsNode.isObject()) {
+            ChatCitationResponse singleCitation = mapCitation(citationsNode);
+            if (singleCitation != null) {
+                return List.of(singleCitation);
+            }
+        }
+        return List.of();
+    }
+
+    private ChatAssistantMetadata extractMetadata(JsonNode root) {
+        return new ChatAssistantMetadata(
+                readText(root, "confidenceStatus"),
+                readText(root, "confidenceReason"),
+                readStringArray(root.get("nextSteps")),
+                readBoolean(root, "specialistSupportRecommended")
+        );
+    }
+
+    private List<String> readStringArray(JsonNode node) {
+        if (node == null || node.isNull() || !node.isArray()) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : node) {
+            String value = item.isTextual() ? item.asText() : item.toString();
+            if (value != null && !value.isBlank()) {
+                values.add(value.trim());
+            }
+        }
+        return values;
+    }
+
+    private Boolean readBoolean(JsonNode node, String key) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        JsonNode child = node.get(key);
+        if (child == null || child.isNull()) {
+            return null;
+        }
+        if (child.isBoolean()) {
+            return child.asBoolean();
+        }
+        String text = child.isTextual() ? child.asText() : child.toString();
+        if ("true".equalsIgnoreCase(text)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(text)) {
+            return false;
+        }
+        return null;
+    }
+
+    private ChatCitationResponse mapCitation(JsonNode citationNode) {
+        if (citationNode == null || citationNode.isNull()) {
+            return null;
+        }
+
+        String sourceTitle = readText(citationNode, "file_name");
+        String sourceSnippet = readText(citationNode, "snippet");
+        String sourceUrl = readText(citationNode, "file_url");
+
+        if ((sourceTitle == null || sourceTitle.isBlank())
+                && (sourceSnippet == null || sourceSnippet.isBlank())
+                && (sourceUrl == null || sourceUrl.isBlank())) {
+            return null;
+        }
+        if (sourceUrl == null || sourceUrl.isBlank()) {
+            return null;
+        }
+        return new ChatCitationResponse(sourceTitle, sourceSnippet, sourceUrl);
     }
 
     private ChatUpstreamException buildStatusException(int statusCode, String responseBody) {

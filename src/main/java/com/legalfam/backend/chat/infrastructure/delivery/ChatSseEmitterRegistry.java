@@ -2,6 +2,7 @@ package com.legalfam.backend.chat.infrastructure.delivery;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.event.ChatAssistantErrorEvent;
+import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.util.Map;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
-public class ChatSseEmitterRegistry {
+public class ChatSseEmitterRegistry implements IChatAssistantDeliveryPort {
 
     private static final Logger log = LoggerFactory.getLogger(ChatSseEmitterRegistry.class);
     private static final long MIN_INTERVAL_MS = 1000L;
@@ -68,6 +69,7 @@ public class ChatSseEmitterRegistry {
         return emitter;
     }
 
+    @Override
     public boolean dispatchAssistantMessage(UUID userId, UUID sessionId, ChatAssistantMessageEvent event) {
         Map<UUID, SseEmitter> userEmitters = emittersByUser.get(userId);
         if (userEmitters == null) {
@@ -95,6 +97,7 @@ public class ChatSseEmitterRegistry {
         }
     }
 
+    @Override
     public boolean dispatchAssistantError(UUID userId, UUID sessionId, ChatAssistantErrorEvent event) {
         Map<UUID, SseEmitter> userEmitters = emittersByUser.get(userId);
         if (userEmitters == null) {

@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat.infrastructure.adapter.out;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
+import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -14,6 +15,11 @@ public class SpringChatEventPublisherAdapter implements IChatEventPublisherPort 
 
     public SpringChatEventPublisherAdapter(ApplicationEventPublisher applicationEventPublisher) {
         this.applicationEventPublisher = applicationEventPublisher;
+    }
+
+    @Override
+    public void publishMessageQueued(ChatMessageQueuedEvent event) {
+        applicationEventPublisher.publishEvent(event);
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.legalfam.backend.chat.application.service;
 
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.port.in.IChatUseCase;
+import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.IChatUserLookupPort;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
@@ -30,7 +31,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +40,7 @@ public class ChatService implements IChatUseCase {
     private final IChatPersistencePort IChatPersistencePort;
     private final IChatUserLookupPort IChatUserLookupPort;
     private final IPaymentTokenUseCase IPaymentTokenUseCase;
-    private final ApplicationEventPublisher applicationEventPublisher;
+    private final IChatEventPublisherPort IChatEventPublisherPort;
     private static final int MAX_SESSION_TITLE_LENGTH = 80;
     private static final int MAX_FEEDBACK_COMMENT_LENGTH = 1000;
     private static final Pattern EMAIL_PATTERN = Pattern.compile("\\b[\\w.%+-]+@[\\w.-]+\\.[A-Za-z]{2,}\\b");
@@ -55,12 +55,12 @@ public class ChatService implements IChatUseCase {
             IChatPersistencePort IChatPersistencePort,
             IChatUserLookupPort IChatUserLookupPort,
             IPaymentTokenUseCase IPaymentTokenUseCase,
-            ApplicationEventPublisher applicationEventPublisher
+            IChatEventPublisherPort IChatEventPublisherPort
     ) {
         this.IChatPersistencePort = IChatPersistencePort;
         this.IChatUserLookupPort = IChatUserLookupPort;
         this.IPaymentTokenUseCase = IPaymentTokenUseCase;
-        this.applicationEventPublisher = applicationEventPublisher;
+        this.IChatEventPublisherPort = IChatEventPublisherPort;
     }
 
     @Override
@@ -95,7 +95,7 @@ public class ChatService implements IChatUseCase {
 
         chatSession.setUpdatedAt(now);
         IChatPersistencePort.saveSession(chatSession);
-        applicationEventPublisher.publishEvent(new ChatMessageQueuedEvent(chatSession.getId(), userMessage.getId(), messageInput));
+        IChatEventPublisherPort.publishMessageQueued(new ChatMessageQueuedEvent(chatSession.getId(), userMessage.getId(), messageInput));
 
         return new ChatSendAcceptedResponse(chatSession.getId(), userMessage.getId(), "PROCESSING");
     }

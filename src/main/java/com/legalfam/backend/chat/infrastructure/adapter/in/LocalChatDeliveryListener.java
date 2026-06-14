@@ -1,10 +1,10 @@
 package com.legalfam.backend.chat.infrastructure.adapter.in;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
+import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
-import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,14 +22,14 @@ public class LocalChatDeliveryListener {
     private static final Duration RETRY_DELAY = Duration.ofMinutes(10);
 
     private final IChatPersistencePort IChatPersistencePort;
-    private final ChatSseEmitterRegistry chatSseEmitterRegistry;
+    private final IChatAssistantDeliveryPort IChatAssistantDeliveryPort;
 
     public LocalChatDeliveryListener(
             IChatPersistencePort IChatPersistencePort,
-            ChatSseEmitterRegistry chatSseEmitterRegistry
+            IChatAssistantDeliveryPort IChatAssistantDeliveryPort
     ) {
         this.IChatPersistencePort = IChatPersistencePort;
-        this.chatSseEmitterRegistry = chatSseEmitterRegistry;
+        this.IChatAssistantDeliveryPort = IChatAssistantDeliveryPort;
     }
 
     @Async("chatTaskExecutor")
@@ -43,7 +43,7 @@ public class LocalChatDeliveryListener {
         }
 
         Instant now = Instant.now();
-        boolean delivered = chatSseEmitterRegistry.dispatchAssistantMessage(event.userId(), event.chatSessionId(), event.event());
+        boolean delivered = IChatAssistantDeliveryPort.dispatchAssistantMessage(event.userId(), event.chatSessionId(), event.event());
         outboxEvent.setAttemptCount(outboxEvent.getAttemptCount() + 1);
         outboxEvent.setAvailableAt(now.plus(RETRY_DELAY));
         outboxEvent.setStatus(delivered ? ChatOutboxEventStatus.PUBLISHED : ChatOutboxEventStatus.PENDING);

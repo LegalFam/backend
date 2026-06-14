@@ -1,10 +1,10 @@
 package com.legalfam.backend.chat.infrastructure.adapter.in;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
+import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
-import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -21,16 +21,16 @@ public class RabbitChatDeliveryListener {
 
     private final ObjectMapper objectMapper;
     private final IChatPersistencePort IChatPersistencePort;
-    private final ChatSseEmitterRegistry chatSseEmitterRegistry;
+    private final IChatAssistantDeliveryPort IChatAssistantDeliveryPort;
 
     public RabbitChatDeliveryListener(
             ObjectMapper objectMapper,
             IChatPersistencePort IChatPersistencePort,
-            ChatSseEmitterRegistry chatSseEmitterRegistry
+            IChatAssistantDeliveryPort IChatAssistantDeliveryPort
     ) {
         this.objectMapper = objectMapper;
         this.IChatPersistencePort = IChatPersistencePort;
-        this.chatSseEmitterRegistry = chatSseEmitterRegistry;
+        this.IChatAssistantDeliveryPort = IChatAssistantDeliveryPort;
     }
 
     @RabbitListener(
@@ -47,7 +47,7 @@ public class RabbitChatDeliveryListener {
         }
 
         Instant now = Instant.now();
-        boolean delivered = chatSseEmitterRegistry.dispatchAssistantMessage(event.userId(), event.chatSessionId(), event.event());
+        boolean delivered = IChatAssistantDeliveryPort.dispatchAssistantMessage(event.userId(), event.chatSessionId(), event.event());
         outboxEvent.setAttemptCount(outboxEvent.getAttemptCount() + 1);
         outboxEvent.setAvailableAt(now.plus(RETRY_DELAY));
         outboxEvent.setStatus(delivered ? ChatOutboxEventStatus.PUBLISHED : ChatOutboxEventStatus.PENDING);
