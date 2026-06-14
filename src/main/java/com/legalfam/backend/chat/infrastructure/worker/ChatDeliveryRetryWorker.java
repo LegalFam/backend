@@ -4,6 +4,7 @@ import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEv
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
+import com.legalfam.backend.chat.infrastructure.config.ChatOutboxRelayProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -12,7 +13,6 @@ import java.util.UUID;
 import com.legalfam.backend.chat.infrastructure.adapter.out.ChatOutboxRelayTransactionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -34,14 +34,13 @@ public class ChatDeliveryRetryWorker {
             ChatOutboxRelayTransactionService relayTransactionService,
             IChatEventPublisherPort IChatEventPublisherPort,
             ObjectMapper objectMapper,
-            @Value("${app.chat.outbox.relay.batch-size:50}") int batchSize,
-            @Value("${app.chat.outbox.relay.retry-delay-ms:600000}") long retryDelayMs
+            ChatOutboxRelayProperties properties
     ) {
         this.relayTransactionService = relayTransactionService;
         this.IChatEventPublisherPort = IChatEventPublisherPort;
         this.objectMapper = objectMapper;
-        this.batchSize = batchSize;
-        this.retryDelay = Duration.ofMillis(retryDelayMs);
+        this.batchSize = properties.safeBatchSize();
+        this.retryDelay = Duration.ofMillis(properties.safeRetryDelayMs());
     }
 
     @Scheduled(fixedDelayString = "${app.chat.outbox.relay.fixed-delay-ms:5000}")

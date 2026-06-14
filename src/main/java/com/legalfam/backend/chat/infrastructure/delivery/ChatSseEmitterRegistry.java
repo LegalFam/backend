@@ -3,6 +3,7 @@ package com.legalfam.backend.chat.infrastructure.delivery;
 import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.event.ChatAssistantErrorEvent;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
+import com.legalfam.backend.chat.infrastructure.config.ChatSseProperties;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.util.Map;
@@ -13,7 +14,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -27,12 +27,9 @@ public class ChatSseEmitterRegistry implements IChatAssistantDeliveryPort {
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final long emitterTimeoutMs;
 
-    public ChatSseEmitterRegistry(
-            @Value("${app.chat.sse.emitter-timeout-ms:1800000}") long emitterTimeoutMs,
-            @Value("${app.chat.sse.heartbeat-interval-ms:15000}") long heartbeatIntervalMs
-    ) {
-        this.emitterTimeoutMs = Math.max(emitterTimeoutMs, MIN_INTERVAL_MS);
-        long safeHeartbeatIntervalMs = Math.max(heartbeatIntervalMs, MIN_INTERVAL_MS);
+    public ChatSseEmitterRegistry(ChatSseProperties properties) {
+        this.emitterTimeoutMs = Math.max(properties.safeEmitterTimeoutMs(), MIN_INTERVAL_MS);
+        long safeHeartbeatIntervalMs = Math.max(properties.safeHeartbeatIntervalMs(), MIN_INTERVAL_MS);
         heartbeatExecutor.scheduleAtFixedRate(
                 this::sendHeartbeatsSafely,
                 safeHeartbeatIntervalMs,

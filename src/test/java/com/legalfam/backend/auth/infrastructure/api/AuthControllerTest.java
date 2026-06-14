@@ -49,7 +49,7 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
                 .andExpect(jsonPath("$.code", is("invalid_request")))
-                .andExpect(jsonPath("$.message", is("Email, password, name and phone are required")))
+                .andExpect(jsonPath("$.message", is("Email is required")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/auth/signup")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
@@ -61,7 +61,7 @@ class AuthControllerTest {
     void signupReturnsBadRequestWhenEmailIsInvalid() throws Exception {
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"invalid-email\",\"password\":\"secret\",\"name\":\"Name\",\"phone\":\"900000000\"}"))
+                        .content("{\"email\":\"invalid-email\",\"password\":\"secret123\",\"name\":\"Name\",\"phone\":\"900000000\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
                 .andExpect(jsonPath("$.code", is("invalid_request")))
@@ -80,7 +80,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"user@example.com\",\"password\":\"secret\",\"name\":\"Juan\",\"phone\":\"900000000\"}"))
+                        .content("{\"email\":\"user@example.com\",\"password\":\"secret123\",\"name\":\"Juan\",\"phone\":\"900000000\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accessToken", is("access-1")))
                 .andExpect(jsonPath("$.refreshToken", is("refresh-1")))
@@ -95,7 +95,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"user@example.com\",\"password\":\"secret\",\"name\":\"Juan\",\"phone\":\"900000000\"}"))
+                        .content("{\"email\":\"user@example.com\",\"password\":\"secret123\",\"name\":\"Juan\",\"phone\":\"900000000\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type", is("conflict_error")))
                 .andExpect(jsonPath("$.code", is("email_already_exists")))
@@ -111,7 +111,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"user@example.com\",\"password\":\"wrong\"}"))
+                        .content("{\"email\":\"user@example.com\",\"password\":\"wrong123\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.type", is("authentication_error")))
                 .andExpect(jsonPath("$.code", is("invalid_credentials")))
@@ -125,7 +125,7 @@ class AuthControllerTest {
     void loginReturnsBadRequestWhenEmailIsInvalid() throws Exception {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"invalid-email\",\"password\":\"secret\"}"))
+                        .content("{\"email\":\"invalid-email\",\"password\":\"secret123\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
                 .andExpect(jsonPath("$.code", is("invalid_request")))

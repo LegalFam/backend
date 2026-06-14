@@ -7,7 +7,6 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.annotation.EnableRabbit;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -19,58 +18,47 @@ import org.springframework.context.annotation.Configuration;
 public class ChatRabbitConfig {
 
     @Bean
-    public TopicExchange chatEventsExchange(
-            @Value("${app.chat.messaging.rabbit.exchange}") String exchangeName
-    ) {
-        return new TopicExchange(exchangeName, true, false);
+    public TopicExchange chatEventsExchange(ChatRabbitProperties properties) {
+        return new TopicExchange(properties.exchangeName(), true, false);
     }
 
     @Bean
-    public DirectExchange chatDeadLetterExchange(
-            @Value("${app.chat.messaging.rabbit.exchange.dlx}") String dlxName
-    ) {
-        return new DirectExchange(dlxName, true, false);
+    public DirectExchange chatDeadLetterExchange(ChatRabbitProperties properties) {
+        return new DirectExchange(properties.deadLetterExchangeName(), true, false);
     }
 
     @Bean
-    public Queue assistantDeliveryQueue(
-            @Value("${app.chat.messaging.rabbit.queue.assistant-delivery}") String queueName,
-            @Value("${app.chat.messaging.rabbit.exchange.dlx}") String deadLetterExchange,
-            @Value("${app.chat.messaging.rabbit.routing-key.dlq}") String deadLetterRoutingKey,
-            @Value("${app.chat.messaging.rabbit.queue.ttl-ms:10800000}") long messageTtlMs
-    ) {
-        return QueueBuilder.durable(queueName)
-                .deadLetterExchange(deadLetterExchange)
-                .deadLetterRoutingKey(deadLetterRoutingKey)
-                .ttl((int) messageTtlMs)
+    public Queue assistantDeliveryQueue(ChatRabbitProperties properties) {
+        return QueueBuilder.durable(properties.assistantDeliveryQueueName())
+                .deadLetterExchange(properties.deadLetterExchangeName())
+                .deadLetterRoutingKey(properties.deadLetterRoutingKey())
+                .ttl((int) properties.safeQueueTtlMs())
                 .withArgument("x-queue-type", "quorum")
                 .build();
     }
 
     @Bean
-    public Queue assistantDeliveryDeadLetterQueue(
-            @Value("${app.chat.messaging.rabbit.queue.dlq}") String deadLetterQueueName
-    ) {
-        return QueueBuilder.durable(deadLetterQueueName).build();
+    public Queue assistantDeliveryDeadLetterQueue(ChatRabbitProperties properties) {
+        return QueueBuilder.durable(properties.deadLetterQueueName()).build();
     }
 
     @Bean
     public Binding assistantDeliveryBinding(
             @Qualifier("assistantDeliveryQueue") Queue assistantDeliveryQueue,
             TopicExchange chatEventsExchange,
-            @Value("${app.chat.messaging.rabbit.routing-key.assistant-delivery}") String routingKey
+            ChatRabbitProperties properties
     ) {
-        return BindingBuilder.bind(assistantDeliveryQueue).to(chatEventsExchange).with(routingKey);
+        return BindingBuilder.bind(assistantDeliveryQueue).to(chatEventsExchange).with(properties.assistantDeliveryRoutingKey());
     }
 
     @Bean
     public Binding assistantDeliveryDeadLetterBinding(
             @Qualifier("assistantDeliveryDeadLetterQueue") Queue assistantDeliveryDeadLetterQueue,
             DirectExchange chatDeadLetterExchange,
-            @Value("${app.chat.messaging.rabbit.routing-key.dlq}") String deadLetterRoutingKey
+            ChatRabbitProperties properties
     ) {
         return BindingBuilder.bind(assistantDeliveryDeadLetterQueue)
                 .to(chatDeadLetterExchange)
-                .with(deadLetterRoutingKey);
+                .with(properties.deadLetterRoutingKey());
     }
 }

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 
+import com.legalfam.backend.auth.infrastructure.config.CorsProperties;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -19,7 +20,7 @@ class SecurityConfigTest {
         SecurityConfig securityConfig = new SecurityConfig(
                 mock(JwtAuthenticationFilter.class),
                 mock(ObjectMapper.class),
-                "*"
+                new CorsProperties("*")
         );
 
         CorsConfigurationSource source = securityConfig.corsConfigurationSource();
@@ -39,7 +40,7 @@ class SecurityConfigTest {
         SecurityConfig securityConfig = new SecurityConfig(
                 mock(JwtAuthenticationFilter.class),
                 mock(ObjectMapper.class),
-                origin
+                new CorsProperties(origin)
         );
 
         CorsConfigurationSource source = securityConfig.corsConfigurationSource();

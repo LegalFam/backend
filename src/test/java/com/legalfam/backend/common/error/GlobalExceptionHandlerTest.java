@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.legalfam.backend.common.error.handler.GlobalExceptionHandler;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -45,6 +47,20 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsBeanValidationFailureToStandardError() throws Exception {
+        mockMvc.perform(post("/errors/validation")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"value\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type", is("validation_error")))
+                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.message", is("Value is required")))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.path", is("/errors/validation")))
+                .andExpect(jsonPath("$.timestamp", notNullValue()));
+    }
+
+    @Test
     void mapsAccessDeniedToForbidden() throws Exception {
         mockMvc.perform(get("/errors/forbidden"))
                 .andExpect(status().isForbidden())
@@ -75,6 +91,11 @@ class GlobalExceptionHandlerTest {
             return body.value();
         }
 
+        @PostMapping("/errors/validation")
+        String validation(@Valid @RequestBody DummyBody body) {
+            return body.value();
+        }
+
         @org.springframework.web.bind.annotation.GetMapping("/errors/forbidden")
         String forbidden() {
             throw new AccessDeniedException("nope");
@@ -86,6 +107,6 @@ class GlobalExceptionHandlerTest {
         }
     }
 
-    private record DummyBody(String value) {
+    private record DummyBody(@NotBlank(message = "Value is required") String value) {
     }
 }

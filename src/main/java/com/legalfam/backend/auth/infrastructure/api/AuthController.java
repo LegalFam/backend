@@ -13,7 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.regex.Pattern;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,9 +25,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Authentication")
 public class AuthController {
-
-    private static final Pattern EMAIL_PATTERN =
-            Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private final IAuthUseCase IAuthUseCase;
 
@@ -45,13 +42,9 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping("/signup")
-    public ResponseEntity<TokenResponse> signup(@RequestBody(required = false) SignupRequest request) {
-        if (request == null || isBlank(request.email()) || isBlank(request.password())
-                || isBlank(request.name()) || isBlank(request.phone())) {
+    public ResponseEntity<TokenResponse> signup(@Valid @RequestBody(required = false) SignupRequest request) {
+        if (request == null) {
             throw new InvalidAuthRequestException("Email, password, name and phone are required");
-        }
-        if (!isValidEmail(request.email().trim())) {
-            throw new InvalidAuthRequestException("Valid email is required");
         }
 
         TokenResponse tokens = IAuthUseCase.signup(
@@ -73,12 +66,9 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@RequestBody(required = false) LoginRequest request) {
-        if (request == null || isBlank(request.email()) || isBlank(request.password())) {
+    public ResponseEntity<TokenResponse> login(@Valid @RequestBody(required = false) LoginRequest request) {
+        if (request == null) {
             throw new InvalidAuthRequestException("Email and password are required");
-        }
-        if (!isValidEmail(request.email().trim())) {
-            throw new InvalidAuthRequestException("Valid email is required");
         }
 
         TokenResponse tokens = IAuthUseCase.login(request.email().trim(), request.password());
@@ -95,20 +85,12 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     @PostMapping("/refresh")
-    public ResponseEntity<TokenResponse> refresh(@RequestBody(required = false) RefreshTokenRequest request) {
-        if (request == null || isBlank(request.refreshToken())) {
+    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody(required = false) RefreshTokenRequest request) {
+        if (request == null) {
             throw new InvalidAuthRequestException("Refresh token is required");
         }
 
         TokenResponse tokens = IAuthUseCase.refresh(request.refreshToken().trim());
         return ResponseEntity.ok(tokens);
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.isBlank();
-    }
-
-    private boolean isValidEmail(String value) {
-        return EMAIL_PATTERN.matcher(value).matches();
     }
 }

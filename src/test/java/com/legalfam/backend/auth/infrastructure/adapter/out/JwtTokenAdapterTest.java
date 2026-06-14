@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.legalfam.backend.auth.infrastructure.config.JwtProperties;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -14,13 +15,13 @@ class JwtTokenAdapterTest {
     void constructorThrowsWhenSecretIsTooShort() {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> new JwtTokenAdapter("short-secret", 900_000L)
+                () -> new JwtTokenAdapter(jwtProperties("short-secret", 900_000L))
         );
     }
 
     @Test
     void generatedTokenIsValidAndContainsEmail() {
-        JwtTokenAdapter jwtTokenAdapter = new JwtTokenAdapter("12345678901234567890123456789012", 900_000L);
+        JwtTokenAdapter jwtTokenAdapter = new JwtTokenAdapter(jwtProperties("12345678901234567890123456789012", 900_000L));
         UUID userId = UUID.randomUUID();
 
         String token = jwtTokenAdapter.generateAccessToken(userId, "user@example.com");
@@ -33,8 +34,12 @@ class JwtTokenAdapterTest {
 
     @Test
     void randomStringIsNotAValidToken() {
-        JwtTokenAdapter jwtTokenAdapter = new JwtTokenAdapter("12345678901234567890123456789012", 900_000L);
+        JwtTokenAdapter jwtTokenAdapter = new JwtTokenAdapter(jwtProperties("12345678901234567890123456789012", 900_000L));
 
         assertFalse(jwtTokenAdapter.isTokenValid("not-a-jwt"));
+    }
+
+    private JwtProperties jwtProperties(String secret, long accessTokenExpirationMs) {
+        return new JwtProperties(secret, accessTokenExpirationMs, 604_800_000L);
     }
 }

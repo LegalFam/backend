@@ -99,6 +99,8 @@ Current relevant tables:
 - Keep responses explicit with proper HTTP status codes.
 - Avoid leaking internal exceptions/messages to clients.
 - Application services should depend on project-owned ports, not concrete infrastructure implementations.
+- Use Bean Validation annotations on request DTOs and `@Valid` at controller request-body boundaries.
+- Use typed `@ConfigurationProperties` for application settings instead of scattered `@Value` injection.
 - Avoid direct application-layer dependencies between business modules. Prefer common events or neutral common/module-owned ports for cross-module collaboration.
 - Prefer trigger-specific names such as `Listener`, `Handler`, `Worker`, or `Job` over generic `Processor` names for inbound adapters.
 - If an infrastructure handler/listener depends only on application abstractions and reacts to a technical trigger, place it as an inbound adapter.

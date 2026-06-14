@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -108,7 +109,7 @@ public class ChatController {
     public ResponseEntity<ChatSessionResponse> updateSession(
             @AuthenticationPrincipal String principalUserId,
             @PathVariable("sessionId") UUID sessionId,
-            @RequestBody(required = false) ChatUpdateSessionRequest request
+            @Valid @RequestBody(required = false) ChatUpdateSessionRequest request
     ) {
         UUID userId = parsePrincipalUserId(principalUserId);
         return ResponseEntity.ok(IChatUseCase.updateSession(userId, sessionId, request));
@@ -152,15 +153,11 @@ public class ChatController {
     })
     public ResponseEntity<ChatSendAcceptedResponse> send(
             @AuthenticationPrincipal String principalUserId,
-            @RequestBody(required = false) ChatAskRequest request
+            @Valid @RequestBody(required = false) ChatAskRequest request
     ) {
-        if (request == null || request.message() == null || request.message().isBlank()) {
+        if (request == null) {
             log.warn("Chat request rejected: blank message");
             throw new InvalidChatRequestException("Message is required");
-        }
-        if (request.sessionId() == null) {
-            log.warn("Chat request rejected: missing sessionId");
-            throw new InvalidChatRequestException("Session id is required");
         }
 
         UUID userId = parsePrincipalUserId(principalUserId);
@@ -227,7 +224,7 @@ public class ChatController {
     public ResponseEntity<Void> rateMessage(
             @AuthenticationPrincipal String principalUserId,
             @PathVariable("messageId") UUID messageId,
-            @RequestBody(required = false) ChatRateMessageRequest request
+            @Valid @RequestBody(required = false) ChatRateMessageRequest request
     ) {
         UUID userId = parsePrincipalUserId(principalUserId);
         IChatUseCase.rateMessage(userId, messageId, request);

@@ -2,6 +2,7 @@ package com.legalfam.backend.auth.infrastructure.adapter.out;
 
 import com.legalfam.backend.auth.application.port.out.IAccessTokenPort;
 import com.legalfam.backend.auth.application.port.out.ITokenValidationPort;
+import com.legalfam.backend.auth.infrastructure.config.JwtProperties;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.security.Keys;
@@ -9,7 +10,6 @@ import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -18,12 +18,9 @@ public class JwtTokenAdapter implements IAccessTokenPort, ITokenValidationPort {
     private final SecretKey signingKey;
     private final long accessTokenExpirationMs;
 
-    public JwtTokenAdapter(
-            @Value("${app.jwt.secret}") String jwtSecret,
-            @Value("${app.jwt.access-token-expiration-ms}") long accessTokenExpirationMs
-    ) {
-        this.signingKey = Keys.hmacShaKeyFor(normalizeSecret(jwtSecret));
-        this.accessTokenExpirationMs = accessTokenExpirationMs;
+    public JwtTokenAdapter(JwtProperties jwtProperties) {
+        this.signingKey = Keys.hmacShaKeyFor(normalizeSecret(jwtProperties.secret()));
+        this.accessTokenExpirationMs = jwtProperties.accessTokenExpirationMs();
     }
 
     @Override

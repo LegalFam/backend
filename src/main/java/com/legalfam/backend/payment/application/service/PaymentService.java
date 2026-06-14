@@ -32,7 +32,6 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,22 +46,23 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     private final IUserIdentityPort IUserIdentityPort;
     private final String defaultCheckoutSuccessUrl;
     private final String defaultCheckoutCancelUrl;
-    private final Clock clock = Clock.systemUTC();
+    private final Clock clock;
 
     public PaymentService(
             IPaymentPersistencePort IPaymentPersistencePort,
             IPaymentGatewayPort IPaymentGatewayPort,
             IPaymentPlanCatalogPort IPaymentPlanCatalogPort,
             IUserIdentityPort IUserIdentityPort,
-            @Value("${app.payment.mercado-pago.checkout-success-url}") String defaultCheckoutSuccessUrl,
-            @Value("${app.payment.mercado-pago.checkout-cancel-url:http://localhost:3000/billing/cancel}") String defaultCheckoutCancelUrl
+            PaymentCheckoutProperties paymentCheckoutProperties,
+            Clock clock
     ) {
         this.IPaymentPersistencePort = IPaymentPersistencePort;
         this.IPaymentGatewayPort = IPaymentGatewayPort;
         this.IPaymentPlanCatalogPort = IPaymentPlanCatalogPort;
         this.IUserIdentityPort = IUserIdentityPort;
-        this.defaultCheckoutSuccessUrl = defaultCheckoutSuccessUrl;
-        this.defaultCheckoutCancelUrl = defaultCheckoutCancelUrl;
+        this.defaultCheckoutSuccessUrl = paymentCheckoutProperties.defaultCheckoutSuccessUrl();
+        this.defaultCheckoutCancelUrl = paymentCheckoutProperties.defaultCheckoutCancelUrl();
+        this.clock = clock;
     }
 
     @Override

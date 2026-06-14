@@ -3,13 +3,13 @@ package com.legalfam.backend.chat.infrastructure.adapter.out;
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
+import com.legalfam.backend.chat.infrastructure.config.ChatRabbitProperties;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.ReturnedMessage;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -32,16 +32,14 @@ public class RabbitChatEventPublisherAdapter implements IChatEventPublisherPort 
             RabbitTemplate rabbitTemplate,
             ObjectMapper objectMapper,
             ApplicationEventPublisher applicationEventPublisher,
-            @Value("${app.chat.messaging.rabbit.exchange}") String exchange,
-            @Value("${app.chat.messaging.rabbit.routing-key.assistant-delivery}") String assistantDeliveryRoutingKey,
-            @Value("${app.chat.messaging.rabbit.publisher.confirm-timeout-ms:5000}") long confirmTimeoutMs
+            ChatRabbitProperties properties
     ) {
         this.rabbitTemplate = rabbitTemplate;
         this.objectMapper = objectMapper;
         this.applicationEventPublisher = applicationEventPublisher;
-        this.exchange = exchange;
-        this.assistantDeliveryRoutingKey = assistantDeliveryRoutingKey;
-        this.confirmTimeoutMs = confirmTimeoutMs;
+        this.exchange = properties.exchangeName();
+        this.assistantDeliveryRoutingKey = properties.assistantDeliveryRoutingKey();
+        this.confirmTimeoutMs = properties.safePublisherConfirmTimeoutMs();
     }
 
     @Override

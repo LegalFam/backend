@@ -13,13 +13,13 @@ import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
+import com.legalfam.backend.chat.infrastructure.config.ChatOutboxRelayProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 import com.legalfam.backend.chat.infrastructure.adapter.out.ChatOutboxRelayTransactionService;
-import com.legalfam.backend.chat.infrastructure.worker.ChatDeliveryRetryWorker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,8 +46,7 @@ class ChatDeliveryRetryWorkerTest {
                 relayTransactionService,
                 IChatEventPublisherPort,
                 new ObjectMapper(),
-                50,
-                600000
+                new ChatOutboxRelayProperties(50, 600000L)
         );
     }
 

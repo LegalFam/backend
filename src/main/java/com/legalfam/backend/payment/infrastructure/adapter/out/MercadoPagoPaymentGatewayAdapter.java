@@ -6,6 +6,7 @@ import com.legalfam.backend.payment.application.dto.PaymentWebhookNotification;
 import com.legalfam.backend.payment.application.port.out.IPaymentGatewayPort;
 import com.legalfam.backend.payment.domain.exception.PaymentGatewayException;
 import com.legalfam.backend.payment.domain.exception.PaymentWebhookException;
+import com.legalfam.backend.payment.infrastructure.config.MercadoPagoProperties;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -17,7 +18,6 @@ import java.util.Locale;
 import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -43,18 +43,11 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
     private final String apiBaseUrl;
     private final String webhookSecret;
 
-    public MercadoPagoPaymentGatewayAdapter(
-            ObjectMapper objectMapper,
-            @Value("${app.payment.mercado-pago.access-token:}") String accessToken,
-            @Value("${app.payment.mercado-pago.api-base-url:https://api.mercadopago.com}") String apiBaseUrl,
-            @Value("${app.payment.mercado-pago.webhook-secret:}") String webhookSecret
-    ) {
+    public MercadoPagoPaymentGatewayAdapter(ObjectMapper objectMapper, MercadoPagoProperties mercadoPagoProperties) {
         this.objectMapper = objectMapper;
-        this.accessToken = accessToken == null ? "" : accessToken.trim();
-        this.apiBaseUrl = apiBaseUrl == null || apiBaseUrl.isBlank()
-                ? "https://api.mercadopago.com"
-                : apiBaseUrl.trim().replaceAll("/+$", "");
-        this.webhookSecret = webhookSecret == null ? "" : webhookSecret.trim();
+        this.accessToken = mercadoPagoProperties.normalizedAccessToken();
+        this.apiBaseUrl = mercadoPagoProperties.normalizedApiBaseUrl();
+        this.webhookSecret = mercadoPagoProperties.normalizedWebhookSecret();
         this.restTemplate = buildRestTemplate();
     }
 

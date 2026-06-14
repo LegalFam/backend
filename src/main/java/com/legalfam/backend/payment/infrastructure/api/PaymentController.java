@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -81,7 +82,7 @@ public class PaymentController {
     })
     public ResponseEntity<CreateCheckoutSessionResponse> createCheckoutSession(
             @AuthenticationPrincipal String principalUserId,
-            @RequestBody(required = false) CreateCheckoutSessionRequest request
+            @Valid @RequestBody(required = false) CreateCheckoutSessionRequest request
     ) {
         if (request == null) {
             throw new InvalidPaymentRequestException("Checkout request is required");

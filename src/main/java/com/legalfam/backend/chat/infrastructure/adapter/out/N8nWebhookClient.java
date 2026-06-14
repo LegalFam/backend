@@ -5,9 +5,9 @@ import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
+import com.legalfam.backend.chat.infrastructure.config.N8nProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -42,18 +42,12 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
     private final String authToken;
     private final int timeoutMs;
 
-    public N8nWebhookClient(
-            ObjectMapper objectMapper,
-            @Value("${app.n8n.webhook-url:}") String webhookUrl,
-            @Value("${app.n8n.auth-header-name:X-N8N-Token}") String authHeaderName,
-            @Value("${app.n8n.auth-token:}") String authToken,
-            @Value("${app.n8n.timeout-ms:30000}") int timeoutMs
-    ) {
+    public N8nWebhookClient(ObjectMapper objectMapper, N8nProperties properties) {
         this.objectMapper = objectMapper;
-        this.webhookUrl = webhookUrl;
-        this.authHeaderName = authHeaderName;
-        this.authToken = authToken;
-        this.timeoutMs = Math.max(timeoutMs, MIN_TIMEOUT_MS);
+        this.webhookUrl = properties.normalizedWebhookUrl();
+        this.authHeaderName = properties.normalizedAuthHeaderName();
+        this.authToken = properties.normalizedAuthToken();
+        this.timeoutMs = Math.max(properties.safeTimeoutMs(), MIN_TIMEOUT_MS);
         this.restTemplate = buildRestTemplate(this.timeoutMs);
     }
 

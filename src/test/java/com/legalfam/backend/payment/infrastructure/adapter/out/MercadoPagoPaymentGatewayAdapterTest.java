@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 import com.legalfam.backend.payment.domain.exception.PaymentWebhookException;
+import com.legalfam.backend.payment.infrastructure.config.MercadoPagoProperties;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -13,9 +14,13 @@ class MercadoPagoPaymentGatewayAdapterTest {
     void parseVerifiedWebhookRejectsMissingSignatureWhenSecretIsConfigured() {
         MercadoPagoPaymentGatewayAdapter adapter = new MercadoPagoPaymentGatewayAdapter(
                 mock(ObjectMapper.class),
-                "access-token",
-                "https://api.mercadopago.com",
-                "webhook-secret"
+                new MercadoPagoProperties(
+                        "access-token",
+                        "https://api.mercadopago.com",
+                        "webhook-secret",
+                        "http://localhost:3000/billing/success",
+                        "http://localhost:3000/billing/cancel"
+                )
         );
 
         assertThrows(PaymentWebhookException.class, () -> adapter.parseVerifiedWebhook(

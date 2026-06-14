@@ -3,12 +3,15 @@ package com.legalfam.backend.common.error.handler;
 import com.legalfam.backend.common.error.ApiError;
 import com.legalfam.backend.common.error.ApiErrorFactory;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Comparator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -26,6 +29,26 @@ public class GlobalExceptionHandler {
                 "validation_error",
                 "malformed_json",
                 "Malformed request body",
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleValidationFailure(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request
+    ) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .sorted(Comparator.comparing(FieldError::getField))
+                .findFirst()
+                .map(error -> error.getDefaultMessage() == null ? "Request validation failed" : error.getDefaultMessage())
+                .orElse("Request validation failed");
+        log.warn("Request validation failed: path={}, message={}", request.getRequestURI(), message);
+        return buildResponse(
+                HttpStatus.BAD_REQUEST,
+                "validation_error",
+                "invalid_request",
+                message,
                 request.getRequestURI()
         );
     }

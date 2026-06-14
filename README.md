@@ -8,6 +8,7 @@ Spring Boot backend with email/password authentication, JWT access tokens, refre
 - Spring Boot 4.0.6
 - Spring Security
 - Spring Data JPA
+- Spring Validation
 - Spring AMQP (RabbitMQ)
 - PostgreSQL
 - Mercado Pago
@@ -74,6 +75,7 @@ N8N_WEBHOOK_URL=http://localhost:5678/webhook/chat-process
 N8N_AUTH_HEADER_NAME=X-N8N-Token
 N8N_AUTH_TOKEN=your-shared-secret
 MERCADO_PAGO_ACCESS_TOKEN=APP_USR-your-access-token
+MERCADO_PAGO_WEBHOOK_SECRET=your-webhook-secret
 RABBITMQ_HOST=localhost
 RABBITMQ_PORT=5672
 RABBITMQ_USER=guest
@@ -88,9 +90,10 @@ Notes:
 - `DB_POOL_MAX_SIZE` controls the Hikari connection pool size. Keep it at or above expected concurrent HTTP, async chat, RabbitMQ, and scheduled DB work, while staying under your PostgreSQL provider limit.
 - `CORS_ALLOWED_ORIGINS=*` allows all origins (current default behavior).
 - To allow only one origin later, set for example `CORS_ALLOWED_ORIGINS=http://localhost:3000`.
-- For the chat module, endpoint URLs and credentials still come from env (`N8N_*`, `RABBITMQ_*`), while non-secret chat settings live in `src/main/resources/chat/chat.properties`.
-- For the payment module, only `MERCADO_PAGO_ACCESS_TOKEN` needs to be provided as an env var.
+- For the chat module, endpoint URLs and credentials still come from env (`N8N_*`, `RABBITMQ_*`), while non-secret chat settings are bound through typed properties from `src/main/resources/chat/chat.properties`.
+- For the payment module, `MERCADO_PAGO_ACCESS_TOKEN` is required for gateway calls; `MERCADO_PAGO_WEBHOOK_SECRET` enables webhook signature verification.
 - Non-secret payment configuration lives in `src/main/resources/payment/payment.properties`.
+- API request bodies use Bean Validation and return the standard error shape for invalid fields.
 - `POST /api/v1/chat/send` enqueues message processing asynchronously.
 - With `CHAT_RABBIT_ENABLED=true` (default), chat processing uses `Transactional Outbox + RabbitMQ`.
 - With `CHAT_RABBIT_ENABLED=false`, the backend still uses the same transactional outbox, but the relay dispatches locally after commit.

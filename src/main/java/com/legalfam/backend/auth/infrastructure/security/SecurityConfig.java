@@ -1,13 +1,12 @@
 package com.legalfam.backend.auth.infrastructure.security;
 
+import com.legalfam.backend.auth.infrastructure.config.CorsProperties;
 import com.legalfam.backend.common.error.ApiError;
 import com.legalfam.backend.common.error.ApiErrorFactory;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -31,16 +30,16 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ObjectMapper objectMapper;
-    private final String corsAllowedOrigins;
+    private final CorsProperties corsProperties;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             ObjectMapper objectMapper,
-            @Value("${app.cors.allowed-origins:*}") String corsAllowedOrigins
+            CorsProperties corsProperties
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.objectMapper = objectMapper;
-        this.corsAllowedOrigins = corsAllowedOrigins;
+        this.corsProperties = corsProperties;
     }
 
     @Bean
@@ -88,16 +87,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfiguration = new CorsConfiguration();
-        List<String> allowedOriginPatterns = Arrays.stream(corsAllowedOrigins.split(","))
-                .map(String::trim)
-                .filter(origin -> !origin.isEmpty())
-                .toList();
-
-        if (allowedOriginPatterns.isEmpty()) {
-            allowedOriginPatterns = List.of("*");
-        }
-
-        corsConfiguration.setAllowedOriginPatterns(allowedOriginPatterns);
+        corsConfiguration.setAllowedOriginPatterns(corsProperties.allowedOriginPatterns());
         corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "OPTIONS"));
         corsConfiguration.setAllowedHeaders(List.of(
                 "Authorization",

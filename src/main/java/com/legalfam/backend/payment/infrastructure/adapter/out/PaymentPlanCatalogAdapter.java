@@ -4,11 +4,11 @@ import com.legalfam.backend.payment.application.dto.PaymentPlanDefinition;
 import com.legalfam.backend.payment.application.port.out.IPaymentPlanCatalogPort;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import com.legalfam.backend.payment.domain.model.SubscriptionPlanCode;
+import com.legalfam.backend.payment.infrastructure.config.PaymentPlanProperties;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,30 +17,11 @@ public class PaymentPlanCatalogAdapter implements IPaymentPlanCatalogPort {
     private final List<PaymentPlanDefinition> plans;
     private final Map<SubscriptionPlanCode, PaymentPlanDefinition> plansByCode;
 
-    public PaymentPlanCatalogAdapter(
-            @Value("${app.payment.plans.free.display-name}") String freeDisplayName,
-            @Value("${app.payment.plans.free.description}") String freeDescription,
-            @Value("${app.payment.plans.free.tokens}") int freeTokens,
-            @Value("${app.payment.plans.free.monthly-price-cents}") int freeMonthlyPriceCents,
-            @Value("${app.payment.plans.free.currency}") String freeCurrency,
-            @Value("${app.payment.plans.basic.display-name}") String basicDisplayName,
-            @Value("${app.payment.plans.basic.description}") String basicDescription,
-            @Value("${app.payment.plans.basic.tokens}") int basicTokens,
-            @Value("${app.payment.plans.basic.monthly-price-cents}") int basicMonthlyPriceCents,
-            @Value("${app.payment.plans.basic.currency}") String basicCurrency,
-            @Value("${app.payment.plans.premium.display-name}") String premiumDisplayName,
-            @Value("${app.payment.plans.premium.description}") String premiumDescription,
-            @Value("${app.payment.plans.premium.tokens}") int premiumTokens,
-            @Value("${app.payment.plans.premium.monthly-price-cents}") int premiumMonthlyPriceCents,
-            @Value("${app.payment.plans.premium.currency}") String premiumCurrency
-    ) {
+    public PaymentPlanCatalogAdapter(PaymentPlanProperties properties) {
         this.plans = List.of(
-                plan(SubscriptionPlanCode.FREE, freeDisplayName, freeDescription, freeTokens,
-                        freeMonthlyPriceCents, freeCurrency),
-                plan(SubscriptionPlanCode.BASIC, basicDisplayName, basicDescription, basicTokens,
-                        basicMonthlyPriceCents, basicCurrency),
-                plan(SubscriptionPlanCode.PREMIUM, premiumDisplayName, premiumDescription, premiumTokens,
-                        premiumMonthlyPriceCents, premiumCurrency)
+                plan(SubscriptionPlanCode.FREE, properties.free()),
+                plan(SubscriptionPlanCode.BASIC, properties.basic()),
+                plan(SubscriptionPlanCode.PREMIUM, properties.premium())
         );
         this.plansByCode = plans.stream().collect(Collectors.toMap(PaymentPlanDefinition::code, plan -> plan));
     }
@@ -84,17 +65,13 @@ public class PaymentPlanCatalogAdapter implements IPaymentPlanCatalogPort {
         }
     }
 
-    private PaymentPlanDefinition plan(
-            SubscriptionPlanCode code,
-            String displayName,
-            String description,
-            int monthlyTokenLimit,
-            int monthlyPriceCents,
-            String currency
-    ) {
+    private PaymentPlanDefinition plan(SubscriptionPlanCode code, PaymentPlanProperties.Plan properties) {
+        String displayName = properties.displayName();
         if (displayName == null || displayName.isBlank()) {
             throw new IllegalStateException("Payment plan display name is required for " + code.name());
         }
+        int monthlyTokenLimit = properties.tokens();
+        int monthlyPriceCents = properties.monthlyPriceCents();
         if (monthlyTokenLimit < 0) {
             throw new IllegalStateException("Payment plan token limit must be non-negative for " + code.name());
         }
@@ -104,10 +81,10 @@ public class PaymentPlanCatalogAdapter implements IPaymentPlanCatalogPort {
         return new PaymentPlanDefinition(
                 code,
                 displayName.trim(),
-                defaultString(description),
+                defaultString(properties.description()),
                 monthlyTokenLimit,
                 monthlyPriceCents,
-                defaultCurrency(currency)
+                defaultCurrency(properties.currency())
         );
     }
 
