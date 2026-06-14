@@ -1,18 +1,18 @@
 package com.legalfam.backend.chat.application.service;
 
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
+import com.legalfam.backend.chat.application.mapper.ChatMessageResponseMapper;
+import com.legalfam.backend.chat.application.policy.ChatAccessPolicy;
+import com.legalfam.backend.chat.application.policy.ChatPrivacyPolicy;
 import com.legalfam.backend.chat.application.port.in.IChatUseCase;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
-import com.legalfam.backend.chat.application.port.out.IChatUserLookupPort;
-import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
-import com.legalfam.backend.chat.domain.exception.ChatAccessDeniedException;
 import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.domain.exception.PendingAssistantMessageException;
@@ -25,11 +25,9 @@ import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatSession;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,29 +36,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class ChatService implements IChatUseCase {
 
     private final IChatPersistencePort IChatPersistencePort;
-    private final IChatUserLookupPort IChatUserLookupPort;
     private final IChatTokenPort IChatTokenPort;
     private final IChatEventPublisherPort IChatEventPublisherPort;
-    private static final int MAX_SESSION_TITLE_LENGTH = 80;
-    private static final int MAX_FEEDBACK_COMMENT_LENGTH = 1000;
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("\\b[\\w.%+-]+@[\\w.-]+\\.[A-Za-z]{2,}\\b");
-    private static final Pattern PHONE_PATTERN = Pattern.compile("(?<!\\d)(?:\\+?51\\s*)?(?:9\\d{2}|0?1|[2-8]\\d)(?:[\\s.-]*\\d){6,8}(?!\\d)");
-    private static final Pattern DNI_PATTERN = Pattern.compile("(?<!\\d)\\d{8}(?!\\d)");
-    private static final Pattern ADDRESS_PATTERN = Pattern.compile(
-            "\\b(?:av\\.?|avenida|jr\\.?|jiron|calle|pasaje|mz\\.?|manzana|lote)\\b",
-            Pattern.CASE_INSENSITIVE
-    );
+    private final ChatAccessPolicy chatAccessPolicy;
+    private final ChatPrivacyPolicy chatPrivacyPolicy;
+    private final ChatMessageResponseMapper chatMessageResponseMapper;
 
     public ChatService(
             IChatPersistencePort IChatPersistencePort,
-            IChatUserLookupPort IChatUserLookupPort,
             IChatTokenPort IChatTokenPort,
-            IChatEventPublisherPort IChatEventPublisherPort
+            IChatEventPublisherPort IChatEventPublisherPort,
+            ChatAccessPolicy chatAccessPolicy,
+            ChatPrivacyPolicy chatPrivacyPolicy,
+            ChatMessageResponseMapper chatMessageResponseMapper
     ) {
         this.IChatPersistencePort = IChatPersistencePort;
-        this.IChatUserLookupPort = IChatUserLookupPort;
         this.IChatTokenPort = IChatTokenPort;
         this.IChatEventPublisherPort = IChatEventPublisherPort;
+        this.chatAccessPolicy = chatAccessPolicy;
+        this.chatPrivacyPolicy = chatPrivacyPolicy;
+        this.chatMessageResponseMapper = chatMessageResponseMapper;
     }
 
     @Override
@@ -69,19 +64,22 @@ public class ChatService implements IChatUseCase {
         if (sessionId == null) {
             throw new InvalidChatRequestException("Session id is required");
         }
-        validateMessagePrivacy(messageInput);
-        assertUserExists(userId);
-        ChatSession chatSession = assertSessionOwnership(userId, sessionId);
+        chatPrivacyPolicy.assertAllowed(messageInput);
+        chatAccessPolicy.assertUserExists(userId);
+        ChatSession chatSession = chatAccessPolicy.requireSessionOwner(userId, sessionId);
         if (IChatPersistencePort.existsUnreadAssistantMessageBySessionId(chatSession.getId())) {
             throw new PendingAssistantMessageException("Assistant receipt confirmation is still pending for this session");
         }
         Instant now = Instant.now();
 
         ChatMessage userMessage = new ChatMessage();
+        userMessage.setId(UUID.randomUUID());
         userMessage.setChatSessionId(chatSession.getId());
         userMessage.setRole(ChatMessageRole.USER);
         userMessage.setContent(messageInput);
         userMessage.setCreatedAt(now);
+
+        IChatTokenPort.consumeChatToken(userId, userMessage.getId());
         userMessage = IChatPersistencePort.saveMessage(userMessage);
 
         ChatMessageProcessing messageProcessing = new ChatMessageProcessing();
@@ -90,8 +88,6 @@ public class ChatService implements IChatUseCase {
         messageProcessing.setCreatedAt(now);
         messageProcessing.setUpdatedAt(now);
         IChatPersistencePort.saveMessageProcessing(messageProcessing);
-
-        IChatTokenPort.consumeChatToken(userId, userMessage.getId());
 
         chatSession.setUpdatedAt(now);
         IChatPersistencePort.saveSession(chatSession);
@@ -103,7 +99,7 @@ public class ChatService implements IChatUseCase {
     @Override
     @Transactional
     public ChatSessionResponse createSession(UUID userId) {
-        assertUserExists(userId);
+        chatAccessPolicy.assertUserExists(userId);
         Instant now = Instant.now();
         ChatSession session = new ChatSession();
         session.setUserId(userId);
@@ -116,20 +112,19 @@ public class ChatService implements IChatUseCase {
     @Override
     @Transactional
     public ChatSessionResponse updateSession(UUID userId, UUID sessionId, ChatUpdateSessionRequest request) {
-        if (request == null || request.title() == null || request.title().isBlank()) {
+        if (request == null) {
             throw new InvalidChatRequestException("Session title is required");
         }
 
-        ChatSession session = assertSessionOwnership(userId, sessionId);
-        session.setTitle(normalizeSessionTitle(request.title()));
-        session.setUpdatedAt(Instant.now());
+        ChatSession session = chatAccessPolicy.requireSessionOwner(userId, sessionId);
+        session.rename(request.title(), Instant.now());
         return toSessionResponse(IChatPersistencePort.saveSession(session));
     }
 
     @Override
     @Transactional
     public void deleteSession(UUID userId, UUID sessionId) {
-        ChatSession session = assertSessionOwnership(userId, sessionId);
+        ChatSession session = chatAccessPolicy.requireSessionOwner(userId, sessionId);
         IChatPersistencePort.deleteSessionById(session.getId());
     }
 
@@ -144,7 +139,7 @@ public class ChatService implements IChatUseCase {
     @Override
     @Transactional(readOnly = true)
     public List<ChatMessageResponse> listMessages(UUID userId, UUID sessionId) {
-        ChatSession session = assertSessionOwnership(userId, sessionId);
+        ChatSession session = chatAccessPolicy.requireSessionOwner(userId, sessionId);
         List<ChatMessage> messages = IChatPersistencePort.findMessagesBySessionIdOrderByCreatedAtAsc(session.getId());
         if (messages.isEmpty()) {
             return List.of();
@@ -160,22 +155,7 @@ public class ChatService implements IChatUseCase {
                 .collect(Collectors.toMap(ChatOutboxEvent::getAggregateId, event -> event));
 
         return messages.stream()
-                .map(message -> new ChatMessageResponse(
-                        message.getId(),
-                        message.getRole().name(),
-                        message.getContent(),
-                        message.getRating(),
-                        message.getFeedbackComment(),
-                        message.getFeedbackSubmittedAt(),
-                        message.getCreatedAt(),
-                        mapCitations(citationsByMessageId.getOrDefault(message.getId(), Collections.emptyList())),
-                        message.getConfidenceStatus(),
-                        message.getConfidenceReason(),
-                        message.getNextSteps(),
-                        message.getSpecialistSupportRecommended(),
-                        resolveReceiptStatus(message, outboxByMessageId.get(message.getId())),
-                        resolveReadAt(message, outboxByMessageId.get(message.getId()))
-                ))
+                .map(message -> chatMessageResponseMapper.toResponse(message, citationsByMessageId, outboxByMessageId))
                 .toList();
     }
 
@@ -185,27 +165,11 @@ public class ChatService implements IChatUseCase {
         if (request == null || request.rating() == null) {
             throw new InvalidChatRequestException("Rating is required");
         }
-        if (request.rating() < 1 || request.rating() > 5) {
-            throw new InvalidChatRequestException("Rating must be between 1 and 5");
-        }
-        String comment = normalizeFeedbackComment(request.comment());
 
         ChatMessage message = IChatPersistencePort.findMessageById(messageId)
                 .orElseThrow(() -> new ChatNotFoundException("Chat message not found"));
-        if (message.getRole() != ChatMessageRole.ASSISTANT) {
-            throw new InvalidChatRequestException("Only assistant messages can be rated");
-        }
-
-        ChatSession messageSession = IChatPersistencePort.findSessionById(message.getChatSessionId())
-                .orElseThrow(() -> new ChatNotFoundException("Chat session not found"));
-        UUID ownerId = messageSession.getUserId();
-        if (!ownerId.equals(userId)) {
-            throw new ChatAccessDeniedException("Access is forbidden");
-        }
-
-        message.setRating(request.rating());
-        message.setFeedbackComment(comment);
-        message.setFeedbackSubmittedAt(Instant.now());
+        chatAccessPolicy.requireMessageSessionOwner(userId, message);
+        message.submitFeedback(request.rating(), request.comment(), Instant.now());
         IChatPersistencePort.saveMessage(message);
     }
 
@@ -218,7 +182,7 @@ public class ChatService implements IChatUseCase {
             throw new InvalidChatRequestException("Receipt can only be confirmed for assistant messages");
         }
 
-        ChatSession messageSession = assertSessionOwnership(userId, message.getChatSessionId());
+        ChatSession messageSession = chatAccessPolicy.requireSessionOwner(userId, message.getChatSessionId());
         ChatOutboxEvent outboxEvent = IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(messageId)
                 .orElseThrow(() -> new ChatNotFoundException("Assistant delivery event not found"));
 
@@ -235,23 +199,7 @@ public class ChatService implements IChatUseCase {
     @Override
     @Transactional(readOnly = true)
     public void assertSessionOwnershipExists(UUID userId, UUID sessionId) {
-        assertSessionOwnership(userId, sessionId);
-    }
-
-    private ChatSession assertSessionOwnership(UUID userId, UUID sessionId) {
-        ChatSession session = IChatPersistencePort.findSessionById(sessionId)
-                .orElseThrow(() -> new ChatNotFoundException("Chat session not found"));
-
-        if (!session.getUserId().equals(userId)) {
-            throw new ChatAccessDeniedException("Access is forbidden");
-        }
-        return session;
-    }
-
-    private void assertUserExists(UUID userId) {
-        if (!IChatUserLookupPort.existsById(userId)) {
-            throw new ChatAccessDeniedException("Authenticated user not found");
-        }
+        chatAccessPolicy.requireSessionOwner(userId, sessionId);
     }
 
     private ChatSessionResponse toSessionResponse(ChatSession session) {
@@ -261,63 +209,6 @@ public class ChatService implements IChatUseCase {
                 session.getCreatedAt(),
                 session.getUpdatedAt()
         );
-    }
-
-    private String normalizeSessionTitle(String title) {
-        String normalized = title.trim();
-        if (normalized.length() > MAX_SESSION_TITLE_LENGTH) {
-            normalized = normalized.substring(0, MAX_SESSION_TITLE_LENGTH);
-        }
-        return normalized;
-    }
-
-    private void validateMessagePrivacy(String messageInput) {
-        if (messageInput == null) {
-            return;
-        }
-        if (EMAIL_PATTERN.matcher(messageInput).find()
-                || PHONE_PATTERN.matcher(messageInput).find()
-                || DNI_PATTERN.matcher(messageInput).find()
-                || ADDRESS_PATTERN.matcher(messageInput).find()) {
-            throw new InvalidChatRequestException(
-                    "Evita enviar datos personales como DNI, telefono, correo o direccion. Describe la situacion de forma general."
-            );
-        }
-    }
-
-    private String normalizeFeedbackComment(String comment) {
-        if (comment == null || comment.isBlank()) {
-            return null;
-        }
-        String normalized = comment.trim();
-        if (normalized.length() > MAX_FEEDBACK_COMMENT_LENGTH) {
-            throw new InvalidChatRequestException("Feedback comment must be at most 1000 characters");
-        }
-        return normalized;
-    }
-
-    private List<ChatCitationResponse> mapCitations(List<ChatCitation> citations) {
-        return citations.stream()
-                .map(citation -> new ChatCitationResponse(
-                        citation.getSourceTitle(),
-                        citation.getSourceSnippet(),
-                        citation.getSourceUrl()
-                ))
-                .toList();
-    }
-
-    private String resolveReceiptStatus(ChatMessage message, ChatOutboxEvent event) {
-        if (message.getRole() != ChatMessageRole.ASSISTANT || event == null) {
-            return null;
-        }
-        return event.getStatus().name();
-    }
-
-    private Instant resolveReadAt(ChatMessage message, ChatOutboxEvent event) {
-        if (message.getRole() != ChatMessageRole.ASSISTANT || event == null) {
-            return null;
-        }
-        return event.getReadAt();
     }
 
 }

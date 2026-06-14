@@ -8,16 +8,17 @@ import static org.mockito.Mockito.when;
 
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
+import com.legalfam.backend.chat.application.mapper.ChatMessageResponseMapper;
+import com.legalfam.backend.chat.application.policy.ChatAccessPolicy;
+import com.legalfam.backend.chat.application.policy.ChatPrivacyPolicy;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
-import com.legalfam.backend.chat.application.port.out.IChatUserLookupPort;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,13 +34,19 @@ class ChatServiceTest {
     private IChatPersistencePort IChatPersistencePort;
 
     @Mock
-    private IChatUserLookupPort IChatUserLookupPort;
-
-    @Mock
     private IChatTokenPort IChatTokenPort;
 
     @Mock
     private IChatEventPublisherPort IChatEventPublisherPort;
+
+    @Mock
+    private ChatAccessPolicy chatAccessPolicy;
+
+    @Mock
+    private ChatPrivacyPolicy chatPrivacyPolicy;
+
+    @Mock
+    private ChatMessageResponseMapper chatMessageResponseMapper;
 
     @InjectMocks
     private ChatService chatService;
@@ -48,20 +55,14 @@ class ChatServiceTest {
     void sendPersistsQueuedMessageConsumesTokenAndPublishesLocalAsyncEvent() {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
-        UUID userMessageId = UUID.randomUUID();
 
         ChatSession session = new ChatSession();
         session.setId(sessionId);
         session.setUserId(userId);
 
-        when(IChatUserLookupPort.existsById(userId)).thenReturn(true);
-        when(IChatPersistencePort.findSessionById(sessionId)).thenReturn(Optional.of(session));
+        when(chatAccessPolicy.requireSessionOwner(userId, sessionId)).thenReturn(session);
         when(IChatPersistencePort.existsUnreadAssistantMessageBySessionId(sessionId)).thenReturn(false);
-        when(IChatPersistencePort.saveMessage(any(ChatMessage.class))).thenAnswer(invocation -> {
-            ChatMessage message = invocation.getArgument(0);
-            message.setId(userMessageId);
-            return message;
-        });
+        when(IChatPersistencePort.saveMessage(any(ChatMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(IChatPersistencePort.saveMessageProcessing(any(ChatMessageProcessing.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(IChatPersistencePort.saveSession(any(ChatSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -77,13 +78,13 @@ class ChatServiceTest {
 
         ArgumentCaptor<ChatMessageProcessing> processingCaptor = ArgumentCaptor.forClass(ChatMessageProcessing.class);
         verify(IChatPersistencePort).saveMessageProcessing(processingCaptor.capture());
-        assertEquals(userMessageId, processingCaptor.getValue().getUserMessageId());
+        assertEquals(response.userMessageId(), processingCaptor.getValue().getUserMessageId());
         assertEquals(ChatMessageProcessingStatus.QUEUED, processingCaptor.getValue().getStatus());
 
-        verify(IChatTokenPort).consumeChatToken(userId, userMessageId);
-        verify(IChatEventPublisherPort).publishMessageQueued(new ChatMessageQueuedEvent(sessionId, userMessageId, "hola"));
+        verify(IChatTokenPort).consumeChatToken(userId, response.userMessageId());
+        verify(IChatEventPublisherPort).publishMessageQueued(new ChatMessageQueuedEvent(sessionId, response.userMessageId(), "hola"));
         assertEquals(sessionId, response.sessionId());
-        assertEquals(userMessageId, response.userMessageId());
+        assertEquals(savedMessage.getId(), response.userMessageId());
         assertEquals("PROCESSING", response.status());
     }
 }

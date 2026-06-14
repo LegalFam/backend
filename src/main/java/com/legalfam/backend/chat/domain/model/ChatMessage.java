@@ -1,5 +1,6 @@
 package com.legalfam.backend.chat.domain.model;
 
+import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -113,5 +114,28 @@ public class ChatMessage {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public void submitFeedback(int rating, String comment, Instant submittedAt) {
+        if (role != ChatMessageRole.ASSISTANT) {
+            throw new InvalidChatRequestException("Only assistant messages can be rated");
+        }
+        if (rating < 1 || rating > 5) {
+            throw new InvalidChatRequestException("Rating must be between 1 and 5");
+        }
+        this.rating = rating;
+        this.feedbackComment = normalizeFeedbackComment(comment);
+        this.feedbackSubmittedAt = submittedAt;
+    }
+
+    private String normalizeFeedbackComment(String comment) {
+        if (comment == null || comment.isBlank()) {
+            return null;
+        }
+        String normalized = comment.trim();
+        if (normalized.length() > 1000) {
+            throw new InvalidChatRequestException("Feedback comment must be at most 1000 characters");
+        }
+        return normalized;
     }
 }

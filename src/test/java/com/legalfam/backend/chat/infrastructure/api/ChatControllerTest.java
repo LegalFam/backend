@@ -22,6 +22,7 @@ import com.legalfam.backend.chat.infrastructure.api.handler.ChatExceptionHandler
 import com.legalfam.backend.chat.application.service.ChatService;
 import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
 import com.legalfam.backend.common.error.handler.GlobalExceptionHandler;
+import com.legalfam.backend.common.security.AuthenticatedUserResolver;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -52,7 +53,11 @@ class ChatControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(chatService, chatSseEmitterRegistry))
+        mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(
+                        chatService,
+                        chatSseEmitterRegistry,
+                        new AuthenticatedUserResolver()
+                ))
                 .setControllerAdvice(new ChatExceptionHandler(), new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
@@ -161,11 +166,11 @@ class ChatControllerTest {
         authenticateAs("not-a-uuid");
 
         mockMvc.perform(get("/api/v1/chat/sessions"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type", is("validation_error")))
-                .andExpect(jsonPath("$.code", is("invalid_request")))
-                .andExpect(jsonPath("$.message", is("Authenticated user id is invalid")))
-                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type", is("authorization_error")))
+                .andExpect(jsonPath("$.code", is("forbidden")))
+                .andExpect(jsonPath("$.message", is("Access is forbidden")))
+                .andExpect(jsonPath("$.status", is(403)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/sessions")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
 

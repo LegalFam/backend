@@ -20,7 +20,7 @@ Spring Boot backend with email/password authentication, JWT access tokens, refre
 The backend is organized as a modular hexagonal Spring Boot application under `src/main/java/com/legalfam/backend`.
 
 - Business modules currently include `auth`, `chat`, `payment`, and the planned/related `user` boundary.
-- Shared cross-cutting API/config/error concerns live under `common`.
+- Shared cross-cutting API/config/error/security concerns live under `common`.
 - Domain code belongs in `domain`.
 - Use cases, DTOs, events, and ports belong in `application`.
 - Infrastructure code belongs in `infrastructure`.

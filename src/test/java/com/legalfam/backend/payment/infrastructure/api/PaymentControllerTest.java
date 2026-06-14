@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.legalfam.backend.common.error.handler.GlobalExceptionHandler;
+import com.legalfam.backend.common.security.AuthenticatedUserResolver;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionResponse;
 import com.legalfam.backend.payment.application.dto.PaymentPlanResponse;
 import com.legalfam.backend.payment.application.dto.PaymentSubscriptionResponse;
@@ -50,7 +51,7 @@ class PaymentControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-                        new PaymentController(paymentService),
+                        new PaymentController(paymentService, new AuthenticatedUserResolver()),
                         new PaymentWebhookController(paymentService)
                 )
                 .setControllerAdvice(new PaymentExceptionHandler(), new GlobalExceptionHandler())
@@ -107,9 +108,9 @@ class PaymentControllerTest {
         mockMvc.perform(post("/api/v1/payments/checkout-sessions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"planCode\":\"BASIC\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code", is("invalid_request")))
-                .andExpect(jsonPath("$.message", is("Authenticated user id is invalid")));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is("forbidden")))
+                .andExpect(jsonPath("$.message", is("Access is forbidden")));
 
         verifyNoInteractions(paymentService);
     }

@@ -1,6 +1,7 @@
 package com.legalfam.backend.payment.infrastructure.api;
 
 import com.legalfam.backend.common.error.ApiError;
+import com.legalfam.backend.common.security.AuthenticatedUserResolver;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionRequest;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionResponse;
 import com.legalfam.backend.payment.application.dto.PaymentPlanResponse;
@@ -32,9 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class PaymentController {
 
     private final IPaymentUseCase IPaymentUseCase;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    public PaymentController(IPaymentUseCase IPaymentUseCase) {
+    public PaymentController(IPaymentUseCase IPaymentUseCase, AuthenticatedUserResolver authenticatedUserResolver) {
         this.IPaymentUseCase = IPaymentUseCase;
+        this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
     @GetMapping("/plans")
@@ -44,9 +47,7 @@ public class PaymentController {
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = PaymentPlanResponse.class))))
     })
     public ResponseEntity<List<PaymentPlanResponse>> listPlans(@AuthenticationPrincipal String principalUserId) {
-        UUID userId = principalUserId == null || principalUserId.isBlank()
-                ? null
-                : parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.optionalUserId(principalUserId).orElse(null);
         return ResponseEntity.ok(IPaymentUseCase.listPlans(userId));
     }
 
@@ -64,7 +65,7 @@ public class PaymentController {
     public ResponseEntity<PaymentSubscriptionResponse> getSubscription(
             @AuthenticationPrincipal String principalUserId
     ) {
-        return ResponseEntity.ok(IPaymentUseCase.getSubscription(parsePrincipalUserId(principalUserId)));
+        return ResponseEntity.ok(IPaymentUseCase.getSubscription(authenticatedUserResolver.requireUserId(principalUserId)));
     }
 
     @PostMapping("/checkout-sessions")
@@ -87,7 +88,7 @@ public class PaymentController {
         if (request == null) {
             throw new InvalidPaymentRequestException("Checkout request is required");
         }
-        return ResponseEntity.ok(IPaymentUseCase.createCheckoutSession(parsePrincipalUserId(principalUserId), request));
+        return ResponseEntity.ok(IPaymentUseCase.createCheckoutSession(authenticatedUserResolver.requireUserId(principalUserId), request));
     }
 
     @PostMapping("/subscription/cancel")
@@ -103,18 +104,7 @@ public class PaymentController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<Void> cancelSubscription(@AuthenticationPrincipal String principalUserId) {
-        IPaymentUseCase.cancelSubscription(parsePrincipalUserId(principalUserId));
+        IPaymentUseCase.cancelSubscription(authenticatedUserResolver.requireUserId(principalUserId));
         return ResponseEntity.noContent().build();
-    }
-
-    private UUID parsePrincipalUserId(String principalUserId) {
-        if (principalUserId == null || principalUserId.isBlank()) {
-            throw new InvalidPaymentRequestException("Authenticated user is required");
-        }
-        try {
-            return UUID.fromString(principalUserId.trim());
-        } catch (IllegalArgumentException ex) {
-            throw new InvalidPaymentRequestException("Authenticated user id is invalid");
-        }
     }
 }

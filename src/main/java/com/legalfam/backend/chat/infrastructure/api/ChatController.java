@@ -10,6 +10,7 @@ import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
 import com.legalfam.backend.common.error.ApiError;
+import com.legalfam.backend.common.security.AuthenticatedUserResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -47,10 +48,16 @@ public class ChatController {
 
     private final IChatUseCase IChatUseCase;
     private final ChatSseEmitterRegistry chatSseEmitterRegistry;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    public ChatController(IChatUseCase IChatUseCase, ChatSseEmitterRegistry chatSseEmitterRegistry) {
+    public ChatController(
+            IChatUseCase IChatUseCase,
+            ChatSseEmitterRegistry chatSseEmitterRegistry,
+            AuthenticatedUserResolver authenticatedUserResolver
+    ) {
         this.IChatUseCase = IChatUseCase;
         this.chatSseEmitterRegistry = chatSseEmitterRegistry;
+        this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
     @GetMapping(value = "/chat/subscribe/{sessionId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -69,7 +76,7 @@ public class ChatController {
             @AuthenticationPrincipal String principalUserId,
             @PathVariable("sessionId") UUID sessionId
     ) {
-        UUID userId = parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         IChatUseCase.assertSessionOwnershipExists(userId, sessionId);
         SseEmitter emitter = chatSseEmitterRegistry.subscribe(userId, sessionId);
         return ResponseEntity.ok(emitter);
@@ -87,7 +94,7 @@ public class ChatController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<ChatSessionResponse> createSession(@AuthenticationPrincipal String principalUserId) {
-        UUID userId = parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(IChatUseCase.createSession(userId));
     }
 
@@ -111,7 +118,7 @@ public class ChatController {
             @PathVariable("sessionId") UUID sessionId,
             @Valid @RequestBody(required = false) ChatUpdateSessionRequest request
     ) {
-        UUID userId = parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         return ResponseEntity.ok(IChatUseCase.updateSession(userId, sessionId, request));
     }
 
@@ -131,7 +138,7 @@ public class ChatController {
             @AuthenticationPrincipal String principalUserId,
             @PathVariable("sessionId") UUID sessionId
     ) {
-        UUID userId = parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         IChatUseCase.deleteSession(userId, sessionId);
         return ResponseEntity.noContent().build();
     }
@@ -160,7 +167,7 @@ public class ChatController {
             throw new InvalidChatRequestException("Message is required");
         }
 
-        UUID userId = parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         log.info("Chat request accepted: messageLength={}", request.message().trim().length());
         ChatSendAcceptedResponse response = IChatUseCase.send(
                 userId,
@@ -182,7 +189,7 @@ public class ChatController {
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<List<ChatSessionResponse>> listSessions(@AuthenticationPrincipal String principalUserId) {
-        UUID userId = parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         return ResponseEntity.ok(IChatUseCase.listSessions(userId));
     }
 
@@ -203,7 +210,7 @@ public class ChatController {
             @AuthenticationPrincipal String principalUserId,
             @PathVariable("sessionId") @Parameter(description = "Chat session id") UUID sessionId
     ) {
-        UUID userId = parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         return ResponseEntity.ok(IChatUseCase.listMessages(userId, sessionId));
     }
 
@@ -226,7 +233,7 @@ public class ChatController {
             @PathVariable("messageId") UUID messageId,
             @Valid @RequestBody(required = false) ChatRateMessageRequest request
     ) {
-        UUID userId = parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         IChatUseCase.rateMessage(userId, messageId, request);
         return ResponseEntity.ok().build();
     }
@@ -249,19 +256,9 @@ public class ChatController {
             @AuthenticationPrincipal String principalUserId,
             @PathVariable("messageId") UUID messageId
     ) {
-        UUID userId = parsePrincipalUserId(principalUserId);
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         IChatUseCase.confirmAssistantReceipt(userId, messageId);
         return ResponseEntity.noContent().build();
     }
 
-    private UUID parsePrincipalUserId(String principalUserId) {
-        if (principalUserId == null || principalUserId.isBlank()) {
-            throw new InvalidChatRequestException("Authenticated user is required");
-        }
-        try {
-            return UUID.fromString(principalUserId.trim());
-        } catch (IllegalArgumentException ex) {
-            throw new InvalidChatRequestException("Authenticated user id is invalid");
-        }
-    }
 }

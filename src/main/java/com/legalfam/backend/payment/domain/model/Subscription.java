@@ -1,5 +1,7 @@
 package com.legalfam.backend.payment.domain.model;
 
+import com.legalfam.backend.payment.domain.exception.InsufficientTokensException;
+import com.legalfam.backend.payment.domain.exception.SubscriptionInactiveException;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -130,5 +132,69 @@ public class Subscription {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public void consumeChatToken(Instant now) {
+        assertActive();
+        if (remainingTokens <= 0) {
+            throw new InsufficientTokensException("No chat tokens remaining for the current period");
+        }
+        remainingTokens--;
+        updatedAt = now;
+    }
+
+    public int refundChatToken(Instant now) {
+        int nextRemainingTokens = Math.min(monthlyTokenLimit, remainingTokens + 1);
+        int delta = nextRemainingTokens - remainingTokens;
+        remainingTokens = nextRemainingTokens;
+        updatedAt = now;
+        return delta;
+    }
+
+    public void activateFreePlan(
+            SubscriptionPlanCode planCode,
+            int tokenLimit,
+            Instant periodStart,
+            Instant periodEnd,
+            Instant now
+    ) {
+        this.planCode = planCode;
+        this.status = SubscriptionStatus.ACTIVE;
+        this.provider = PaymentProvider.FREE;
+        this.gatewayCustomerId = null;
+        this.gatewaySubscriptionId = null;
+        this.currentPeriodStart = periodStart;
+        this.currentPeriodEnd = periodEnd;
+        this.cancelAtPeriodEnd = false;
+        this.monthlyTokenLimit = tokenLimit;
+        this.remainingTokens = tokenLimit;
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+    }
+
+    public int allocateCurrentPeriodTokens(Instant periodStart, Instant periodEnd, Instant now) {
+        int delta = monthlyTokenLimit - remainingTokens;
+        currentPeriodStart = periodStart;
+        currentPeriodEnd = periodEnd;
+        remainingTokens = monthlyTokenLimit;
+        status = SubscriptionStatus.ACTIVE;
+        updatedAt = now;
+        return delta;
+    }
+
+    public boolean hasActiveGatewaySubscription() {
+        return provider == PaymentProvider.MERCADO_PAGO
+                && gatewaySubscriptionId != null
+                && !gatewaySubscriptionId.isBlank()
+                && status != SubscriptionStatus.CANCELED
+                && status != SubscriptionStatus.EXPIRED;
+    }
+
+    private void assertActive() {
+        if (status != SubscriptionStatus.ACTIVE) {
+            throw new SubscriptionInactiveException("Subscription is not active");
+        }
     }
 }

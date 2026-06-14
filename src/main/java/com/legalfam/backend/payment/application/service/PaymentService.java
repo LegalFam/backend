@@ -14,10 +14,8 @@ import com.legalfam.backend.payment.application.port.in.IPaymentUseCase;
 import com.legalfam.backend.payment.application.port.out.IPaymentGatewayPort;
 import com.legalfam.backend.payment.application.port.out.IPaymentPlanCatalogPort;
 import com.legalfam.backend.payment.application.port.out.IPaymentPersistencePort;
-import com.legalfam.backend.payment.domain.exception.InsufficientTokensException;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import com.legalfam.backend.payment.domain.exception.PaymentWebhookException;
-import com.legalfam.backend.payment.domain.exception.SubscriptionInactiveException;
 import com.legalfam.backend.payment.domain.exception.SubscriptionNotFoundException;
 import com.legalfam.backend.payment.domain.model.PaymentProvider;
 import com.legalfam.backend.payment.domain.model.Subscription;
@@ -197,13 +195,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             return;
         }
         refreshFreeSubscriptionIfNeeded(subscription);
-        ensureSubscriptionActive(subscription);
-        if (subscription.getRemainingTokens() <= 0) {
-            throw new InsufficientTokensException("No chat tokens remaining for the current period");
-        }
-
-        subscription.setRemainingTokens(subscription.getRemainingTokens() - 1);
-        subscription.setUpdatedAt(now());
+        subscription.consumeChatToken(now());
         subscription = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(
                 subscription,
@@ -240,10 +232,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             return;
         }
 
-        int nextRemainingTokens = Math.min(subscription.getMonthlyTokenLimit(), subscription.getRemainingTokens() + 1);
-        int delta = nextRemainingTokens - subscription.getRemainingTokens();
-        subscription.setRemainingTokens(nextRemainingTokens);
-        subscription.setUpdatedAt(now());
+        int delta = subscription.refundChatToken(now());
         subscription = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(
                 subscription,
@@ -295,18 +284,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         PaymentPlanDefinition freePlan = IPaymentPlanCatalogPort.getFreePlan();
         Subscription subscription = new Subscription();
         subscription.setUserId(userId);
-        subscription.setPlanCode(freePlan.code());
-        subscription.setStatus(SubscriptionStatus.ACTIVE);
-        subscription.setProvider(PaymentProvider.FREE);
-        subscription.setGatewayCustomerId(null);
-        subscription.setGatewaySubscriptionId(null);
-        subscription.setCurrentPeriodStart(anchor);
-        subscription.setCurrentPeriodEnd(addMonths(anchor, 1));
-        subscription.setCancelAtPeriodEnd(false);
-        subscription.setMonthlyTokenLimit(freePlan.monthlyTokenLimit());
-        subscription.setRemainingTokens(freePlan.monthlyTokenLimit());
-        subscription.setCreatedAt(anchor);
-        subscription.setUpdatedAt(anchor);
+        subscription.activateFreePlan(freePlan.code(), freePlan.monthlyTokenLimit(), anchor, addMonths(anchor, 1), anchor);
         subscription = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(subscription, null, TokenTransactionType.PERIOD_ALLOCATION,
                 freePlan.monthlyTokenLimit(), "Allocated monthly tokens for free plan");
@@ -333,21 +311,10 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             periodEnd = addMonths(periodEnd, 1);
         }
 
-        int delta = subscription.getMonthlyTokenLimit() - subscription.getRemainingTokens();
-        subscription.setCurrentPeriodStart(periodStart);
-        subscription.setCurrentPeriodEnd(periodEnd);
-        subscription.setRemainingTokens(subscription.getMonthlyTokenLimit());
-        subscription.setStatus(SubscriptionStatus.ACTIVE);
-        subscription.setUpdatedAt(now);
+        int delta = subscription.allocateCurrentPeriodTokens(periodStart, periodEnd, now);
         Subscription saved = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(saved, null, TokenTransactionType.PERIOD_ALLOCATION, delta,
                 "Allocated monthly tokens for new free-plan period");
-    }
-
-    private void ensureSubscriptionActive(Subscription subscription) {
-        if (subscription.getStatus() != SubscriptionStatus.ACTIVE) {
-            throw new SubscriptionInactiveException("Subscription is not active");
-        }
     }
 
     private void ensureCheckoutAllowed(Subscription subscription, PaymentPlanDefinition targetPlan) {
@@ -356,12 +323,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
                 && subscription.getStatus() == SubscriptionStatus.ACTIVE) {
             throw new InvalidPaymentRequestException("User is already subscribed to the selected plan");
         }
-        boolean managedInGateway = subscription.getProvider() == PaymentProvider.MERCADO_PAGO
-                && subscription.getGatewaySubscriptionId() != null
-                && !subscription.getGatewaySubscriptionId().isBlank()
-                && subscription.getStatus() != SubscriptionStatus.CANCELED
-                && subscription.getStatus() != SubscriptionStatus.EXPIRED;
-        if (managedInGateway) {
+        if (subscription.hasActiveGatewaySubscription()) {
             throw new InvalidPaymentRequestException("Cancel the current Mercado Pago subscription before changing plans");
         }
     }
@@ -443,17 +405,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         int previousRemainingTokens = subscription.getRemainingTokens();
         Instant anchor = now();
 
-        subscription.setPlanCode(freePlan.code());
-        subscription.setProvider(PaymentProvider.FREE);
-        subscription.setStatus(SubscriptionStatus.ACTIVE);
-        subscription.setGatewayCustomerId(null);
-        subscription.setGatewaySubscriptionId(null);
-        subscription.setCurrentPeriodStart(anchor);
-        subscription.setCurrentPeriodEnd(addMonths(anchor, 1));
-        subscription.setCancelAtPeriodEnd(false);
-        subscription.setMonthlyTokenLimit(freePlan.monthlyTokenLimit());
-        subscription.setRemainingTokens(freePlan.monthlyTokenLimit());
-        subscription.setUpdatedAt(anchor);
+        subscription.activateFreePlan(freePlan.code(), freePlan.monthlyTokenLimit(), anchor, addMonths(anchor, 1), anchor);
         Subscription saved = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(
                 saved,

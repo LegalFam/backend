@@ -32,6 +32,7 @@ This document describes how contributors (human or AI agents) should work in thi
   - `common/config/**` for shared configuration.
   - `common/event/**` for cross-module application events.
   - `common/identity/**` for neutral identity contracts and DTOs shared by modules.
+  - `common/security/**` for shared authentication/principal helpers.
   - `common/error/**` for shared API error models/factories/exceptions/handlers.
 - Mirror main packages in `src/test/java/com/legalfam/backend/**`.
 - Do not place business/domain logic in `common/config/**`.
@@ -107,6 +108,7 @@ Current relevant tables:
 - If a class implements an application abstraction using a concrete external system or framework, place it as an outbound adapter.
 - In infrastructure, Spring stereotypes such as `@Service` or `@Component` are bean registration details, not architecture labels. Prefer role-based names such as `Adapter`, `Client`, `Gateway`, `Listener`, `Handler`, `Worker`, `Job`, or `Registry` when the class is not an application service.
 - Do not inject Spring `ApplicationEventPublisher`, HTTP clients, RabbitMQ clients, repositories, or SSE services directly into application services unless there is a deliberate architectural exception.
+- Parse authenticated principals through shared security/API helpers instead of duplicating UUID parsing in controllers.
 
 ## Change Checklist
 

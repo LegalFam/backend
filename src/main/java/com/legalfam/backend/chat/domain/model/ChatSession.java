@@ -1,9 +1,12 @@
 package com.legalfam.backend.chat.domain.model;
 
+import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import java.time.Instant;
 import java.util.UUID;
 
 public class ChatSession {
+
+    private static final int MAX_TITLE_LENGTH = 80;
 
     private UUID id;
     private UUID userId;
@@ -49,5 +52,16 @@ public class ChatSession {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public void rename(String title, Instant now) {
+        if (title == null || title.isBlank()) {
+            throw new InvalidChatRequestException("Session title is required");
+        }
+        String normalized = title.trim();
+        this.title = normalized.length() > MAX_TITLE_LENGTH
+                ? normalized.substring(0, MAX_TITLE_LENGTH)
+                : normalized;
+        this.updatedAt = now;
     }
 }
