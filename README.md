@@ -14,6 +14,39 @@ Spring Boot backend with email/password authentication, JWT access tokens, refre
 - JWT (`io.jsonwebtoken`)
 - Swagger / OpenAPI (`springdoc`)
 
+## Architecture Notes
+
+The backend is organized as a modular hexagonal Spring Boot application under `src/main/java/com/legalfam/backend`.
+
+- Business modules currently include `auth`, `chat`, `payment`, and the planned/related `user` boundary.
+- Shared cross-cutting API/config/error concerns live under `common`.
+- Domain code belongs in `domain`.
+- Use cases, DTOs, events, and ports belong in `application`.
+- Infrastructure code belongs in `infrastructure`.
+- Application ports are split by direction:
+  - `application/port/in` for use cases called by inbound adapters.
+  - `application/port/out` for dependencies implemented by outbound adapters.
+- Infrastructure adapters should be classified by direction:
+  - `infrastructure/adapter/in` for controllers, event processors, listeners, and scheduled workers that trigger application behavior.
+  - `infrastructure/adapter/out` for persistence adapters, external clients, event publishers, catalogs, and gateway implementations.
+- Spring Data repositories and JPA entities remain under `infrastructure/persistence`.
+- Spring configuration remains under `infrastructure/config` or `common/config`.
+
+Project convention: interfaces use the instructor-required `I` prefix, for example `IAuthUseCase`, `IChatPersistencePort`, and `IPaymentGatewayPort`.
+
+For the current architecture review and staged remediation plan, see [`ARCHITECTURE_CODE_REVIEW.md`](ARCHITECTURE_CODE_REVIEW.md).
+
+### Suggested Remediation Order
+
+1. Stabilize package structure and adapter direction.
+2. Restore application-to-infrastructure boundaries.
+3. Reduce cross-module application coupling.
+4. Fix critical payment consistency and webhook security.
+5. Introduce typed validation and configuration.
+6. Improve domain modeling and service cohesion.
+7. Improve API scalability and documentation maintainability.
+8. Add architecture regression tests.
+
 ## Requirements
 
 - JDK 21
