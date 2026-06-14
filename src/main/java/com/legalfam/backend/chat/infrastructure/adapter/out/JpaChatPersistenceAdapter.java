@@ -13,11 +13,17 @@ import com.legalfam.backend.chat.infrastructure.persistence.IChatMessageProcessi
 import com.legalfam.backend.chat.infrastructure.persistence.IChatOutboxEventRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.IChatSessionRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatMessageEntity;
+import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatSessionEntity;
+import com.legalfam.backend.common.cursor.CursorQuery;
+import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -69,11 +75,12 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
     }
 
     @Override
-    public List<ChatSession> findSessionsByUserIdOrderByUpdatedAtDesc(UUID userId) {
-        return IChatSessionRepository.findByUserIdOrderByUpdatedAtDesc(userId)
-                .stream()
-                .map(ChatEntityMapper::toDomain)
-                .toList();
+    public CursorResult<ChatSession> findSessionsByUserIdOrderByUpdatedAtDesc(UUID userId, CursorQuery cursorQuery) {
+        Slice<ChatSessionEntity> page = IChatSessionRepository.findByUserIdOrderByUpdatedAtDesc(
+                userId,
+                OffsetPageRequest.of(cursorQuery.offset(), cursorQuery.size())
+        );
+        return toCursorResult(page, cursorQuery, ChatEntityMapper::toDomain);
     }
 
     @Override
@@ -87,11 +94,12 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
     }
 
     @Override
-    public List<ChatMessage> findMessagesBySessionIdOrderByCreatedAtAsc(UUID sessionId) {
-        return IChatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(sessionId)
-                .stream()
-                .map(ChatEntityMapper::toDomain)
-                .toList();
+    public CursorResult<ChatMessage> findMessagesBySessionIdOrderByCreatedAtAsc(UUID sessionId, CursorQuery cursorQuery) {
+        Slice<ChatMessageEntity> page = IChatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(
+                sessionId,
+                OffsetPageRequest.of(cursorQuery.offset(), cursorQuery.size())
+        );
+        return toCursorResult(page, cursorQuery, ChatEntityMapper::toDomain);
     }
 
     @Override
@@ -178,5 +186,68 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
             Instant threshold
     ) {
         return IChatOutboxEventRepository.deleteByStatusInAndUpdatedAtBefore(statuses, threshold);
+    }
+
+    private <E, D> CursorResult<D> toCursorResult(
+            Slice<E> page,
+            CursorQuery cursorQuery,
+            java.util.function.Function<E, D> mapper
+    ) {
+        return new CursorResult<>(
+                page.getContent().stream().map(mapper).toList(),
+                page.hasNext() ? CursorQuery.nextCursor(cursorQuery.offset() + page.getNumberOfElements()) : null
+        );
+    }
+
+    private record OffsetPageRequest(int offset, int limit) implements Pageable {
+
+        private static OffsetPageRequest of(int offset, int limit) {
+            return new OffsetPageRequest(offset, limit);
+        }
+
+        @Override
+        public int getPageNumber() {
+            return offset / limit;
+        }
+
+        @Override
+        public int getPageSize() {
+            return limit;
+        }
+
+        @Override
+        public long getOffset() {
+            return offset;
+        }
+
+        @Override
+        public Sort getSort() {
+            return Sort.unsorted();
+        }
+
+        @Override
+        public Pageable next() {
+            return new OffsetPageRequest(offset + limit, limit);
+        }
+
+        @Override
+        public Pageable previousOrFirst() {
+            return hasPrevious() ? new OffsetPageRequest(Math.max(offset - limit, 0), limit) : first();
+        }
+
+        @Override
+        public Pageable first() {
+            return new OffsetPageRequest(0, limit);
+        }
+
+        @Override
+        public Pageable withPage(int pageNumber) {
+            return new OffsetPageRequest(pageNumber * limit, limit);
+        }
+
+        @Override
+        public boolean hasPrevious() {
+            return offset > 0;
+        }
     }
 }

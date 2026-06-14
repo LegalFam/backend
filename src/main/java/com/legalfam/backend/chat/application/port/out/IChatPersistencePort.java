@@ -6,6 +6,8 @@ import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatSession;
+import com.legalfam.backend.common.cursor.CursorQuery;
+import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -19,13 +21,13 @@ public interface IChatPersistencePort {
 
     void deleteSessionById(UUID sessionId);
 
-    List<ChatSession> findSessionsByUserIdOrderByUpdatedAtDesc(UUID userId);
+    CursorResult<ChatSession> findSessionsByUserIdOrderByUpdatedAtDesc(UUID userId, CursorQuery cursorQuery);
 
     ChatMessage saveMessage(ChatMessage chatMessage);
 
     Optional<ChatMessage> findMessageById(UUID messageId);
 
-    List<ChatMessage> findMessagesBySessionIdOrderByCreatedAtAsc(UUID sessionId);
+    CursorResult<ChatMessage> findMessagesBySessionIdOrderByCreatedAtAsc(UUID sessionId, CursorQuery cursorQuery);
 
     List<ChatCitation> findCitationsByMessageIdsOrderByMessageIdAndId(List<UUID> messageIds);
 

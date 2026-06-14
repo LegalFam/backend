@@ -24,6 +24,8 @@ import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatSession;
+import com.legalfam.backend.common.cursor.CursorQuery;
+import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -130,19 +132,22 @@ public class ChatService implements IChatUseCase {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ChatSessionResponse> listSessions(UUID userId) {
-        return IChatPersistencePort.findSessionsByUserIdOrderByUpdatedAtDesc(userId).stream()
-                .map(this::toSessionResponse)
-                .toList();
+    public CursorResult<ChatSessionResponse> listSessions(UUID userId, CursorQuery cursorQuery) {
+        return IChatPersistencePort.findSessionsByUserIdOrderByUpdatedAtDesc(userId, cursorQuery)
+                .map(this::toSessionResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ChatMessageResponse> listMessages(UUID userId, UUID sessionId) {
+    public CursorResult<ChatMessageResponse> listMessages(UUID userId, UUID sessionId, CursorQuery cursorQuery) {
         ChatSession session = chatAccessPolicy.requireSessionOwner(userId, sessionId);
-        List<ChatMessage> messages = IChatPersistencePort.findMessagesBySessionIdOrderByCreatedAtAsc(session.getId());
+        CursorResult<ChatMessage> messageBatch = IChatPersistencePort.findMessagesBySessionIdOrderByCreatedAtAsc(
+                session.getId(),
+                cursorQuery
+        );
+        List<ChatMessage> messages = messageBatch.content();
         if (messages.isEmpty()) {
-            return List.of();
+            return messageBatch.map(message -> chatMessageResponseMapper.toResponse(message, Map.of(), Map.of()));
         }
 
         List<UUID> messageIds = messages.stream().map(ChatMessage::getId).toList();
@@ -154,9 +159,7 @@ public class ChatService implements IChatUseCase {
                 .stream()
                 .collect(Collectors.toMap(ChatOutboxEvent::getAggregateId, event -> event));
 
-        return messages.stream()
-                .map(message -> chatMessageResponseMapper.toResponse(message, citationsByMessageId, outboxByMessageId))
-                .toList();
+        return messageBatch.map(message -> chatMessageResponseMapper.toResponse(message, citationsByMessageId, outboxByMessageId));
     }
 
     @Override

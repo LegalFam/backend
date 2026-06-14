@@ -5,7 +5,8 @@ import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
-import java.util.List;
+import com.legalfam.backend.common.cursor.CursorQuery;
+import com.legalfam.backend.common.cursor.CursorResult;
 import java.util.UUID;
 
 public interface IChatUseCase {
@@ -17,9 +18,9 @@ public interface IChatUseCase {
 
     void deleteSession(UUID userId, UUID sessionId);
 
-    List<ChatSessionResponse> listSessions(UUID userId);
+    CursorResult<ChatSessionResponse> listSessions(UUID userId, CursorQuery cursorQuery);
 
-    List<ChatMessageResponse> listMessages(UUID userId, UUID sessionId);
+    CursorResult<ChatMessageResponse> listMessages(UUID userId, UUID sessionId, CursorQuery cursorQuery);
 
     void rateMessage(UUID userId, UUID messageId, ChatRateMessageRequest request);
 

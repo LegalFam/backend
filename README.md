@@ -163,8 +163,8 @@ Token response format:
 - `POST /api/v1/chat/sessions`
 - `GET /api/v1/chat/subscribe/{sessionId}`
 - `POST /api/v1/chat/send`
-- `GET /api/v1/chat/sessions`
-- `GET /api/v1/chat/sessions/{sessionId}/messages`
+- `GET /api/v1/chat/sessions?size=20&cursor=<nextCursor>`
+- `GET /api/v1/chat/sessions/{sessionId}/messages?size=20&cursor=<nextCursor>`
 - `PATCH /api/v1/chat/messages/{messageId}/rating`
 - `PATCH /api/v1/chat/messages/{messageId}/receipt`
 - `GET /api/v1/payments/plans`
@@ -252,6 +252,41 @@ Response format:
   }
 ]
 ```
+
+### List chat sessions (protected, cursor-based)
+
+```bash
+curl "http://localhost:8080/api/v1/chat/sessions?size=20" \
+  -H "Authorization: Bearer <your_access_token>"
+```
+
+Response format:
+
+```json
+{
+  "content": [
+    {
+      "id": "b0a8f12a-a605-4556-bef9-35f7868f7a3a",
+      "title": "Consulta laboral",
+      "createdAt": "2026-05-01T00:00:00Z",
+      "updatedAt": "2026-05-01T00:10:00Z"
+    }
+  ],
+  "nextCursor": "MQ"
+}
+```
+
+Use `nextCursor` as the `cursor` query parameter on the next request. When `nextCursor` is `null`,
+there are no more results. `size` must be between `1` and `100`.
+
+### List chat messages (protected, cursor-based)
+
+```bash
+curl "http://localhost:8080/api/v1/chat/sessions/<sessionId>/messages?size=20" \
+  -H "Authorization: Bearer <your_access_token>"
+```
+
+The response uses the same cursor envelope as chat sessions, with chat messages in `content`.
 
 ### Get subscription + token status (protected)
 

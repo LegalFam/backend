@@ -22,6 +22,8 @@ import com.legalfam.backend.chat.infrastructure.api.handler.ChatExceptionHandler
 import com.legalfam.backend.chat.application.service.ChatService;
 import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
 import com.legalfam.backend.common.error.handler.GlobalExceptionHandler;
+import com.legalfam.backend.common.cursor.CursorQuery;
+import com.legalfam.backend.common.cursor.CursorResult;
 import com.legalfam.backend.common.security.AuthenticatedUserResolver;
 import java.time.Instant;
 import java.util.List;
@@ -183,16 +185,17 @@ class ChatControllerTest {
         UUID sessionId = UUID.randomUUID();
         authenticateAs(userId.toString());
 
-        when(chatService.listSessions(userId))
-                .thenReturn(List.of(new ChatSessionResponse(
+        when(chatService.listSessions(eq(userId), eq(CursorQuery.of(null, 20))))
+                .thenReturn(new CursorResult<>(List.of(new ChatSessionResponse(
                         sessionId,
                         Instant.parse("2026-01-01T00:00:00Z"),
                         Instant.parse("2026-01-01T00:10:00Z")
-                )));
+                )), "MQ"));
 
         mockMvc.perform(get("/api/v1/chat/sessions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id", is(sessionId.toString())));
+                .andExpect(jsonPath("$.content[0].id", is(sessionId.toString())))
+                .andExpect(jsonPath("$.nextCursor", is("MQ")));
     }
 
     @Test
@@ -202,8 +205,8 @@ class ChatControllerTest {
         UUID messageId = UUID.randomUUID();
         authenticateAs(userId.toString());
 
-        when(chatService.listMessages(userId, sessionId))
-                .thenReturn(List.of(new ChatMessageResponse(
+        when(chatService.listMessages(eq(userId), eq(sessionId), eq(CursorQuery.of(null, 20))))
+                .thenReturn(new CursorResult<>(List.of(new ChatMessageResponse(
                         messageId,
                         "ASSISTANT",
                         "Hola",
@@ -218,16 +221,16 @@ class ChatControllerTest {
                         true,
                         "PUBLISHED",
                         null
-                )));
+                )), null));
 
         mockMvc.perform(get("/api/v1/chat/sessions/{sessionId}/messages", sessionId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id", is(messageId.toString())))
-                .andExpect(jsonPath("$[0].role", is("ASSISTANT")))
-                .andExpect(jsonPath("$[0].content", is("Hola")))
-                .andExpect(jsonPath("$[0].rating", is(5)))
-                .andExpect(jsonPath("$[0].receiptStatus", is("PUBLISHED")))
-                .andExpect(jsonPath("$[0].citations[0].sourceUrl", is("https://example.com/ley")));
+                .andExpect(jsonPath("$.content[0].id", is(messageId.toString())))
+                .andExpect(jsonPath("$.content[0].role", is("ASSISTANT")))
+                .andExpect(jsonPath("$.content[0].content", is("Hola")))
+                .andExpect(jsonPath("$.content[0].rating", is(5)))
+                .andExpect(jsonPath("$.content[0].receiptStatus", is("PUBLISHED")))
+                .andExpect(jsonPath("$.content[0].citations[0].sourceUrl", is("https://example.com/ley")));
     }
 
     @Test

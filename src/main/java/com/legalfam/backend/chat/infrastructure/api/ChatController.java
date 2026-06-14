@@ -10,18 +10,17 @@ import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
 import com.legalfam.backend.common.error.ApiError;
+import com.legalfam.backend.common.openapi.ProtectedApiOperation;
+import com.legalfam.backend.common.cursor.CursorQuery;
+import com.legalfam.backend.common.cursor.CursorResponse;
 import com.legalfam.backend.common.security.AuthenticatedUserResolver;
-import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +34,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -61,14 +61,9 @@ public class ChatController {
     }
 
     @GetMapping(value = "/chat/subscribe/{sessionId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "Subscribe to chat updates using SSE")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Subscribe to chat updates using SSE")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "SSE subscription established"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "404", description = "Session not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
@@ -83,15 +78,10 @@ public class ChatController {
     }
 
     @PostMapping("/chat/sessions")
-    @Operation(summary = "Create a new chat session")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Create a new chat session")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Session created",
-                    content = @Content(schema = @Schema(implementation = ChatSessionResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+                    content = @Content(schema = @Schema(implementation = ChatSessionResponse.class)))
     })
     public ResponseEntity<ChatSessionResponse> createSession(@AuthenticationPrincipal String principalUserId) {
         UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
@@ -99,16 +89,11 @@ public class ChatController {
     }
 
     @PatchMapping("/chat/sessions/{sessionId}")
-    @Operation(summary = "Update a chat session")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Update a chat session")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Session updated",
                     content = @Content(schema = @Schema(implementation = ChatSessionResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "404", description = "Session not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -123,14 +108,9 @@ public class ChatController {
     }
 
     @DeleteMapping("/chat/sessions/{sessionId}")
-    @Operation(summary = "Delete a chat session")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Delete a chat session")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Session deleted"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "404", description = "Session not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
@@ -144,18 +124,13 @@ public class ChatController {
     }
 
     @PostMapping("/chat/send")
-    @Operation(summary = "Send message for asynchronous chat processing")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Send message for asynchronous chat processing")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "202", description = "Message accepted for processing",
                     content = @Content(schema = @Schema(implementation = ChatSendAcceptedResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "409", description = "Assistant receipt confirmation is still pending",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<ChatSendAcceptedResponse> send(
@@ -178,52 +153,45 @@ public class ChatController {
     }
 
     @GetMapping("/chat/sessions")
-    @Operation(summary = "List chat sessions for authenticated user")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "List chat sessions for authenticated user")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Sessions fetched",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ChatSessionResponse.class)))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+                    content = @Content(schema = @Schema(implementation = CursorResponse.class)))
     })
-    public ResponseEntity<List<ChatSessionResponse>> listSessions(@AuthenticationPrincipal String principalUserId) {
+    public ResponseEntity<CursorResponse<ChatSessionResponse>> listSessions(
+            @AuthenticationPrincipal String principalUserId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") int size
+    ) {
         UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
-        return ResponseEntity.ok(IChatUseCase.listSessions(userId));
+        return ResponseEntity.ok(CursorResponse.from(IChatUseCase.listSessions(userId, cursorQuery(cursor, size))));
     }
 
     @GetMapping("/chat/sessions/{sessionId}/messages")
-    @Operation(summary = "List messages for a chat session")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "List messages for a chat session")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Messages fetched",
-                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ChatMessageResponse.class)))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
+                    content = @Content(schema = @Schema(implementation = CursorResponse.class))),
             @ApiResponse(responseCode = "404", description = "Session not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
-    public ResponseEntity<List<ChatMessageResponse>> listMessages(
+    public ResponseEntity<CursorResponse<ChatMessageResponse>> listMessages(
             @AuthenticationPrincipal String principalUserId,
-            @PathVariable("sessionId") @Parameter(description = "Chat session id") UUID sessionId
+            @PathVariable("sessionId") @Parameter(description = "Chat session id") UUID sessionId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") int size
     ) {
         UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
-        return ResponseEntity.ok(IChatUseCase.listMessages(userId, sessionId));
+        return ResponseEntity.ok(CursorResponse.from(
+                IChatUseCase.listMessages(userId, sessionId, cursorQuery(cursor, size))
+        ));
     }
 
     @PatchMapping("/chat/messages/{messageId}/rating")
-    @Operation(summary = "Rate a chat message")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Rate a chat message")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Rating updated"),
             @ApiResponse(responseCode = "400", description = "Invalid request",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "404", description = "Message not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -239,15 +207,10 @@ public class ChatController {
     }
 
     @PatchMapping("/chat/messages/{messageId}/receipt")
-    @Operation(summary = "Confirm assistant message receipt")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Confirm assistant message receipt")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Receipt confirmed"),
             @ApiResponse(responseCode = "400", description = "Invalid request",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "404", description = "Message not found",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
@@ -259,6 +222,14 @@ public class ChatController {
         UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         IChatUseCase.confirmAssistantReceipt(userId, messageId);
         return ResponseEntity.noContent().build();
+    }
+
+    private CursorQuery cursorQuery(String cursor, int size) {
+        try {
+            return CursorQuery.of(cursor, size);
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidChatRequestException(ex.getMessage());
+        }
     }
 
 }

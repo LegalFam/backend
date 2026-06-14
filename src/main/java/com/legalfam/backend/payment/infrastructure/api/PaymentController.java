@@ -1,6 +1,7 @@
 package com.legalfam.backend.payment.infrastructure.api;
 
 import com.legalfam.backend.common.error.ApiError;
+import com.legalfam.backend.common.openapi.ProtectedApiOperation;
 import com.legalfam.backend.common.security.AuthenticatedUserResolver;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionRequest;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionResponse;
@@ -14,7 +15,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -52,15 +52,10 @@ public class PaymentController {
     }
 
     @GetMapping("/subscription")
-    @Operation(summary = "Get current subscription and token status")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Get current subscription and token status")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Subscription fetched",
-                    content = @Content(schema = @Schema(implementation = PaymentSubscriptionResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
-                    content = @Content(schema = @Schema(implementation = ApiError.class)))
+                    content = @Content(schema = @Schema(implementation = PaymentSubscriptionResponse.class)))
     })
     public ResponseEntity<PaymentSubscriptionResponse> getSubscription(
             @AuthenticationPrincipal String principalUserId
@@ -69,16 +64,11 @@ public class PaymentController {
     }
 
     @PostMapping("/checkout-sessions")
-    @Operation(summary = "Create a Mercado Pago checkout link for a paid subscription")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Create a Mercado Pago checkout link for a paid subscription")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Checkout session created",
                     content = @Content(schema = @Schema(implementation = CreateCheckoutSessionResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<CreateCheckoutSessionResponse> createCheckoutSession(
@@ -92,15 +82,10 @@ public class PaymentController {
     }
 
     @PostMapping("/subscription/cancel")
-    @Operation(summary = "Cancel the current Mercado Pago subscription")
-    @SecurityRequirement(name = "bearerAuth")
+    @ProtectedApiOperation(summary = "Cancel the current Mercado Pago subscription")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "204", description = "Subscription canceled"),
             @ApiResponse(responseCode = "400", description = "Invalid request",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized",
-                    content = @Content(schema = @Schema(implementation = ApiError.class))),
-            @ApiResponse(responseCode = "403", description = "Forbidden",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })
     public ResponseEntity<Void> cancelSubscription(@AuthenticationPrincipal String principalUserId) {

@@ -100,6 +100,8 @@ Current relevant tables:
 - Keep responses explicit with proper HTTP status codes.
 - Avoid leaking internal exceptions/messages to clients.
 - Application services should depend on project-owned ports, not concrete infrastructure implementations.
+- Use cursor responses for list endpoints that can grow with user activity.
+- Use shared OpenAPI annotations for common protected endpoint responses.
 - Use Bean Validation annotations on request DTOs and `@Valid` at controller request-body boundaries.
 - Use typed `@ConfigurationProperties` for application settings instead of scattered `@Value` injection.
 - Avoid direct application-layer dependencies between business modules. Prefer common events or neutral common/module-owned ports for cross-module collaboration.

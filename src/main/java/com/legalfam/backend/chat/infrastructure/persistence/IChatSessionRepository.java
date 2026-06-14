@@ -1,11 +1,12 @@
 package com.legalfam.backend.chat.infrastructure.persistence;
 
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatSessionEntity;
-import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface IChatSessionRepository extends JpaRepository<ChatSessionEntity, UUID> {
-    List<ChatSessionEntity> findByUserIdOrderByUpdatedAtDesc(UUID userId);
+    Slice<ChatSessionEntity> findByUserIdOrderByUpdatedAtDesc(UUID userId, Pageable pageable);
 }
 

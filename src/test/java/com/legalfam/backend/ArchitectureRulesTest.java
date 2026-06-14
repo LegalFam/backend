@@ -30,6 +30,33 @@ class ArchitectureRulesTest {
             .should().dependOnClassesThat().resideInAPackage("..infrastructure..");
 
     @ArchTest
+    static final ArchRule api_must_not_depend_on_persistence = noClasses()
+            .that().resideInAPackage("..infrastructure.api..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "..infrastructure.persistence..",
+                    "..infrastructure.persistence.entity.."
+            );
+
+    @ArchTest
+    static final ArchRule domain_must_not_depend_on_application_dtos = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAPackage("..application.dto..");
+
+    @ArchTest
+    static final ArchRule inbound_adapters_must_not_depend_on_outbound_adapters = noClasses()
+            .that().resideInAPackage("..infrastructure.adapter.in..")
+            .should().dependOnClassesThat().resideInAPackage("..infrastructure.adapter.out..");
+
+    @ArchTest
+    static final ArchRule outbound_adapters_must_not_depend_on_inbound_adapters = noClasses()
+            .that().resideInAPackage("..infrastructure.adapter.out..")
+            .should().dependOnClassesThat().resideInAPackage("..infrastructure.adapter.in..");
+
+    @ArchTest
+    static final ArchRule infrastructure_must_not_use_integration_packages = noClasses()
+            .should().resideInAPackage("..infrastructure.integration..");
+
+    @ArchTest
     static final ArchRule auth_application_must_not_depend_on_other_applications = noClasses()
             .that().resideInAPackage("com.legalfam.backend.auth.application..")
             .should().dependOnClassesThat().resideInAnyPackage(
