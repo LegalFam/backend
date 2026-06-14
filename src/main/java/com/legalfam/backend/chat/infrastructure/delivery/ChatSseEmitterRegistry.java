@@ -89,7 +89,6 @@ public class ChatSseEmitterRegistry implements IChatAssistantDeliveryPort {
         } catch (IOException | IllegalStateException ex) {
             log.info("Failed to dispatch SSE event for userId={} sessionId={}: {}", userId, sessionId, ex.getMessage());
             removeEmitter(userId, sessionId, emitter);
-            emitter.completeWithError(ex);
             return false;
         }
     }
@@ -117,7 +116,6 @@ public class ChatSseEmitterRegistry implements IChatAssistantDeliveryPort {
         } catch (IOException | IllegalStateException ex) {
             log.info("Failed to dispatch SSE error event for userId={} sessionId={}: {}", userId, sessionId, ex.getMessage());
             removeEmitter(userId, sessionId, emitter);
-            emitter.completeWithError(ex);
             return false;
         }
     }
@@ -131,7 +129,7 @@ public class ChatSseEmitterRegistry implements IChatAssistantDeliveryPort {
         try {
             sendHeartbeats();
         } catch (RuntimeException ex) {
-            log.warn("Failed to emit SSE heartbeat", ex);
+            log.debug("Failed to emit SSE heartbeat", ex);
         }
     }
 
@@ -141,8 +139,11 @@ public class ChatSseEmitterRegistry implements IChatAssistantDeliveryPort {
                     try {
                         emitter.send(SseEmitter.event().name("heartbeat").data("ping"));
                     } catch (IOException | IllegalStateException ex) {
+                        log.debug("Removing closed SSE emitter for userId={} sessionId={}: {}",
+                                userId,
+                                sessionId,
+                                ex.getMessage());
                         removeEmitter(userId, sessionId, emitter);
-                        emitter.completeWithError(ex);
                     }
                 }));
     }
