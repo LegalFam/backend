@@ -23,9 +23,9 @@ public class ChatMessage {
     private ChatMessage() {
     }
 
-    public static ChatMessage userMessage(UUID id, UUID chatSessionId, String content, Instant createdAt) {
+    public static ChatMessage userMessage(UUID chatSessionId, String content, Instant createdAt) {
         ChatMessage message = new ChatMessage();
-        message.id = id;
+        message.id = UUID.randomUUID();
         message.chatSessionId = chatSessionId;
         message.role = ChatMessageRole.USER;
         message.content = content;
@@ -35,6 +35,7 @@ public class ChatMessage {
 
     public static ChatMessage assistantMessage(UUID chatSessionId, String content, Instant createdAt) {
         ChatMessage message = new ChatMessage();
+        message.id = UUID.randomUUID();
         message.chatSessionId = chatSessionId;
         message.role = ChatMessageRole.ASSISTANT;
         message.content = content;
@@ -44,6 +45,7 @@ public class ChatMessage {
 
     public static ChatMessage systemMessage(UUID chatSessionId, String content, Instant createdAt) {
         ChatMessage message = new ChatMessage();
+        message.id = UUID.randomUUID();
         message.chatSessionId = chatSessionId;
         message.role = ChatMessageRole.SYSTEM;
         message.content = content;

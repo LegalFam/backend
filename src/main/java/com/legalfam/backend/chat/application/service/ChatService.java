@@ -74,7 +74,7 @@ public class ChatService implements IChatUseCase {
         }
         Instant now = Instant.now();
 
-        ChatMessage userMessage = ChatMessage.userMessage(UUID.randomUUID(), chatSession.getId(), messageInput, now);
+        ChatMessage userMessage = ChatMessage.userMessage(chatSession.getId(), messageInput, now);
 
         IChatTokenPort.consumeChatToken(userId, userMessage.getId());
         userMessage = IChatPersistencePort.saveMessage(userMessage);

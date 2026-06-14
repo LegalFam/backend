@@ -30,7 +30,6 @@ class ChatMessageTest {
     void submitFeedbackRejectsUserMessages() {
         ChatMessage message = ChatMessage.userMessage(
                 UUID.randomUUID(),
-                UUID.randomUUID(),
                 "question",
                 Instant.parse("2026-01-01T00:00:00Z")
         );
