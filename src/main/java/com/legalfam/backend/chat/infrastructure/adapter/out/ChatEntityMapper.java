@@ -22,13 +22,13 @@ final class ChatEntityMapper {
     }
 
     static ChatSession toDomain(ChatSessionEntity entity) {
-        ChatSession session = new ChatSession();
-        session.setId(entity.getId());
-        session.setUserId(entity.getUserId());
-        session.setTitle(entity.getTitle());
-        session.setCreatedAt(entity.getCreatedAt());
-        session.setUpdatedAt(entity.getUpdatedAt());
-        return session;
+        return ChatSession.rehydrate(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getTitle(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
     }
 
     static ChatSessionEntity toEntity(ChatSession domain) {
@@ -42,20 +42,20 @@ final class ChatEntityMapper {
     }
 
     static ChatMessage toDomain(ChatMessageEntity entity) {
-        ChatMessage message = new ChatMessage();
-        message.setId(entity.getId());
-        message.setChatSessionId(entity.getChatSessionId());
-        message.setRole(entity.getRole());
-        message.setContent(entity.getContent());
-        message.setRating(entity.getRating());
-        message.setFeedbackComment(entity.getFeedbackComment());
-        message.setFeedbackSubmittedAt(entity.getFeedbackSubmittedAt());
-        message.setConfidenceStatus(entity.getConfidenceStatus());
-        message.setConfidenceReason(entity.getConfidenceReason());
-        message.setNextSteps(readStringList(entity.getNextSteps()));
-        message.setSpecialistSupportRecommended(entity.getSpecialistSupportRecommended());
-        message.setCreatedAt(entity.getCreatedAt());
-        return message;
+        return ChatMessage.rehydrate(
+                entity.getId(),
+                entity.getChatSessionId(),
+                entity.getRole(),
+                entity.getContent(),
+                entity.getRating(),
+                entity.getFeedbackComment(),
+                entity.getFeedbackSubmittedAt(),
+                entity.getConfidenceStatus(),
+                entity.getConfidenceReason(),
+                readStringList(entity.getNextSteps()),
+                entity.getSpecialistSupportRecommended(),
+                entity.getCreatedAt()
+        );
     }
 
     static ChatMessageEntity toEntity(ChatMessage domain) {

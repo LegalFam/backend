@@ -74,12 +74,7 @@ public class ChatService implements IChatUseCase {
         }
         Instant now = Instant.now();
 
-        ChatMessage userMessage = new ChatMessage();
-        userMessage.setId(UUID.randomUUID());
-        userMessage.setChatSessionId(chatSession.getId());
-        userMessage.setRole(ChatMessageRole.USER);
-        userMessage.setContent(messageInput);
-        userMessage.setCreatedAt(now);
+        ChatMessage userMessage = ChatMessage.userMessage(UUID.randomUUID(), chatSession.getId(), messageInput, now);
 
         IChatTokenPort.consumeChatToken(userId, userMessage.getId());
         userMessage = IChatPersistencePort.saveMessage(userMessage);
@@ -91,7 +86,7 @@ public class ChatService implements IChatUseCase {
         messageProcessing.setUpdatedAt(now);
         IChatPersistencePort.saveMessageProcessing(messageProcessing);
 
-        chatSession.setUpdatedAt(now);
+        chatSession.touch(now);
         IChatPersistencePort.saveSession(chatSession);
         IChatEventPublisherPort.publishMessageQueued(new ChatMessageQueuedEvent(chatSession.getId(), userMessage.getId(), messageInput));
 
@@ -103,10 +98,7 @@ public class ChatService implements IChatUseCase {
     public ChatSessionResponse createSession(UUID userId) {
         chatAccessPolicy.assertUserExists(userId);
         Instant now = Instant.now();
-        ChatSession session = new ChatSession();
-        session.setUserId(userId);
-        session.setCreatedAt(now);
-        session.setUpdatedAt(now);
+        ChatSession session = ChatSession.create(userId, now);
         session = IChatPersistencePort.saveSession(session);
         return toSessionResponse(session);
     }
@@ -195,7 +187,7 @@ public class ChatService implements IChatUseCase {
         outboxEvent.setUpdatedAt(now);
         IChatPersistencePort.saveOutboxEvent(outboxEvent);
 
-        messageSession.setUpdatedAt(now);
+        messageSession.touch(now);
         IChatPersistencePort.saveSession(messageSession);
     }
 

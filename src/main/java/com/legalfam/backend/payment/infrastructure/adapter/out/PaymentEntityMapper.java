@@ -15,22 +15,22 @@ final class PaymentEntityMapper {
     }
 
     static Subscription toDomain(SubscriptionEntity entity) {
-        Subscription subscription = new Subscription();
-        subscription.setId(entity.getId());
-        subscription.setUserId(entity.getUserId());
-        subscription.setPlanCode(SubscriptionPlanCode.valueOf(entity.getPlanCode()));
-        subscription.setStatus(SubscriptionStatus.valueOf(entity.getStatus()));
-        subscription.setProvider(PaymentProvider.valueOf(entity.getProvider()));
-        subscription.setGatewayCustomerId(entity.getGatewayCustomerId());
-        subscription.setGatewaySubscriptionId(entity.getGatewaySubscriptionId());
-        subscription.setCurrentPeriodStart(entity.getCurrentPeriodStart());
-        subscription.setCurrentPeriodEnd(entity.getCurrentPeriodEnd());
-        subscription.setCancelAtPeriodEnd(entity.isCancelAtPeriodEnd());
-        subscription.setMonthlyTokenLimit(entity.getMonthlyTokenLimit());
-        subscription.setRemainingTokens(entity.getRemainingTokens());
-        subscription.setCreatedAt(entity.getCreatedAt());
-        subscription.setUpdatedAt(entity.getUpdatedAt());
-        return subscription;
+        return Subscription.rehydrate(
+                entity.getId(),
+                entity.getUserId(),
+                SubscriptionPlanCode.valueOf(entity.getPlanCode()),
+                SubscriptionStatus.valueOf(entity.getStatus()),
+                PaymentProvider.valueOf(entity.getProvider()),
+                entity.getGatewayCustomerId(),
+                entity.getGatewaySubscriptionId(),
+                entity.getCurrentPeriodStart(),
+                entity.getCurrentPeriodEnd(),
+                entity.isCancelAtPeriodEnd(),
+                entity.getMonthlyTokenLimit(),
+                entity.getRemainingTokens(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
     }
 
     static SubscriptionEntity toEntity(Subscription domain) {

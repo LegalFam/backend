@@ -60,7 +60,17 @@ This document describes how contributors (human or AI agents) should work in thi
 
 ### Protected
 
-- Any other endpoints under `/api/v1/**` not listed above
+- `POST /api/v1/chat/sessions`
+- `GET /api/v1/chat/subscribe/{sessionId}`
+- `POST /api/v1/chat/send`
+- `GET /api/v1/chat/sessions?size={size}&cursor={nextCursor}`
+- `GET /api/v1/chat/sessions/{sessionId}/messages?size={size}&cursor={nextCursor}`
+- `PATCH /api/v1/chat/messages/{messageId}/rating`
+- `PATCH /api/v1/chat/messages/{messageId}/receipt`
+- `GET /api/v1/payments/subscription`
+- `POST /api/v1/payments/checkout-sessions`
+- `POST /api/v1/payments/subscription/cancel`
+- Any other endpoints under `/api/v1/**` not listed as public
 
 ## Security Expectations
 
@@ -105,6 +115,7 @@ Current relevant tables:
 - Use Bean Validation annotations on request DTOs and `@Valid` at controller request-body boundaries.
 - Use typed `@ConfigurationProperties` for application settings instead of scattered `@Value` injection.
 - Avoid direct application-layer dependencies between business modules. Prefer common events or neutral common/module-owned ports for cross-module collaboration.
+- Prefer domain factories and explicit behavior methods over public setters for business invariants.
 - Prefer trigger-specific names such as `Listener`, `Handler`, `Worker`, or `Job` over generic `Processor` names for inbound adapters.
 - If an infrastructure handler/listener depends only on application abstractions and reacts to a technical trigger, place it as an inbound adapter.
 - If a class implements an application abstraction using a concrete external system or framework, place it as an outbound adapter.

@@ -156,6 +156,7 @@ Token response format:
 - `POST /api/v1/auth/signup`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
+- `GET /api/v1/payments/plans`
 - `POST /api/v1/payments/webhook/mercado-pago`
 
 ### Protected endpoints (Bearer token required)
@@ -163,11 +164,10 @@ Token response format:
 - `POST /api/v1/chat/sessions`
 - `GET /api/v1/chat/subscribe/{sessionId}`
 - `POST /api/v1/chat/send`
-- `GET /api/v1/chat/sessions?size=20&cursor=<nextCursor>`
-- `GET /api/v1/chat/sessions/{sessionId}/messages?size=20&cursor=<nextCursor>`
+- `GET /api/v1/chat/sessions?size={size}&cursor={nextCursor}`
+- `GET /api/v1/chat/sessions/{sessionId}/messages?size={size}&cursor={nextCursor}`
 - `PATCH /api/v1/chat/messages/{messageId}/rating`
 - `PATCH /api/v1/chat/messages/{messageId}/receipt`
-- `GET /api/v1/payments/plans`
 - `GET /api/v1/payments/subscription`
 - `POST /api/v1/payments/checkout-sessions`
 - `POST /api/v1/payments/subscription/cancel`
@@ -221,12 +221,13 @@ Response format:
 }
 ```
 
-### List available plans (protected)
+### List available plans (public)
 
 ```bash
-curl http://localhost:8080/api/v1/payments/plans \
-  -H "Authorization: Bearer <your_access_token>"
+curl http://localhost:8080/api/v1/payments/plans
 ```
+
+Authenticated users may also send a Bearer token so the response can mark the current plan.
 
 Response format:
 
@@ -257,6 +258,13 @@ Response format:
 
 ```bash
 curl "http://localhost:8080/api/v1/chat/sessions?size=20" \
+  -H "Authorization: Bearer <your_access_token>"
+```
+
+For the next batch, call:
+
+```bash
+curl "http://localhost:8080/api/v1/chat/sessions?size=20&cursor=<nextCursor>" \
   -H "Authorization: Bearer <your_access_token>"
 ```
 

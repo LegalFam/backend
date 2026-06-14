@@ -96,18 +96,14 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         }
 
         Instant now = Instant.now();
-        ChatMessage assistantMessage = new ChatMessage();
-        assistantMessage.setChatSessionId(chatSession.getId());
-        assistantMessage.setRole(ChatMessageRole.ASSISTANT);
-        assistantMessage.setContent(assistantMessageText);
+        ChatMessage assistantMessage = ChatMessage.assistantMessage(chatSession.getId(), assistantMessageText, now);
         applyMetadata(assistantMessage, metadata);
-        assistantMessage.setCreatedAt(now);
         assistantMessage = IChatPersistencePort.saveMessage(assistantMessage);
 
         persistCitations(assistantMessage, citations);
         markUserMessageCompleted(userMessageId, now);
 
-        chatSession.setUpdatedAt(now);
+        chatSession.touch(now);
         IChatPersistencePort.saveSession(chatSession);
 
         ChatAssistantMessageEvent assistantMessageEvent = new ChatAssistantMessageEvent(
@@ -152,15 +148,11 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         }
 
         Instant now = Instant.now();
-        ChatMessage failureMessage = new ChatMessage();
-        failureMessage.setChatSessionId(chatSession.getId());
-        failureMessage.setRole(ChatMessageRole.SYSTEM);
-        failureMessage.setContent(errorMessage);
-        failureMessage.setCreatedAt(now);
+        ChatMessage failureMessage = ChatMessage.systemMessage(chatSession.getId(), errorMessage, now);
         failureMessage = IChatPersistencePort.saveMessage(failureMessage);
         markUserMessageFailed(userMessageId, errorCode, errorMessage, now);
 
-        chatSession.setUpdatedAt(now);
+        chatSession.touch(now);
         IChatPersistencePort.saveSession(chatSession);
         IChatTokenPort.refundChatToken(userMessageId);
 
@@ -221,14 +213,12 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
 
     private void applyMetadata(ChatMessage assistantMessage, ChatAssistantMetadata metadata) {
         ChatAssistantMetadata safeMetadata = metadata == null ? ChatAssistantMetadata.empty() : metadata;
-        assistantMessage.setConfidenceStatus(blankToNull(safeMetadata.confidenceStatus()));
-        assistantMessage.setConfidenceReason(blankToNull(safeMetadata.confidenceReason()));
-        assistantMessage.setNextSteps(safeMetadata.nextSteps());
-        assistantMessage.setSpecialistSupportRecommended(safeMetadata.specialistSupportRecommended());
-    }
-
-    private String blankToNull(String value) {
-        return value == null || value.isBlank() ? null : value.trim();
+        assistantMessage.applyAssistantMetadata(
+                safeMetadata.confidenceStatus(),
+                safeMetadata.confidenceReason(),
+                safeMetadata.nextSteps(),
+                safeMetadata.specialistSupportRecommended()
+        );
     }
 
     private void markUserMessageCompleted(UUID userMessageId, Instant now) {

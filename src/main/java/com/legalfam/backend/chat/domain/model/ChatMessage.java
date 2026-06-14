@@ -20,100 +20,128 @@ public class ChatMessage {
     private Boolean specialistSupportRecommended;
     private Instant createdAt;
 
-    public UUID getId() {
-        return id;
+    private ChatMessage() {
     }
 
-    public void setId(UUID id) {
-        this.id = id;
+    public static ChatMessage userMessage(UUID id, UUID chatSessionId, String content, Instant createdAt) {
+        ChatMessage message = new ChatMessage();
+        message.id = id;
+        message.chatSessionId = chatSessionId;
+        message.role = ChatMessageRole.USER;
+        message.content = content;
+        message.createdAt = createdAt;
+        return message;
+    }
+
+    public static ChatMessage assistantMessage(UUID chatSessionId, String content, Instant createdAt) {
+        ChatMessage message = new ChatMessage();
+        message.chatSessionId = chatSessionId;
+        message.role = ChatMessageRole.ASSISTANT;
+        message.content = content;
+        message.createdAt = createdAt;
+        return message;
+    }
+
+    public static ChatMessage systemMessage(UUID chatSessionId, String content, Instant createdAt) {
+        ChatMessage message = new ChatMessage();
+        message.chatSessionId = chatSessionId;
+        message.role = ChatMessageRole.SYSTEM;
+        message.content = content;
+        message.createdAt = createdAt;
+        return message;
+    }
+
+    public static ChatMessage rehydrate(
+            UUID id,
+            UUID chatSessionId,
+            ChatMessageRole role,
+            String content,
+            Integer rating,
+            String feedbackComment,
+            Instant feedbackSubmittedAt,
+            String confidenceStatus,
+            String confidenceReason,
+            List<String> nextSteps,
+            Boolean specialistSupportRecommended,
+            Instant createdAt
+    ) {
+        ChatMessage message = new ChatMessage();
+        message.id = id;
+        message.chatSessionId = chatSessionId;
+        message.role = role;
+        message.content = content;
+        message.rating = rating;
+        message.feedbackComment = feedbackComment;
+        message.feedbackSubmittedAt = feedbackSubmittedAt;
+        message.confidenceStatus = confidenceStatus;
+        message.confidenceReason = confidenceReason;
+        message.nextSteps = nextSteps == null ? List.of() : List.copyOf(nextSteps);
+        message.specialistSupportRecommended = specialistSupportRecommended;
+        message.createdAt = createdAt;
+        return message;
+    }
+
+    public UUID getId() {
+        return id;
     }
 
     public UUID getChatSessionId() {
         return chatSessionId;
     }
 
-    public void setChatSessionId(UUID chatSessionId) {
-        this.chatSessionId = chatSessionId;
-    }
-
     public ChatMessageRole getRole() {
         return role;
-    }
-
-    public void setRole(ChatMessageRole role) {
-        this.role = role;
     }
 
     public String getContent() {
         return content;
     }
 
-    public void setContent(String content) {
-        this.content = content;
-    }
-
     public Integer getRating() {
         return rating;
-    }
-
-    public void setRating(Integer rating) {
-        this.rating = rating;
     }
 
     public String getFeedbackComment() {
         return feedbackComment;
     }
 
-    public void setFeedbackComment(String feedbackComment) {
-        this.feedbackComment = feedbackComment;
-    }
-
     public Instant getFeedbackSubmittedAt() {
         return feedbackSubmittedAt;
-    }
-
-    public void setFeedbackSubmittedAt(Instant feedbackSubmittedAt) {
-        this.feedbackSubmittedAt = feedbackSubmittedAt;
     }
 
     public String getConfidenceStatus() {
         return confidenceStatus;
     }
 
-    public void setConfidenceStatus(String confidenceStatus) {
-        this.confidenceStatus = confidenceStatus;
-    }
-
     public String getConfidenceReason() {
         return confidenceReason;
-    }
-
-    public void setConfidenceReason(String confidenceReason) {
-        this.confidenceReason = confidenceReason;
     }
 
     public List<String> getNextSteps() {
         return nextSteps;
     }
 
-    public void setNextSteps(List<String> nextSteps) {
-        this.nextSteps = nextSteps == null ? List.of() : nextSteps;
-    }
-
     public Boolean getSpecialistSupportRecommended() {
         return specialistSupportRecommended;
-    }
-
-    public void setSpecialistSupportRecommended(Boolean specialistSupportRecommended) {
-        this.specialistSupportRecommended = specialistSupportRecommended;
     }
 
     public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
+    public void applyAssistantMetadata(
+            String confidenceStatus,
+            String confidenceReason,
+            List<String> nextSteps,
+            Boolean specialistSupportRecommended
+    ) {
+        if (role != ChatMessageRole.ASSISTANT) {
+            throw new InvalidChatRequestException("Metadata can only be applied to assistant messages");
+        }
+        this.confidenceStatus = normalizeBlank(confidenceStatus);
+        this.confidenceReason = normalizeBlank(confidenceReason);
+        this.nextSteps = nextSteps == null ? List.of() : List.copyOf(nextSteps);
+        this.specialistSupportRecommended = specialistSupportRecommended;
     }
 
     public void submitFeedback(int rating, String comment, Instant submittedAt) {
@@ -137,5 +165,9 @@ public class ChatMessage {
             throw new InvalidChatRequestException("Feedback comment must be at most 1000 characters");
         }
         return normalized;
+    }
+
+    private String normalizeBlank(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

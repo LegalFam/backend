@@ -71,6 +71,14 @@ Common errors:
 - `400` refresh token missing
 - `401` invalid/expired/revoked refresh token
 
+## Public Endpoints
+
+- `POST /api/v1/auth/signup`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/refresh`
+- `GET /api/v1/payments/plans`
+- `POST /api/v1/payments/webhook/mercado-pago`
+
 ## Protected Endpoints
 
 Use header:
@@ -78,10 +86,23 @@ Use header:
 Authorization: Bearer <accessToken>
 ```
 
+- `GET /api/v1/payments/subscription`
+- `POST /api/v1/payments/checkout-sessions`
+- `POST /api/v1/payments/subscription/cancel`
+- `POST /api/v1/chat/sessions`
+- `PATCH /api/v1/chat/sessions/{sessionId}`
+- `DELETE /api/v1/chat/sessions/{sessionId}`
+- `GET /api/v1/chat/subscribe/{sessionId}`
+- `GET /api/v1/chat/sessions?size={size}&cursor={nextCursor}`
+- `GET /api/v1/chat/sessions/{sessionId}/messages?size={size}&cursor={nextCursor}`
+- `POST /api/v1/chat/send`
+- `PATCH /api/v1/chat/messages/{messageId}/rating`
+- `PATCH /api/v1/chat/messages/{messageId}/receipt`
+
 ## Payments
 
 ### `GET /api/v1/payments/plans`
-Return the available plans. Authentication is optional; authenticated requests include `currentPlan`.
+Return the available plans. This endpoint is public. Authentication is optional; authenticated requests include `currentPlan`.
 
 Success response `200`:
 ```json
@@ -203,7 +224,7 @@ Notes:
 - Default mode (`CHAT_RABBIT_ENABLED=true`): transactional outbox -> RabbitMQ relay -> consumer -> n8n.
 - Fallback mode (`CHAT_RABBIT_ENABLED=false`): transactional outbox -> local async dispatch after commit.
 - Assistant response is persisted in DB before SSE dispatch is attempted.
-- If SSE is disconnected, frontend can recover data from `GET /api/v1/chat/sessions/{sessionId}/messages`.
+- If SSE is disconnected, frontend can recover data from `GET /api/v1/chat/sessions/{sessionId}/messages?size=20`.
 
 Common errors:
 - `400` `message` missing/blank
@@ -268,43 +289,59 @@ Common errors:
 ### `GET /api/v1/chat/sessions`
 List chat sessions for current user.
 
+Query parameters:
+- `size`: optional, default `20`, allowed range `1..100`.
+- `cursor`: optional. Omit it for the first batch. Use `nextCursor` from the previous response for the next batch.
+
 Success response `200`:
 ```json
-[
-  {
-    "id": "uuid",
-    "title": "Consulta de alimentos",
-    "createdAt": "2026-04-19T10:00:00Z",
-    "updatedAt": "2026-04-19T10:03:00Z"
-  }
-]
+{
+  "content": [
+    {
+      "id": "uuid",
+      "title": "Consulta de alimentos",
+      "createdAt": "2026-04-19T10:00:00Z",
+      "updatedAt": "2026-04-19T10:03:00Z"
+    }
+  ],
+  "nextCursor": "MQ"
+}
 ```
+
+When `nextCursor` is `null`, there are no more results.
 
 ### `GET /api/v1/chat/sessions/{sessionId}/messages`
 List messages in one session (ordered oldest to newest).
 
+Query parameters:
+- `size`: optional, default `20`, allowed range `1..100`.
+- `cursor`: optional. Omit it for the first batch. Use `nextCursor` from the previous response for the next batch.
+
 Success response `200`:
 ```json
-[
-  {
-    "id": "uuid",
-    "role": "USER",
-    "content": "Hola",
-    "rating": null,
-    "createdAt": "2026-04-19T10:00:00Z",
-    "citations": []
-  },
-  {
-    "id": "uuid",
-    "role": "ASSISTANT",
-    "content": "Hola, en que puedo ayudarte?",
-    "rating": 5,
-    "createdAt": "2026-04-19T10:00:02Z",
-    "receiptStatus": "PUBLISHED",
-    "readAt": null,
-    "citations": []
-  }
-]
+{
+  "content": [
+    {
+      "id": "uuid",
+      "role": "USER",
+      "content": "Hola",
+      "rating": null,
+      "createdAt": "2026-04-19T10:00:00Z",
+      "citations": []
+    },
+    {
+      "id": "uuid",
+      "role": "ASSISTANT",
+      "content": "Hola, en que puedo ayudarte?",
+      "rating": 5,
+      "createdAt": "2026-04-19T10:00:02Z",
+      "receiptStatus": "PUBLISHED",
+      "readAt": null,
+      "citations": []
+    }
+  ],
+  "nextCursor": null
+}
 ```
 
 Common errors:
@@ -384,7 +421,7 @@ All error responses return:
 - Disable repeated submits for the same text while the first `POST /api/v1/chat/send` is in flight.
 - If `/chat/send` returns `202`, replace the temporary id with `userMessageId` from backend and mark the message as `processing`.
 - Do not auto-retry `/chat/send` blindly after network timeout, browser abort, or unknown connection loss. The request may already have been accepted and would consume another token if sent again.
-- If send result is unknown, show a recoverable banner such as "Connection interrupted. We are checking your conversation status." then call `GET /api/v1/chat/sessions/{sessionId}/messages` to reconcile.
+- If send result is unknown, show a recoverable banner such as "Connection interrupted. We are checking your conversation status." then call `GET /api/v1/chat/sessions/{sessionId}/messages?size=20` to reconcile.
 - After reconciliation:
 - If the user message appears in history, keep it and continue waiting for assistant completion.
 - If it does not appear, allow the user to send again manually.
@@ -393,11 +430,11 @@ All error responses return:
 
 - Open `GET /api/v1/chat/subscribe/{sessionId}` as soon as the session screen is active.
 - Reconnect SSE with exponential backoff, for example `1s`, `2s`, `5s`, `10s`, max `30s`.
-- On every reconnect, immediately reload `GET /api/v1/chat/sessions/{sessionId}/messages` before trusting only live events.
+- On every reconnect, immediately reload `GET /api/v1/chat/sessions/{sessionId}/messages?size=20` before trusting only live events.
 - Treat SSE as a real-time delivery channel, not as the source of truth.
-- The source of truth for rendering the chat history is always `GET /api/v1/chat/sessions/{sessionId}/messages`.
+- The source of truth for rendering the chat history is always `GET /api/v1/chat/sessions/{sessionId}/messages?size=20`.
 - Ignore duplicate SSE payloads if the same persisted message id is already rendered.
-- If SSE is unavailable for a prolonged period, continue polling `GET /api/v1/chat/sessions/{sessionId}/messages` every few seconds while there is at least one message still waiting for assistant completion.
+- If SSE is unavailable for a prolonged period, continue polling `GET /api/v1/chat/sessions/{sessionId}/messages?size=20` every few seconds while there is at least one message still waiting for assistant completion.
 
 ### 4. Recommended chat screen state machine
 
@@ -416,7 +453,7 @@ Recommended rendering behavior:
 
 ### 5. History reconciliation logic
 
-Use `GET /api/v1/chat/sessions/{sessionId}/messages` in these cases:
+Use `GET /api/v1/chat/sessions/{sessionId}/messages?size=20` in these cases:
 - Initial session load.
 - After browser refresh.
 - After SSE reconnect.
@@ -434,7 +471,7 @@ Suggested reconciliation rule:
 - Detect offline mode with browser connectivity signals, but do not trust them as exact truth.
 - If the browser goes offline while user is typing, keep the draft locally.
 - If the browser goes offline before `/chat/send` finishes, mark the message as `unknown_delivery` instead of failed.
-- When connection returns, reconcile against `GET /chat/sessions/{sessionId}/messages` before allowing resend.
+- When connection returns, reconcile against `GET /api/v1/chat/sessions/{sessionId}/messages?size=20` before allowing resend.
 - For regular `GET` endpoints like plans, subscription, sessions, and messages, safe automatic retries with short backoff are acceptable.
 - For mutation endpoints like `/chat/send`, `/payments/checkout-sessions`, `/payments/subscription/cancel`, and `/chat/messages/{messageId}/rating`, retry only when the failure is clearly before request dispatch, not after an uncertain transport break.
 
@@ -478,5 +515,5 @@ For `GET /api/v1/payments/subscription`:
 - This reduces the time the user stays blocked on a slow network request and lowers the chance of browser/network timeouts on high-latency connections.
 - After acceptance, the frontend can safely move to a `processing` UI state while backend async processing continues through outbox + queue + consumer.
 - If the user's connection drops after acceptance, the chat is still recoverable because the source of truth is persisted in the database.
-- SSE improves responsiveness, but it is not required for correctness; the frontend can always resynchronize from `GET /api/v1/chat/sessions/{sessionId}/messages`.
+- SSE improves responsiveness, but it is not required for correctness; the frontend can always resynchronize from `GET /api/v1/chat/sessions/{sessionId}/messages?size=20`.
 - This makes the UI robust for unstable mobile networks, intermittent Wi-Fi, browser refreshes, and temporary disconnects from SSE.

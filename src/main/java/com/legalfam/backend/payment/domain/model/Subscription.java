@@ -22,116 +22,104 @@ public class Subscription {
     private Instant createdAt;
     private Instant updatedAt;
 
-    public UUID getId() {
-        return id;
+    private Subscription() {
     }
 
-    public void setId(UUID id) {
-        this.id = id;
+    public static Subscription createFree(UUID userId, SubscriptionPlanCode planCode, int tokenLimit, Instant periodStart, Instant periodEnd, Instant now) {
+        Subscription subscription = new Subscription();
+        subscription.userId = userId;
+        subscription.activateFreePlan(planCode, tokenLimit, periodStart, periodEnd, now);
+        return subscription;
+    }
+
+    public static Subscription rehydrate(
+            UUID id,
+            UUID userId,
+            SubscriptionPlanCode planCode,
+            SubscriptionStatus status,
+            PaymentProvider provider,
+            String gatewayCustomerId,
+            String gatewaySubscriptionId,
+            Instant currentPeriodStart,
+            Instant currentPeriodEnd,
+            boolean cancelAtPeriodEnd,
+            int monthlyTokenLimit,
+            int remainingTokens,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+        Subscription subscription = new Subscription();
+        subscription.id = id;
+        subscription.userId = userId;
+        subscription.planCode = planCode;
+        subscription.status = status;
+        subscription.provider = provider;
+        subscription.gatewayCustomerId = gatewayCustomerId;
+        subscription.gatewaySubscriptionId = gatewaySubscriptionId;
+        subscription.currentPeriodStart = currentPeriodStart;
+        subscription.currentPeriodEnd = currentPeriodEnd;
+        subscription.cancelAtPeriodEnd = cancelAtPeriodEnd;
+        subscription.monthlyTokenLimit = monthlyTokenLimit;
+        subscription.remainingTokens = remainingTokens;
+        subscription.createdAt = createdAt;
+        subscription.updatedAt = updatedAt;
+        return subscription;
+    }
+
+    public UUID getId() {
+        return id;
     }
 
     public UUID getUserId() {
         return userId;
     }
 
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
-
     public SubscriptionPlanCode getPlanCode() {
         return planCode;
-    }
-
-    public void setPlanCode(SubscriptionPlanCode planCode) {
-        this.planCode = planCode;
     }
 
     public SubscriptionStatus getStatus() {
         return status;
     }
 
-    public void setStatus(SubscriptionStatus status) {
-        this.status = status;
-    }
-
     public PaymentProvider getProvider() {
         return provider;
-    }
-
-    public void setProvider(PaymentProvider provider) {
-        this.provider = provider;
     }
 
     public String getGatewayCustomerId() {
         return gatewayCustomerId;
     }
 
-    public void setGatewayCustomerId(String gatewayCustomerId) {
-        this.gatewayCustomerId = gatewayCustomerId;
-    }
-
     public String getGatewaySubscriptionId() {
         return gatewaySubscriptionId;
-    }
-
-    public void setGatewaySubscriptionId(String gatewaySubscriptionId) {
-        this.gatewaySubscriptionId = gatewaySubscriptionId;
     }
 
     public Instant getCurrentPeriodStart() {
         return currentPeriodStart;
     }
 
-    public void setCurrentPeriodStart(Instant currentPeriodStart) {
-        this.currentPeriodStart = currentPeriodStart;
-    }
-
     public Instant getCurrentPeriodEnd() {
         return currentPeriodEnd;
-    }
-
-    public void setCurrentPeriodEnd(Instant currentPeriodEnd) {
-        this.currentPeriodEnd = currentPeriodEnd;
     }
 
     public boolean isCancelAtPeriodEnd() {
         return cancelAtPeriodEnd;
     }
 
-    public void setCancelAtPeriodEnd(boolean cancelAtPeriodEnd) {
-        this.cancelAtPeriodEnd = cancelAtPeriodEnd;
-    }
-
     public int getMonthlyTokenLimit() {
         return monthlyTokenLimit;
-    }
-
-    public void setMonthlyTokenLimit(int monthlyTokenLimit) {
-        this.monthlyTokenLimit = monthlyTokenLimit;
     }
 
     public int getRemainingTokens() {
         return remainingTokens;
     }
 
-    public void setRemainingTokens(int remainingTokens) {
-        this.remainingTokens = remainingTokens;
-    }
-
     public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public Instant getUpdatedAt() {
         return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public void consumeChatToken(Instant now) {
@@ -182,6 +170,44 @@ public class Subscription {
         status = SubscriptionStatus.ACTIVE;
         updatedAt = now;
         return delta;
+    }
+
+    public void syncGatewaySubscription(
+            SubscriptionPlanCode planCode,
+            SubscriptionStatus status,
+            String gatewayCustomerId,
+            String gatewaySubscriptionId,
+            Instant periodStart,
+            Instant periodEnd,
+            boolean cancelAtPeriodEnd,
+            int monthlyTokenLimit,
+            boolean resetPeriodTokens,
+            Instant now
+    ) {
+        SubscriptionPlanCode previousPlan = this.planCode;
+        int previousLimit = this.monthlyTokenLimit;
+        int previousRemainingTokens = this.remainingTokens;
+
+        this.planCode = planCode;
+        this.status = status;
+        this.provider = PaymentProvider.MERCADO_PAGO;
+        this.gatewayCustomerId = gatewayCustomerId;
+        this.gatewaySubscriptionId = gatewaySubscriptionId;
+        this.currentPeriodStart = periodStart;
+        this.currentPeriodEnd = periodEnd;
+        this.cancelAtPeriodEnd = cancelAtPeriodEnd;
+        this.monthlyTokenLimit = monthlyTokenLimit;
+
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (resetPeriodTokens) {
+            remainingTokens = monthlyTokenLimit;
+        } else if (previousPlan != planCode) {
+            int usedTokens = Math.max(previousLimit - previousRemainingTokens, 0);
+            remainingTokens = Math.max(monthlyTokenLimit - usedTokens, 0);
+        }
+        updatedAt = now;
     }
 
     public boolean hasActiveGatewaySubscription() {

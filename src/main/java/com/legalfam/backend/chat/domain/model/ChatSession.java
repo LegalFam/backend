@@ -14,44 +14,55 @@ public class ChatSession {
     private Instant createdAt;
     private Instant updatedAt;
 
-    public UUID getId() {
-        return id;
+    private ChatSession() {
     }
 
-    public void setId(UUID id) {
-        this.id = id;
+    public static ChatSession create(UUID userId, Instant now) {
+        ChatSession session = new ChatSession();
+        session.userId = userId;
+        session.createdAt = now;
+        session.updatedAt = now;
+        return session;
+    }
+
+    public static ChatSession rehydrate(
+            UUID id,
+            UUID userId,
+            String title,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+        ChatSession session = new ChatSession();
+        session.id = id;
+        session.userId = userId;
+        session.title = title;
+        session.createdAt = createdAt;
+        session.updatedAt = updatedAt;
+        return session;
+    }
+
+    public UUID getId() {
+        return id;
     }
 
     public UUID getUserId() {
         return userId;
     }
 
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
-
     public String getTitle() {
         return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
     }
 
     public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public Instant getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
+    public void touch(Instant now) {
+        this.updatedAt = now;
     }
 
     public void rename(String title, Instant now) {

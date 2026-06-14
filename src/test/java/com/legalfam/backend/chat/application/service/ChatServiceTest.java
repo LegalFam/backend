@@ -19,6 +19,7 @@ import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,9 +57,7 @@ class ChatServiceTest {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
 
-        ChatSession session = new ChatSession();
-        session.setId(sessionId);
-        session.setUserId(userId);
+        ChatSession session = ChatSession.rehydrate(sessionId, userId, null, Instant.now(), Instant.now());
 
         when(chatAccessPolicy.requireSessionOwner(userId, sessionId)).thenReturn(session);
         when(IChatPersistencePort.existsUnreadAssistantMessageBySessionId(sessionId)).thenReturn(false);

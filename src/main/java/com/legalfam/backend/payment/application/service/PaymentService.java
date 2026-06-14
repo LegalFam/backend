@@ -282,9 +282,14 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
 
     private Subscription createFreeSubscription(UUID userId, Instant anchor) {
         PaymentPlanDefinition freePlan = IPaymentPlanCatalogPort.getFreePlan();
-        Subscription subscription = new Subscription();
-        subscription.setUserId(userId);
-        subscription.activateFreePlan(freePlan.code(), freePlan.monthlyTokenLimit(), anchor, addMonths(anchor, 1), anchor);
+        Subscription subscription = Subscription.createFree(
+                userId,
+                freePlan.code(),
+                freePlan.monthlyTokenLimit(),
+                anchor,
+                addMonths(anchor, 1),
+                anchor
+        );
         subscription = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(subscription, null, TokenTransactionType.PERIOD_ALLOCATION,
                 freePlan.monthlyTokenLimit(), "Allocated monthly tokens for free plan");
@@ -338,7 +343,6 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         SubscriptionPlanCode previousPlan = subscription.getPlanCode();
         Instant previousPeriodStart = subscription.getCurrentPeriodStart();
         int previousRemainingTokens = subscription.getRemainingTokens();
-        int previousLimit = subscription.getMonthlyTokenLimit();
 
         Instant nextPeriodStart = notification.currentPeriodStart() != null
                 ? notification.currentPeriodStart()
@@ -353,27 +357,19 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             nextPeriodEnd = addMonths(nextPeriodStart, 1);
         }
 
-        subscription.setPlanCode(plan.code());
-        subscription.setProvider(PaymentProvider.MERCADO_PAGO);
-        subscription.setStatus(mapGatewayStatus(notification.status()));
-        subscription.setGatewayCustomerId(notification.customerId());
-        subscription.setGatewaySubscriptionId(notification.subscriptionId());
-        subscription.setCurrentPeriodStart(nextPeriodStart);
-        subscription.setCurrentPeriodEnd(nextPeriodEnd);
-        subscription.setCancelAtPeriodEnd(notification.cancelAtPeriodEnd());
-        subscription.setMonthlyTokenLimit(plan.monthlyTokenLimit());
-        if (subscription.getCreatedAt() == null) {
-            subscription.setCreatedAt(now());
-        }
-
         boolean periodChanged = previousPeriodStart == null || !previousPeriodStart.equals(nextPeriodStart);
-        if (forcePeriodAllocation || periodChanged) {
-            subscription.setRemainingTokens(plan.monthlyTokenLimit());
-        } else if (previousPlan != plan.code()) {
-            int usedTokens = Math.max(previousLimit - previousRemainingTokens, 0);
-            subscription.setRemainingTokens(Math.max(plan.monthlyTokenLimit() - usedTokens, 0));
-        }
-        subscription.setUpdatedAt(now());
+        subscription.syncGatewaySubscription(
+                plan.code(),
+                mapGatewayStatus(notification.status()),
+                notification.customerId(),
+                notification.subscriptionId(),
+                nextPeriodStart,
+                nextPeriodEnd,
+                notification.cancelAtPeriodEnd(),
+                plan.monthlyTokenLimit(),
+                forcePeriodAllocation || periodChanged,
+                now()
+        );
         Subscription saved = IPaymentPersistencePort.saveSubscription(subscription);
 
         if (forcePeriodAllocation || periodChanged) {
