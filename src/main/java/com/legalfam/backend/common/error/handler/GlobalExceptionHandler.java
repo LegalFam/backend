@@ -40,7 +40,8 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         String message = ex.getBindingResult().getFieldErrors().stream()
-                .sorted(Comparator.comparing(FieldError::getField))
+                .sorted(Comparator.comparing(FieldError::getField)
+                        .thenComparingInt(GlobalExceptionHandler::constraintPriority))
                 .findFirst()
                 .map(error -> error.getDefaultMessage() == null ? "Request validation failed" : error.getDefaultMessage())
                 .orElse("Request validation failed");
@@ -107,5 +108,14 @@ public class GlobalExceptionHandler {
             String path
     ) {
         return ResponseEntity.status(status).body(ApiErrorFactory.build(status, type, code, message, path));
+    }
+
+    private static int constraintPriority(FieldError error) {
+        return switch (error.getCode() == null ? "" : error.getCode()) {
+            case "NotBlank", "NotEmpty", "NotNull" -> 0;
+            case "Email", "Pattern" -> 1;
+            case "Size", "Min", "Max" -> 2;
+            default -> 3;
+        };
     }
 }
