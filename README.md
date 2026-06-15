@@ -280,11 +280,11 @@ Response format:
       "updatedAt": "2026-05-01T00:10:00Z"
     }
   ],
-  "nextCursor": "MQ"
+  "nextCursor": 20
 }
 ```
 
-Use `nextCursor` as the `cursor` query parameter on the next request. When `nextCursor` is `null`,
+Use numeric `nextCursor` as the `cursor` query parameter on the next request. When `nextCursor` is `null`,
 there are no more results. `size` must be between `1` and `100`.
 
 ### List chat messages (protected, cursor-based)

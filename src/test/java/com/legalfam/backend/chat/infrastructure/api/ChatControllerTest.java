@@ -190,12 +190,12 @@ class ChatControllerTest {
                         sessionId,
                         Instant.parse("2026-01-01T00:00:00Z"),
                         Instant.parse("2026-01-01T00:10:00Z")
-                )), "MQ"));
+                )), 20));
 
         mockMvc.perform(get("/api/v1/chat/sessions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id", is(sessionId.toString())))
-                .andExpect(jsonPath("$.nextCursor", is("MQ")));
+                .andExpect(jsonPath("$.nextCursor", is(20)));
     }
 
     @Test

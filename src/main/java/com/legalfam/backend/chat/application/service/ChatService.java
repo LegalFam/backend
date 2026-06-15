@@ -27,6 +27,8 @@ import com.legalfam.backend.chat.domain.model.ChatSession;
 import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -133,11 +135,13 @@ public class ChatService implements IChatUseCase {
     @Transactional(readOnly = true)
     public CursorResult<ChatMessageResponse> listMessages(UUID userId, UUID sessionId, CursorQuery cursorQuery) {
         ChatSession session = chatAccessPolicy.requireSessionOwner(userId, sessionId);
-        CursorResult<ChatMessage> messageBatch = IChatPersistencePort.findMessagesBySessionIdOrderByCreatedAtAsc(
+        CursorResult<ChatMessage> messageBatch = IChatPersistencePort.findMessagesBySessionIdOrderByCreatedAtDesc(
                 session.getId(),
                 cursorQuery
         );
-        List<ChatMessage> messages = messageBatch.content();
+        List<ChatMessage> messages = new ArrayList<>(messageBatch.content());
+        Collections.reverse(messages);
+        messageBatch = new CursorResult<>(messages, messageBatch.nextCursor());
         if (messages.isEmpty()) {
             return messageBatch.map(message -> chatMessageResponseMapper.toResponse(message, Map.of(), Map.of()));
         }

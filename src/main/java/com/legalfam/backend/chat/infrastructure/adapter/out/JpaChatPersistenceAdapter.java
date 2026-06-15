@@ -94,8 +94,8 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
     }
 
     @Override
-    public CursorResult<ChatMessage> findMessagesBySessionIdOrderByCreatedAtAsc(UUID sessionId, CursorQuery cursorQuery) {
-        Slice<ChatMessageEntity> page = IChatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(
+    public CursorResult<ChatMessage> findMessagesBySessionIdOrderByCreatedAtDesc(UUID sessionId, CursorQuery cursorQuery) {
+        Slice<ChatMessageEntity> page = IChatMessageRepository.findByChatSessionIdOrderByCreatedAtDesc(
                 sessionId,
                 OffsetPageRequest.of(cursorQuery.offset(), cursorQuery.size())
         );
@@ -195,7 +195,7 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
     ) {
         return new CursorResult<>(
                 page.getContent().stream().map(mapper).toList(),
-                page.hasNext() ? CursorQuery.nextCursor(cursorQuery.offset() + page.getNumberOfElements()) : null
+                page.hasNext() ? cursorQuery.offset() + page.getNumberOfElements() : null
         );
     }
 

@@ -160,7 +160,7 @@ public class ChatController {
     })
     public ResponseEntity<CursorResponse<ChatSessionResponse>> listSessions(
             @AuthenticationPrincipal String principalUserId,
-            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer cursor,
             @RequestParam(defaultValue = "20") int size
     ) {
         UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
@@ -178,7 +178,7 @@ public class ChatController {
     public ResponseEntity<CursorResponse<ChatMessageResponse>> listMessages(
             @AuthenticationPrincipal String principalUserId,
             @PathVariable("sessionId") @Parameter(description = "Chat session id") UUID sessionId,
-            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer cursor,
             @RequestParam(defaultValue = "20") int size
     ) {
         UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
@@ -224,7 +224,7 @@ public class ChatController {
         return ResponseEntity.noContent().build();
     }
 
-    private CursorQuery cursorQuery(String cursor, int size) {
+    private CursorQuery cursorQuery(Integer cursor, int size) {
         try {
             return CursorQuery.of(cursor, size);
         } catch (IllegalArgumentException ex) {

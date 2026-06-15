@@ -27,7 +27,7 @@ public interface IChatPersistencePort {
 
     Optional<ChatMessage> findMessageById(UUID messageId);
 
-    CursorResult<ChatMessage> findMessagesBySessionIdOrderByCreatedAtAsc(UUID sessionId, CursorQuery cursorQuery);
+    CursorResult<ChatMessage> findMessagesBySessionIdOrderByCreatedAtDesc(UUID sessionId, CursorQuery cursorQuery);
 
     List<ChatCitation> findCitationsByMessageIdsOrderByMessageIdAndId(List<UUID> messageIds);
 

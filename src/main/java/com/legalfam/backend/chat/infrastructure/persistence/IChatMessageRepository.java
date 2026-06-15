@@ -12,6 +12,8 @@ public interface IChatMessageRepository extends JpaRepository<ChatMessageEntity,
 
     Slice<ChatMessageEntity> findByChatSessionIdOrderByCreatedAtAsc(UUID chatSessionId, Pageable pageable);
 
+    Slice<ChatMessageEntity> findByChatSessionIdOrderByCreatedAtDesc(UUID chatSessionId, Pageable pageable);
+
     long deleteByChatSessionId(UUID chatSessionId);
 }
 

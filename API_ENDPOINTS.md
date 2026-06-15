@@ -304,11 +304,11 @@ Success response `200`:
       "updatedAt": "2026-04-19T10:03:00Z"
     }
   ],
-  "nextCursor": "MQ"
+  "nextCursor": 20
 }
 ```
 
-When `nextCursor` is `null`, there are no more results.
+`nextCursor` is a numeric offset. Pass it unchanged as the `cursor` query parameter on the next request. When `nextCursor` is `null`, there are no more results.
 
 ### `GET /api/v1/chat/sessions/{sessionId}/messages`
 List messages in one session (ordered oldest to newest).
