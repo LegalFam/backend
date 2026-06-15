@@ -198,13 +198,15 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
     }
 
     private ChatAssistantMetadata extractMetadata(JsonNode root) {
-        String citationSupportStatus = readCitationSupportStatus(root);
+        String citationSupportStatus = root != null && root.get("citationSupportStatus") != null
+                ? readCitationSupportStatus(root)
+                : inferCitationSupportStatus(root == null ? null : root.get("citations"));
         return new ChatAssistantMetadata(
                 readText(root, "confidenceStatus"),
                 readText(root, "confidenceReason"),
                 readStringArray(root.get("nextSteps")),
                 readBoolean(root, "specialistSupportRecommended"),
-                citationSupportStatus == null ? inferCitationSupportStatus(root.get("citations")) : citationSupportStatus
+                citationSupportStatus
         );
     }
 
