@@ -3,6 +3,7 @@ package com.legalfam.backend.chat.infrastructure.adapter.out;
 import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
+import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import com.legalfam.backend.chat.infrastructure.config.N8nProperties;
@@ -20,12 +21,14 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.net.URI;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Component
@@ -52,7 +55,11 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
     }
 
     @Override
-    public ChatAssistantGatewayResponse sendMessage(String message, UUID sessionId) {
+    public ChatAssistantGatewayResponse sendMessage(
+            String message,
+            UUID sessionId,
+            List<ChatPreviousMessage> previousMessages
+    ) {
         log.info("Preparing n8n webhook call: configuredUrl={}, timeoutMs={}",
                 webhookUrl == null || webhookUrl.isBlank() ? "<empty>" : webhookUrl,
                 timeoutMs);
@@ -63,7 +70,7 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         }
 
         validateWebhookUrl(webhookUrl);
-        String payloadJson = buildPayload(message, sessionId);
+        String payloadJson = buildPayload(message, sessionId, previousMessages);
         HttpEntity<String> requestEntity = buildRequestEntity(payloadJson);
         ResponseEntity<String> response;
 
@@ -124,10 +131,19 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         return new HttpEntity<>(payloadJson, headers);
     }
 
-    private String buildPayload(String message, UUID sessionId) {
+    private String buildPayload(String message, UUID sessionId, List<ChatPreviousMessage> previousMessages) {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("message", message);
         payload.put("session_id", sessionId.toString());
+        ArrayNode history = payload.putArray("previous_messages");
+        for (ChatPreviousMessage previousMessage : previousMessages == null ? List.<ChatPreviousMessage>of() : previousMessages) {
+            ObjectNode item = history.addObject();
+            item.put("role", previousMessage.role());
+            item.put("content", previousMessage.content());
+            if (previousMessage.createdAt() != null) {
+                item.put("created_at", previousMessage.createdAt().toString());
+            }
+        }
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (Exception ex) {
@@ -182,12 +198,30 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
     }
 
     private ChatAssistantMetadata extractMetadata(JsonNode root) {
+        String citationSupportStatus = readCitationSupportStatus(root);
         return new ChatAssistantMetadata(
                 readText(root, "confidenceStatus"),
                 readText(root, "confidenceReason"),
                 readStringArray(root.get("nextSteps")),
-                readBoolean(root, "specialistSupportRecommended")
+                readBoolean(root, "specialistSupportRecommended"),
+                citationSupportStatus == null ? inferCitationSupportStatus(root.get("citations")) : citationSupportStatus
         );
+    }
+
+    private String readCitationSupportStatus(JsonNode root) {
+        String value = readText(root, "citationSupportStatus");
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "GOOD", "WEAK", "NONE" -> normalized;
+            default -> null;
+        };
+    }
+
+    private String inferCitationSupportStatus(JsonNode citationsNode) {
+        return extractCitations(citationsNode).isEmpty() ? "NONE" : "GOOD";
     }
 
     private List<String> readStringArray(JsonNode node) {

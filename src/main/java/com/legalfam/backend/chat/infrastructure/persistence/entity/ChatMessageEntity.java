@@ -49,6 +49,9 @@ public class ChatMessageEntity {
     @Column(name = "specialist_support_recommended")
     private Boolean specialistSupportRecommended;
 
+    @Column(name = "citation_support_status")
+    private String citationSupportStatus;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -138,6 +141,14 @@ public class ChatMessageEntity {
 
     public void setSpecialistSupportRecommended(Boolean specialistSupportRecommended) {
         this.specialistSupportRecommended = specialistSupportRecommended;
+    }
+
+    public String getCitationSupportStatus() {
+        return citationSupportStatus;
+    }
+
+    public void setCitationSupportStatus(String citationSupportStatus) {
+        this.citationSupportStatus = citationSupportStatus;
     }
 
     public Instant getCreatedAt() {

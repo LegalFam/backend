@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS chat_message (
     confidence_reason TEXT NULL,
     next_steps TEXT NULL,
     specialist_support_recommended BOOLEAN NULL,
+    citation_support_status VARCHAR(32) NULL CHECK (citation_support_status IS NULL OR citation_support_status IN ('GOOD', 'WEAK', 'NONE')),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 

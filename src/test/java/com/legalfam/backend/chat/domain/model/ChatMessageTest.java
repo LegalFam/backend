@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat.domain.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
@@ -47,7 +48,24 @@ class ChatMessageTest {
 
         assertThrows(
                 InvalidChatRequestException.class,
-                () -> message.applyAssistantMetadata("LOW", "reason", List.of("step"), true)
+                () -> message.applyAssistantMetadata("LOW", "reason", List.of("step"), true, "GOOD")
         );
+    }
+
+    @Test
+    void applyAssistantMetadataNormalizesCitationSupportStatus() {
+        ChatMessage message = ChatMessage.assistantMessage(
+                UUID.randomUUID(),
+                "answer",
+                Instant.parse("2026-01-01T00:00:00Z")
+        );
+
+        message.applyAssistantMetadata("LOW", "reason", List.of("step"), true, "weak");
+
+        assertEquals("WEAK", message.getCitationSupportStatus());
+
+        message.applyAssistantMetadata("LOW", "reason", List.of("step"), true, "unsupported");
+
+        assertNull(message.getCitationSupportStatus());
     }
 }

@@ -3,6 +3,7 @@ package com.legalfam.backend.chat.domain.model;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 public class ChatMessage {
@@ -18,6 +19,7 @@ public class ChatMessage {
     private String confidenceReason;
     private List<String> nextSteps = List.of();
     private Boolean specialistSupportRecommended;
+    private String citationSupportStatus;
     private Instant createdAt;
 
     private ChatMessage() {
@@ -65,6 +67,7 @@ public class ChatMessage {
             String confidenceReason,
             List<String> nextSteps,
             Boolean specialistSupportRecommended,
+            String citationSupportStatus,
             Instant createdAt
     ) {
         ChatMessage message = new ChatMessage();
@@ -79,6 +82,7 @@ public class ChatMessage {
         message.confidenceReason = confidenceReason;
         message.nextSteps = nextSteps == null ? List.of() : List.copyOf(nextSteps);
         message.specialistSupportRecommended = specialistSupportRecommended;
+        message.citationSupportStatus = normalizeCitationSupportStatus(citationSupportStatus);
         message.createdAt = createdAt;
         return message;
     }
@@ -127,6 +131,10 @@ public class ChatMessage {
         return specialistSupportRecommended;
     }
 
+    public String getCitationSupportStatus() {
+        return citationSupportStatus;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -135,7 +143,8 @@ public class ChatMessage {
             String confidenceStatus,
             String confidenceReason,
             List<String> nextSteps,
-            Boolean specialistSupportRecommended
+            Boolean specialistSupportRecommended,
+            String citationSupportStatus
     ) {
         if (role != ChatMessageRole.ASSISTANT) {
             throw new InvalidChatRequestException("Metadata can only be applied to assistant messages");
@@ -144,6 +153,7 @@ public class ChatMessage {
         this.confidenceReason = normalizeBlank(confidenceReason);
         this.nextSteps = nextSteps == null ? List.of() : List.copyOf(nextSteps);
         this.specialistSupportRecommended = specialistSupportRecommended;
+        this.citationSupportStatus = normalizeCitationSupportStatus(citationSupportStatus);
     }
 
     public void submitFeedback(int rating, String comment, Instant submittedAt) {
@@ -171,5 +181,16 @@ public class ChatMessage {
 
     private String normalizeBlank(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static String normalizeCitationSupportStatus(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "GOOD", "WEAK", "NONE" -> normalized;
+            default -> null;
+        };
     }
 }

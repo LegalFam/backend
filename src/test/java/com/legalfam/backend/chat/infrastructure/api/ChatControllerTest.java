@@ -219,6 +219,7 @@ class ChatControllerTest {
                         "Faltan datos generales.",
                         List.of("Reune constancias disponibles."),
                         true,
+                        "WEAK",
                         "PUBLISHED",
                         null
                 )), null));
@@ -230,6 +231,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.content[0].content", is("Hola")))
                 .andExpect(jsonPath("$.content[0].rating", is(5)))
                 .andExpect(jsonPath("$.content[0].receiptStatus", is("PUBLISHED")))
+                .andExpect(jsonPath("$.content[0].citationSupportStatus", is("WEAK")))
                 .andExpect(jsonPath("$.content[0].citations[0].sourceUrl", is("https://example.com/ley")));
     }
 

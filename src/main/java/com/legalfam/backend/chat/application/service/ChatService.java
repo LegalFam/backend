@@ -9,6 +9,7 @@ import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
+import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
@@ -38,6 +39,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChatService implements IChatUseCase {
+
+    private static final int ASSISTANT_CONTEXT_MESSAGE_LIMIT = 12;
+    private static final int ASSISTANT_CONTEXT_CONTENT_LIMIT = 2000;
 
     private final IChatPersistencePort IChatPersistencePort;
     private final IChatTokenPort IChatTokenPort;
@@ -77,6 +81,7 @@ public class ChatService implements IChatUseCase {
         Instant now = Instant.now();
 
         ChatMessage userMessage = ChatMessage.userMessage(chatSession.getId(), messageInput, now);
+        List<ChatPreviousMessage> previousMessages = recentPreviousMessages(chatSession.getId());
 
         IChatTokenPort.consumeChatToken(userId, userMessage.getId());
         userMessage = IChatPersistencePort.saveMessage(userMessage);
@@ -90,7 +95,12 @@ public class ChatService implements IChatUseCase {
 
         chatSession.touch(now);
         IChatPersistencePort.saveSession(chatSession);
-        IChatEventPublisherPort.publishMessageQueued(new ChatMessageQueuedEvent(chatSession.getId(), userMessage.getId(), messageInput));
+        IChatEventPublisherPort.publishMessageQueued(new ChatMessageQueuedEvent(
+                chatSession.getId(),
+                userMessage.getId(),
+                messageInput,
+                previousMessages
+        ));
 
         return new ChatSendAcceptedResponse(chatSession.getId(), userMessage.getId(), "PROCESSING");
     }
@@ -208,6 +218,28 @@ public class ChatService implements IChatUseCase {
                 session.getCreatedAt(),
                 session.getUpdatedAt()
         );
+    }
+
+    private List<ChatPreviousMessage> recentPreviousMessages(UUID sessionId) {
+        return IChatPersistencePort.findRecentMessagesForAssistantContext(sessionId, ASSISTANT_CONTEXT_MESSAGE_LIMIT)
+                .stream()
+                .map(message -> new ChatPreviousMessage(
+                        message.getRole().name(),
+                        clipForAssistantContext(message.getContent()),
+                        message.getCreatedAt()
+                ))
+                .toList();
+    }
+
+    private String clipForAssistantContext(String content) {
+        if (content == null) {
+            return "";
+        }
+        String normalized = content.trim();
+        if (normalized.length() <= ASSISTANT_CONTEXT_CONTENT_LIMIT) {
+            return normalized;
+        }
+        return normalized.substring(0, ASSISTANT_CONTEXT_CONTENT_LIMIT) + "...";
     }
 
 }

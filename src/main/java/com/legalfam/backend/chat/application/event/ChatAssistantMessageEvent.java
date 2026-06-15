@@ -16,6 +16,7 @@ public record ChatAssistantMessageEvent(
         String confidenceReason,
         List<String> nextSteps,
         Boolean specialistSupportRecommended,
+        String citationSupportStatus,
         String receiptStatus,
         boolean requiresReceipt
 ) {

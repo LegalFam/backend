@@ -17,6 +17,7 @@ public record ChatMessageResponse(
         String confidenceReason,
         List<String> nextSteps,
         Boolean specialistSupportRecommended,
+        String citationSupportStatus,
         String receiptStatus,
         Instant readAt
 ) {

@@ -105,6 +105,7 @@ class ChatDeliveryRetryWorkerTest {
                 null,
                 List.of(),
                 null,
+                null,
                 "PENDING",
                 true
         );

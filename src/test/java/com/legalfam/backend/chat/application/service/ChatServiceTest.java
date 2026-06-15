@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.mapper.ChatMessageResponseMapper;
@@ -20,6 +21,7 @@ import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,6 +63,10 @@ class ChatServiceTest {
 
         when(chatAccessPolicy.requireSessionOwner(userId, sessionId)).thenReturn(session);
         when(IChatPersistencePort.existsUnreadAssistantMessageBySessionId(sessionId)).thenReturn(false);
+        when(IChatPersistencePort.findRecentMessagesForAssistantContext(sessionId, 12)).thenReturn(List.of(
+                ChatMessage.userMessage(sessionId, "antes", Instant.parse("2026-01-01T00:00:00Z")),
+                ChatMessage.assistantMessage(sessionId, "respuesta anterior", Instant.parse("2026-01-01T00:01:00Z"))
+        ));
         when(IChatPersistencePort.saveMessage(any(ChatMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(IChatPersistencePort.saveMessageProcessing(any(ChatMessageProcessing.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -81,7 +87,16 @@ class ChatServiceTest {
         assertEquals(ChatMessageProcessingStatus.QUEUED, processingCaptor.getValue().getStatus());
 
         verify(IChatTokenPort).consumeChatToken(userId, response.userMessageId());
-        verify(IChatEventPublisherPort).publishMessageQueued(new ChatMessageQueuedEvent(sessionId, response.userMessageId(), "hola"));
+        ArgumentCaptor<ChatMessageQueuedEvent> eventCaptor = ArgumentCaptor.forClass(ChatMessageQueuedEvent.class);
+        verify(IChatEventPublisherPort).publishMessageQueued(eventCaptor.capture());
+        ChatMessageQueuedEvent event = eventCaptor.getValue();
+        assertEquals(sessionId, event.chatSessionId());
+        assertEquals(response.userMessageId(), event.userMessageId());
+        assertEquals("hola", event.userMessageInput());
+        assertEquals(List.of(
+                new ChatPreviousMessage("USER", "antes", Instant.parse("2026-01-01T00:00:00Z")),
+                new ChatPreviousMessage("ASSISTANT", "respuesta anterior", Instant.parse("2026-01-01T00:01:00Z"))
+        ), event.previousMessages());
         assertEquals(sessionId, response.sessionId());
         assertEquals(savedMessage.getId(), response.userMessageId());
         assertEquals("PROCESSING", response.status());

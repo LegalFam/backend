@@ -6,6 +6,7 @@ import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
+import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
 import com.legalfam.backend.chat.infrastructure.persistence.IChatCitationRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.IChatMessageRepository;
@@ -18,6 +19,7 @@ import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -100,6 +102,23 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
                 OffsetPageRequest.of(cursorQuery.offset(), cursorQuery.size())
         );
         return toCursorResult(page, cursorQuery, ChatEntityMapper::toDomain);
+    }
+
+    @Override
+    public List<ChatMessage> findRecentMessagesForAssistantContext(UUID sessionId, int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        Slice<ChatMessageEntity> page = IChatMessageRepository.findByChatSessionIdAndRoleInOrderByCreatedAtDesc(
+                sessionId,
+                List.of(ChatMessageRole.USER, ChatMessageRole.ASSISTANT),
+                OffsetPageRequest.of(0, limit)
+        );
+        List<ChatMessage> messages = page.getContent().stream()
+                .map(ChatEntityMapper::toDomain)
+                .toList();
+        Collections.reverse(messages);
+        return messages;
     }
 
     @Override

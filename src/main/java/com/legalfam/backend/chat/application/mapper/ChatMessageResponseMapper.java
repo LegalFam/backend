@@ -35,6 +35,7 @@ public class ChatMessageResponseMapper {
                 message.getConfidenceReason(),
                 message.getNextSteps(),
                 message.getSpecialistSupportRecommended(),
+                message.getCitationSupportStatus(),
                 resolveReceiptStatus(message, outboxEvent),
                 resolveReadAt(message, outboxEvent)
         );

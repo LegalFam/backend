@@ -116,6 +116,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                 assistantMessage.getConfidenceReason(),
                 assistantMessage.getNextSteps(),
                 assistantMessage.getSpecialistSupportRecommended(),
+                assistantMessage.getCitationSupportStatus(),
                 "PENDING",
                 true
         );
@@ -217,7 +218,8 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                 safeMetadata.confidenceStatus(),
                 safeMetadata.confidenceReason(),
                 safeMetadata.nextSteps(),
-                safeMetadata.specialistSupportRecommended()
+                safeMetadata.specialistSupportRecommended(),
+                safeMetadata.citationSupportStatus()
         );
     }
 

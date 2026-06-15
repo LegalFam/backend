@@ -46,7 +46,7 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
 
         ChatAssistantGatewayResponse response;
         try {
-            response = IChatAssistantGatewayPort.sendMessage(userMessageInput, chatSessionId);
+            response = IChatAssistantGatewayPort.sendMessage(userMessageInput, chatSessionId, event.previousMessages());
         } catch (ChatUpstreamException ex) {
             log.warn("Assistant gateway call failed for chatSessionId={}: {}", chatSessionId, ex.getMessage());
             persistAndDispatchFailure(

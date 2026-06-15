@@ -54,6 +54,7 @@ final class ChatEntityMapper {
                 entity.getConfidenceReason(),
                 readStringList(entity.getNextSteps()),
                 entity.getSpecialistSupportRecommended(),
+                entity.getCitationSupportStatus(),
                 entity.getCreatedAt()
         );
     }
@@ -71,6 +72,7 @@ final class ChatEntityMapper {
         entity.setConfidenceReason(domain.getConfidenceReason());
         entity.setNextSteps(writeStringList(domain.getNextSteps()));
         entity.setSpecialistSupportRecommended(domain.getSpecialistSupportRecommended());
+        entity.setCitationSupportStatus(domain.getCitationSupportStatus());
         entity.setCreatedAt(domain.getCreatedAt());
         return entity;
     }

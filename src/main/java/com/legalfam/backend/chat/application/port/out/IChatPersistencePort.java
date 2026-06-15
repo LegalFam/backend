@@ -29,6 +29,8 @@ public interface IChatPersistencePort {
 
     CursorResult<ChatMessage> findMessagesBySessionIdOrderByCreatedAtDesc(UUID sessionId, CursorQuery cursorQuery);
 
+    List<ChatMessage> findRecentMessagesForAssistantContext(UUID sessionId, int limit);
+
     List<ChatCitation> findCitationsByMessageIdsOrderByMessageIdAndId(List<UUID> messageIds);
 
     ChatCitation saveCitation(ChatCitation chatCitation);
