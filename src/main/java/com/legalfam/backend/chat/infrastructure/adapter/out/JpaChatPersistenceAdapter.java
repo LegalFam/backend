@@ -18,6 +18,7 @@ import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatSessionEn
 import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -117,6 +118,7 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
         List<ChatMessage> messages = page.getContent().stream()
                 .map(ChatEntityMapper::toDomain)
                 .toList();
+        messages = new ArrayList<>(messages);
         Collections.reverse(messages);
         return messages;
     }
