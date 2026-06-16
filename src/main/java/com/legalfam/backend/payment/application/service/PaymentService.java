@@ -17,7 +17,6 @@ import com.legalfam.backend.payment.application.port.out.IPaymentPersistencePort
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import com.legalfam.backend.payment.domain.exception.PaymentWebhookException;
 import com.legalfam.backend.payment.domain.exception.SubscriptionNotFoundException;
-import com.legalfam.backend.payment.domain.model.PaymentProvider;
 import com.legalfam.backend.payment.domain.model.Subscription;
 import com.legalfam.backend.payment.domain.model.SubscriptionPlanCode;
 import com.legalfam.backend.payment.domain.model.SubscriptionStatus;
@@ -121,9 +120,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         Subscription subscription = getOrCreateSubscription(userId);
         refreshFreeSubscriptionIfNeeded(subscription);
 
-        if (subscription.getProvider() != PaymentProvider.MERCADO_PAGO
-                || subscription.getGatewaySubscriptionId() == null
-                || subscription.getGatewaySubscriptionId().isBlank()) {
+        if (!subscription.hasGatewaySubscription()) {
             throw new InvalidPaymentRequestException("No Mercado Pago subscription is available to cancel");
         }
 
@@ -308,11 +305,8 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     }
 
     private void refreshFreeSubscriptionIfNeeded(Subscription subscription) {
-        if (subscription.getProvider() != PaymentProvider.FREE) {
-            return;
-        }
         Instant now = now();
-        if (subscription.getCurrentPeriodEnd() != null && now.isBefore(subscription.getCurrentPeriodEnd())) {
+        if (!subscription.shouldRefreshFreePeriodAt(now)) {
             return;
         }
 
@@ -334,14 +328,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     }
 
     private void ensureCheckoutAllowed(Subscription subscription, PaymentPlanDefinition targetPlan) {
-        if (subscription.getPlanCode() == targetPlan.code()
-                && subscription.getProvider() == PaymentProvider.MERCADO_PAGO
-                && subscription.getStatus() == SubscriptionStatus.ACTIVE) {
-            throw new InvalidPaymentRequestException("User is already subscribed to the selected plan");
-        }
-        if (subscription.hasActiveGatewaySubscription()) {
-            throw new InvalidPaymentRequestException("Cancel the current Mercado Pago subscription before changing plans");
-        }
+        subscription.assertCheckoutAllowedFor(targetPlan.code());
     }
 
     private void syncSubscription(PaymentWebhookNotification notification, boolean forcePeriodAllocation) {

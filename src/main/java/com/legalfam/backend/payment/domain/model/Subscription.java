@@ -1,6 +1,7 @@
 package com.legalfam.backend.payment.domain.model;
 
 import com.legalfam.backend.payment.domain.exception.InsufficientTokensException;
+import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import com.legalfam.backend.payment.domain.exception.SubscriptionInactiveException;
 import java.time.Instant;
 import java.util.UUID;
@@ -157,6 +158,22 @@ public class Subscription {
         return delta;
     }
 
+    public boolean shouldRefreshFreePeriodAt(Instant now) {
+        return provider == PaymentProvider.FREE
+                && (currentPeriodEnd == null || !now.isBefore(currentPeriodEnd));
+    }
+
+    public void assertCheckoutAllowedFor(SubscriptionPlanCode targetPlanCode) {
+        if (planCode == targetPlanCode
+                && provider == PaymentProvider.MERCADO_PAGO
+                && status == SubscriptionStatus.ACTIVE) {
+            throw new InvalidPaymentRequestException("User is already subscribed to the selected plan");
+        }
+        if (hasActiveGatewaySubscription()) {
+            throw new InvalidPaymentRequestException("Cancel the current Mercado Pago subscription before changing plans");
+        }
+    }
+
     public void activateFreePlan(
             SubscriptionPlanCode planCode,
             int tokenLimit,
@@ -229,11 +246,15 @@ public class Subscription {
     }
 
     public boolean hasActiveGatewaySubscription() {
-        return provider == PaymentProvider.MERCADO_PAGO
-                && gatewaySubscriptionId != null
-                && !gatewaySubscriptionId.isBlank()
+        return hasGatewaySubscription()
                 && status != SubscriptionStatus.CANCELED
                 && status != SubscriptionStatus.EXPIRED;
+    }
+
+    public boolean hasGatewaySubscription() {
+        return provider == PaymentProvider.MERCADO_PAGO
+                && gatewaySubscriptionId != null
+                && !gatewaySubscriptionId.isBlank();
     }
 
     private void assertActive() {

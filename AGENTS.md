@@ -47,7 +47,7 @@ This document describes how contributors (human or AI agents) should work in thi
 - Preserve refresh token rotation behavior.
 - Preserve `401` for unauthenticated requests and `403` for forbidden requests.
 - Do not run compile/build verification commands after making changes unless explicitly requested by the user.
-- Treat previous changes as implemented only when they are committed in the repository. Do not assume discussed, planned, generated, or uncommitted changes are available in the codebase; verify the current files before building on them.
+- Treat previous changes as implemented only when they are committed. Do not assume discussed, planned, generated, or uncommitted changes are available in the codebase; verify the current files before building on them.
 
 ## Current API Surface
 

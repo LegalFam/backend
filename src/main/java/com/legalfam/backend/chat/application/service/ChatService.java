@@ -16,13 +16,13 @@ import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
-import com.legalfam.backend.chat.domain.exception.PendingAssistantMessageException;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatSession;
+import com.legalfam.backend.chat.domain.policy.ChatSendPolicy;
 import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
@@ -70,12 +70,10 @@ public class ChatService implements IChatUseCase {
         chatPrivacyPolicy.assertAllowed(messageInput);
         chatAccessPolicy.assertUserExists(userId);
         ChatSession chatSession = chatAccessPolicy.requireSessionOwner(userId, sessionId);
-        if (IChatPersistencePort.findActiveMessageProcessingByUserId(userId).isPresent()) {
-            throw new PendingAssistantMessageException("Message processing is already pending");
-        }
-        if (IChatPersistencePort.existsUnreadAssistantMessageBySessionId(chatSession.getId())) {
-            throw new PendingAssistantMessageException("Assistant receipt confirmation is still pending for this session");
-        }
+        ChatSendPolicy.assertCanSend(
+                IChatPersistencePort.findActiveMessageProcessingByUserId(userId).isPresent(),
+                IChatPersistencePort.existsUnreadAssistantMessageBySessionId(chatSession.getId())
+        );
         Instant now = Instant.now();
 
         ChatMessage userMessage = ChatMessage.userMessage(chatSession.getId(), messageInput, now);
