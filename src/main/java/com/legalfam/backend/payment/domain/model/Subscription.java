@@ -127,12 +127,30 @@ public class Subscription {
         if (remainingTokens <= 0) {
             throw new InsufficientTokensException("No chat tokens remaining for the current period");
         }
-        remainingTokens--;
+        remainingTokens -= 1;
         updatedAt = now;
     }
 
+    public int consumeAvailableChatTokens(int requestedTokens, Instant now) {
+        assertActive();
+        if (requestedTokens <= 0 || remainingTokens <= 0) {
+            return 0;
+        }
+        int consumedTokens = Math.min(requestedTokens, remainingTokens);
+        remainingTokens -= consumedTokens;
+        updatedAt = now;
+        return consumedTokens;
+    }
+
     public int refundChatToken(Instant now) {
-        int nextRemainingTokens = Math.min(monthlyTokenLimit, remainingTokens + 1);
+        return refundChatTokens(1, now);
+    }
+
+    public int refundChatTokens(int tokenCount, Instant now) {
+        if (tokenCount <= 0) {
+            return 0;
+        }
+        int nextRemainingTokens = Math.min(monthlyTokenLimit, remainingTokens + tokenCount);
         int delta = nextRemainingTokens - remainingTokens;
         remainingTokens = nextRemainingTokens;
         updatedAt = now;

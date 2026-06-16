@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
+import com.legalfam.backend.chat.application.dto.ChatProcessingStatusResponse;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.infrastructure.api.ChatController;
@@ -143,6 +144,29 @@ class ChatControllerTest {
 
         verify(chatService).assertSessionOwnershipExists(userId, sessionId);
         verify(chatSseEmitterRegistry).subscribe(userId, sessionId);
+    }
+
+    @Test
+    void getProcessingStatusReturnsOk() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        UUID userMessageId = UUID.randomUUID();
+        authenticateAs(userId.toString());
+
+        when(chatService.getProcessingStatus(userId)).thenReturn(new ChatProcessingStatusResponse(
+                true,
+                sessionId,
+                userMessageId,
+                "PROCESSING",
+                Instant.parse("2026-01-01T00:00:00Z")
+        ));
+
+        mockMvc.perform(get("/api/v1/chat/processing-status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.processing", is(true)))
+                .andExpect(jsonPath("$.chatSessionId", is(sessionId.toString())))
+                .andExpect(jsonPath("$.userMessageId", is(userMessageId.toString())))
+                .andExpect(jsonPath("$.status", is("PROCESSING")));
     }
 
     @Test

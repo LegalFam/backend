@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat.application.port.in;
 
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
+import com.legalfam.backend.chat.application.dto.ChatProcessingStatusResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
@@ -11,6 +12,8 @@ import java.util.UUID;
 
 public interface IChatUseCase {
     ChatSendAcceptedResponse send(UUID userId, String messageInput, UUID sessionId);
+
+    ChatProcessingStatusResponse getProcessingStatus(UUID userId);
 
     ChatSessionResponse createSession(UUID userId);
 

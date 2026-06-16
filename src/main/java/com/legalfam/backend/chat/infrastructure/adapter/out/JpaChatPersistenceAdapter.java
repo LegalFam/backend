@@ -8,6 +8,7 @@ import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
+import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.infrastructure.persistence.IChatCitationRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.IChatMessageRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.IChatMessageProcessingRepository;
@@ -151,6 +152,18 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
     @Override
     public Optional<ChatMessageProcessing> findMessageProcessingByUserMessageIdForUpdate(UUID userMessageId) {
         return Optional.ofNullable(IChatMessageProcessingRepository.findByUserMessageIdForUpdate(userMessageId))
+                .map(ChatEntityMapper::toDomain);
+    }
+
+    @Override
+    public Optional<ChatMessageProcessing> findActiveMessageProcessingByUserId(UUID userId) {
+        return IChatMessageProcessingRepository.findActiveByUserId(
+                        userId,
+                        List.of(ChatMessageProcessingStatus.QUEUED, ChatMessageProcessingStatus.PROCESSING),
+                        OffsetPageRequest.of(0, 1)
+                )
+                .stream()
+                .findFirst()
                 .map(ChatEntityMapper::toDomain);
     }
 

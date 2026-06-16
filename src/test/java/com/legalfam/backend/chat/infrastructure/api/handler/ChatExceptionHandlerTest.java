@@ -44,7 +44,7 @@ class ChatExceptionHandlerTest {
         mockMvc.perform(get("/api/v1/chat/errors/pending"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type", is("chat_state_error")))
-                .andExpect(jsonPath("$.code", is("assistant_receipt_pending")))
+                .andExpect(jsonPath("$.code", is("message_processing_pending")))
                 .andExpect(jsonPath("$.message", is("Assistant receipt confirmation is still pending for this session")))
                 .andExpect(jsonPath("$.status", is(409)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/errors/pending")))

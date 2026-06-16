@@ -20,13 +20,13 @@ class PaymentChatTokenAdapterTest {
     private PaymentChatTokenAdapter paymentChatTokenAdapter;
 
     @Test
-    void consumeChatTokenDelegatesToPaymentUseCase() {
+    void consumeChatTokensForAssistantResultDelegatesToPaymentUseCase() {
         UUID userId = UUID.randomUUID();
         UUID chatMessageId = UUID.randomUUID();
 
-        paymentChatTokenAdapter.consumeChatToken(userId, chatMessageId);
+        paymentChatTokenAdapter.consumeChatTokensForAssistantResult(userId, chatMessageId, 3);
 
-        verify(IPaymentTokenUseCase).consumeChatToken(userId, chatMessageId);
+        verify(IPaymentTokenUseCase).consumeChatTokensForAssistantResult(userId, chatMessageId, 3);
     }
 
     @Test

@@ -14,7 +14,6 @@ import com.legalfam.backend.chat.application.policy.ChatAccessPolicy;
 import com.legalfam.backend.chat.application.policy.ChatPrivacyPolicy;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
-import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
@@ -22,6 +21,7 @@ import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,9 +35,6 @@ class ChatServiceTest {
 
     @Mock
     private IChatPersistencePort IChatPersistencePort;
-
-    @Mock
-    private IChatTokenPort IChatTokenPort;
 
     @Mock
     private IChatEventPublisherPort IChatEventPublisherPort;
@@ -55,13 +52,14 @@ class ChatServiceTest {
     private ChatService chatService;
 
     @Test
-    void sendPersistsQueuedMessageConsumesTokenAndPublishesLocalAsyncEvent() {
+    void sendPersistsQueuedMessageWithoutConsumingTokenAndPublishesLocalAsyncEvent() {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
 
         ChatSession session = ChatSession.rehydrate(sessionId, userId, null, Instant.now(), Instant.now());
 
         when(chatAccessPolicy.requireSessionOwner(userId, sessionId)).thenReturn(session);
+        when(IChatPersistencePort.findActiveMessageProcessingByUserId(userId)).thenReturn(Optional.empty());
         when(IChatPersistencePort.existsUnreadAssistantMessageBySessionId(sessionId)).thenReturn(false);
         when(IChatPersistencePort.findRecentMessagesForAssistantContext(sessionId, 12)).thenReturn(List.of(
                 ChatMessage.userMessage(sessionId, "antes", Instant.parse("2026-01-01T00:00:00Z")),
@@ -86,7 +84,6 @@ class ChatServiceTest {
         assertEquals(response.userMessageId(), processingCaptor.getValue().getUserMessageId());
         assertEquals(ChatMessageProcessingStatus.QUEUED, processingCaptor.getValue().getStatus());
 
-        verify(IChatTokenPort).consumeChatToken(userId, response.userMessageId());
         ArgumentCaptor<ChatMessageQueuedEvent> eventCaptor = ArgumentCaptor.forClass(ChatMessageQueuedEvent.class);
         verify(IChatEventPublisherPort).publishMessageQueued(eventCaptor.capture());
         ChatMessageQueuedEvent event = eventCaptor.getValue();

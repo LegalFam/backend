@@ -92,6 +92,7 @@ Authorization: Bearer <accessToken>
 - `POST /api/v1/chat/sessions`
 - `PATCH /api/v1/chat/sessions/{sessionId}`
 - `DELETE /api/v1/chat/sessions/{sessionId}`
+- `GET /api/v1/chat/processing-status`
 - `GET /api/v1/chat/subscribe/{sessionId}`
 - `GET /api/v1/chat/sessions?size={size}&cursor={nextCursor}`
 - `GET /api/v1/chat/sessions/{sessionId}/messages?size={size}&cursor={nextCursor}`
@@ -218,9 +219,11 @@ Success response `202`:
 ```
 
 Notes:
-- Backend persists the user message, token consumption, session update, and outbox event in one transaction before async delivery continues.
-- Each accepted user message consumes `1` token from the current subscription period.
-- If async assistant processing fails later, that token is refunded automatically.
+- Backend persists the user message, session update, and outbox event in one transaction before async delivery continues.
+- Token consumption is applied after assistant processing finishes, once the backend knows which assistant route was used.
+- Parser-only responses consume up to `1` token; full RAG responses consume up to `3` tokens.
+- If fewer tokens remain than the route cost, backend consumes the remaining balance without going negative.
+- If async assistant processing fails before a result, no token consumption is applied.
 - Default mode (`CHAT_RABBIT_ENABLED=true`): transactional outbox -> RabbitMQ relay -> consumer -> n8n.
 - Fallback mode (`CHAT_RABBIT_ENABLED=false`): transactional outbox -> local async dispatch after commit.
 - Assistant response is persisted in DB before SSE dispatch is attempted.
@@ -229,9 +232,25 @@ Notes:
 Common errors:
 - `400` `message` missing/blank
 - `400` `sessionId` missing
-- `403` insufficient tokens
-- `403` inactive subscription
+- `403` forbidden session access
 - `403` session belongs to another user
+- `409` another message is still processing
+
+### `GET /api/v1/chat/processing-status`
+Return whether the authenticated user currently has one chat message waiting for an assistant result.
+
+Success response `200`:
+```json
+{
+  "processing": true,
+  "chatSessionId": "uuid",
+  "userMessageId": "uuid",
+  "status": "PROCESSING",
+  "updatedAt": "2026-01-01T00:00:00Z"
+}
+```
+
+When there is no pending message, `processing` is `false` and the other fields are `null`.
 
 ### `POST /api/v1/chat/sessions`
 Create a new chat session.
@@ -420,7 +439,7 @@ All error responses return:
 - When user presses send, create a local optimistic `USER` message in UI with a temporary client id and state like `sending`.
 - Disable repeated submits for the same text while the first `POST /api/v1/chat/send` is in flight.
 - If `/chat/send` returns `202`, replace the temporary id with `userMessageId` from backend and mark the message as `processing`.
-- Do not auto-retry `/chat/send` blindly after network timeout, browser abort, or unknown connection loss. The request may already have been accepted and would consume another token if sent again.
+- Do not auto-retry `/chat/send` blindly after network timeout, browser abort, or unknown connection loss. The request may already have been accepted and would create another queued message if sent again.
 - If send result is unknown, show a recoverable banner such as "Connection interrupted. We are checking your conversation status." then call `GET /api/v1/chat/sessions/{sessionId}/messages?size=20` to reconcile.
 - After reconciliation:
 - If the user message appears in history, keep it and continue waiting for assistant completion.
@@ -449,7 +468,7 @@ Recommended rendering behavior:
 - Show the user message immediately.
 - Show a spinner or "Analizando..." placeholder while in `processing`.
 - Replace placeholder when an `ASSISTANT` or `SYSTEM` persisted message appears in history.
-- Never depend on an internal backend processing field; those states are not exposed in v1 responses.
+- Use `GET /api/v1/chat/processing-status` to recover pending state after reloads, tab focus changes, login restoration, or switching sessions.
 
 ### 5. History reconciliation logic
 
@@ -479,7 +498,7 @@ Suggested reconciliation rule:
 
 For `POST /api/v1/chat/send`:
 - `400`: show inline validation error.
-- `403` with insufficient tokens or inactive subscription: block input and refresh `GET /api/v1/payments/subscription`.
+- `403` from protected chat endpoints: block input when access is forbidden and refresh `GET /api/v1/payments/subscription` if the error came from billing.
 - `403` session forbidden: return user to session list.
 - Unknown network failure: reconcile message history before offering resend.
 
@@ -488,7 +507,7 @@ For `GET /api/v1/chat/subscribe/{sessionId}`:
 - Transport disconnect: reconnect with backoff and refresh history.
 
 For `GET /api/v1/payments/subscription`:
-- Refresh this after accepted chat send, after assistant failure, after checkout success return, and after cancellation, because token balance or plan state may have changed.
+- Refresh this after assistant success, after checkout success return, and after cancellation, because token balance or plan state may have changed.
 
 ### 8. Payments flow recommendations
 
@@ -507,7 +526,7 @@ For `GET /api/v1/payments/subscription`:
 5. If `202`, mark local message as `processing` and refresh subscription summary in background.
 6. Wait for SSE, but also reconcile via history on reconnect or uncertainty.
 7. When persisted `ASSISTANT` message appears, stop pending UI.
-8. When persisted `SYSTEM` message appears, show error state and refresh subscription because token refund may have happened.
+8. When persisted `SYSTEM` message appears, show error state. No chat token is consumed when assistant processing fails before producing a result.
 
 ## Why This Architecture Helps Frontend Resilience
 

@@ -176,17 +176,22 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
 
     @Override
     @Transactional
-    public void consumeChatToken(UUID userId, UUID chatMessageId) {
-        if (chatMessageId == null) {
-            throw new InvalidPaymentRequestException("Chat message id is required");
+    public void consumeChatTokensForAssistantResult(UUID userId, UUID chatMessageId, int tokenCost) {
+        if (chatMessageId == null || tokenCost <= 0) {
+            return;
         }
+        int requestedTotalCost = Math.min(Math.max(tokenCost, 1), 3);
+
         if (IPaymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(
                 chatMessageId,
                 TokenTransactionType.CHAT_CONSUMPTION
         )) {
             return;
         }
+        consumeResolvedChatTokens(userId, chatMessageId, requestedTotalCost);
+    }
 
+    private void consumeResolvedChatTokens(UUID userId, UUID chatMessageId, int requestedTotalCost) {
         Subscription subscription = getOrCreateSubscriptionForUpdate(userId);
         if (IPaymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(
                 chatMessageId,
@@ -195,14 +200,19 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             return;
         }
         refreshFreeSubscriptionIfNeeded(subscription);
-        subscription.consumeChatToken(now());
-        subscription = IPaymentPersistencePort.saveSubscription(subscription);
+        int consumedTokens = 0;
+        if (subscription.getStatus() == SubscriptionStatus.ACTIVE) {
+            consumedTokens = subscription.consumeAvailableChatTokens(requestedTotalCost, now());
+            if (consumedTokens > 0) {
+                subscription = IPaymentPersistencePort.saveSubscription(subscription);
+            }
+        }
         saveTokenTransaction(
                 subscription,
                 chatMessageId,
                 TokenTransactionType.CHAT_CONSUMPTION,
-                -1,
-                "Chat token consumed for user message"
+                -consumedTokens,
+                "Chat tokens consumed after assistant route resolution"
         );
     }
 
@@ -232,7 +242,8 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             return;
         }
 
-        int delta = subscription.refundChatToken(now());
+        int consumedTokens = Math.max(-consumption.getTokenDelta(), 0);
+        int delta = subscription.refundChatTokens(consumedTokens, now());
         subscription = IPaymentPersistencePort.saveSubscription(subscription);
         saveTokenTransaction(
                 subscription,

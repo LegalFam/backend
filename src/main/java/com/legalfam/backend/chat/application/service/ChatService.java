@@ -7,9 +7,9 @@ import com.legalfam.backend.chat.application.policy.ChatPrivacyPolicy;
 import com.legalfam.backend.chat.application.port.in.IChatUseCase;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
-import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
+import com.legalfam.backend.chat.application.dto.ChatProcessingStatusResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
@@ -44,7 +44,6 @@ public class ChatService implements IChatUseCase {
     private static final int ASSISTANT_CONTEXT_CONTENT_LIMIT = 2000;
 
     private final IChatPersistencePort IChatPersistencePort;
-    private final IChatTokenPort IChatTokenPort;
     private final IChatEventPublisherPort IChatEventPublisherPort;
     private final ChatAccessPolicy chatAccessPolicy;
     private final ChatPrivacyPolicy chatPrivacyPolicy;
@@ -52,14 +51,12 @@ public class ChatService implements IChatUseCase {
 
     public ChatService(
             IChatPersistencePort IChatPersistencePort,
-            IChatTokenPort IChatTokenPort,
             IChatEventPublisherPort IChatEventPublisherPort,
             ChatAccessPolicy chatAccessPolicy,
             ChatPrivacyPolicy chatPrivacyPolicy,
             ChatMessageResponseMapper chatMessageResponseMapper
     ) {
         this.IChatPersistencePort = IChatPersistencePort;
-        this.IChatTokenPort = IChatTokenPort;
         this.IChatEventPublisherPort = IChatEventPublisherPort;
         this.chatAccessPolicy = chatAccessPolicy;
         this.chatPrivacyPolicy = chatPrivacyPolicy;
@@ -75,6 +72,9 @@ public class ChatService implements IChatUseCase {
         chatPrivacyPolicy.assertAllowed(messageInput);
         chatAccessPolicy.assertUserExists(userId);
         ChatSession chatSession = chatAccessPolicy.requireSessionOwner(userId, sessionId);
+        if (IChatPersistencePort.findActiveMessageProcessingByUserId(userId).isPresent()) {
+            throw new PendingAssistantMessageException("Message processing is already pending");
+        }
         if (IChatPersistencePort.existsUnreadAssistantMessageBySessionId(chatSession.getId())) {
             throw new PendingAssistantMessageException("Assistant receipt confirmation is still pending for this session");
         }
@@ -83,7 +83,6 @@ public class ChatService implements IChatUseCase {
         ChatMessage userMessage = ChatMessage.userMessage(chatSession.getId(), messageInput, now);
         List<ChatPreviousMessage> previousMessages = recentPreviousMessages(chatSession.getId());
 
-        IChatTokenPort.consumeChatToken(userId, userMessage.getId());
         userMessage = IChatPersistencePort.saveMessage(userMessage);
 
         ChatMessageProcessing messageProcessing = new ChatMessageProcessing();
@@ -103,6 +102,22 @@ public class ChatService implements IChatUseCase {
         ));
 
         return new ChatSendAcceptedResponse(chatSession.getId(), userMessage.getId(), "PROCESSING");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ChatProcessingStatusResponse getProcessingStatus(UUID userId) {
+        chatAccessPolicy.assertUserExists(userId);
+        return IChatPersistencePort.findActiveMessageProcessingByUserId(userId)
+                .flatMap(processing -> IChatPersistencePort.findMessageById(processing.getUserMessageId())
+                        .map(message -> new ChatProcessingStatusResponse(
+                                true,
+                                message.getChatSessionId(),
+                                processing.getUserMessageId(),
+                                processing.getStatus().name(),
+                                processing.getUpdatedAt()
+                        )))
+                .orElseGet(ChatProcessingStatusResponse::idle);
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.legalfam.backend.chat.infrastructure.api;
 import com.legalfam.backend.chat.application.port.in.IChatUseCase;
 import com.legalfam.backend.chat.application.dto.ChatAskRequest;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
+import com.legalfam.backend.chat.application.dto.ChatProcessingStatusResponse;
 import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
@@ -150,6 +151,19 @@ public class ChatController {
                 request.sessionId()
         );
         return ResponseEntity.accepted().body(response);
+    }
+
+    @GetMapping("/chat/processing-status")
+    @ProtectedApiOperation(summary = "Get current chat processing status")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Processing status fetched",
+                    content = @Content(schema = @Schema(implementation = ChatProcessingStatusResponse.class)))
+    })
+    public ResponseEntity<ChatProcessingStatusResponse> getProcessingStatus(
+            @AuthenticationPrincipal String principalUserId
+    ) {
+        UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
+        return ResponseEntity.ok(IChatUseCase.getProcessingStatus(userId));
     }
 
     @GetMapping("/chat/sessions")

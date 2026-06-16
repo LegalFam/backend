@@ -15,8 +15,8 @@ public class PaymentChatTokenAdapter implements IChatTokenPort {
     }
 
     @Override
-    public void consumeChatToken(UUID userId, UUID chatMessageId) {
-        IPaymentTokenUseCase.consumeChatToken(userId, chatMessageId);
+    public void consumeChatTokensForAssistantResult(UUID userId, UUID chatMessageId, int tokenCost) {
+        IPaymentTokenUseCase.consumeChatTokensForAssistantResult(userId, chatMessageId, tokenCost);
     }
 
     @Override

@@ -1,0 +1,90 @@
+package com.legalfam.backend.chat.infrastructure.adapter.out;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
+import com.legalfam.backend.chat.infrastructure.config.N8nProperties;
+import java.lang.reflect.Method;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+class N8nWebhookClientTest {
+
+    private N8nWebhookClient client;
+    private Method parseResponseBody;
+    private Method mapResponse;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        client = new N8nWebhookClient(
+                new ObjectMapper(),
+                new N8nProperties("http://localhost/webhook", "X-N8N-Token", "", 1000)
+        );
+        parseResponseBody = N8nWebhookClient.class.getDeclaredMethod("parseResponseBody", String.class);
+        parseResponseBody.setAccessible(true);
+        mapResponse = N8nWebhookClient.class.getDeclaredMethod("mapResponse", JsonNode.class);
+        mapResponse.setAccessible(true);
+    }
+
+    @Test
+    void mapResponseReadsExplicitParserOnlyTokenCost() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "citations": [],
+                  "citationSupportStatus": null,
+                  "agentTokenCost": 1
+                }
+                """);
+
+        assertEquals(1, response.metadata().agentTokenCost());
+    }
+
+    @Test
+    void mapResponseReadsExplicitRagTokenCostFromString() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "citations": [],
+                  "citationSupportStatus": "NONE",
+                  "agentTokenCost": "3"
+                }
+                """);
+
+        assertEquals(3, response.metadata().agentTokenCost());
+    }
+
+    @Test
+    void mapResponseDefaultsToParserOnlyCostWhenBillingMetadataIsInvalid() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "citations": [],
+                  "citationSupportStatus": null,
+                  "agentTokenCost": "invalid"
+                }
+                """);
+
+        assertEquals(1, response.metadata().agentTokenCost());
+    }
+
+    @Test
+    void mapResponseDefaultsToParserOnlyCostWhenBillingMetadataIsMissing() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "citations": [],
+                  "citationSupportStatus": "GOOD"
+                }
+                """);
+
+        assertEquals(1, response.metadata().agentTokenCost());
+    }
+
+    private ChatAssistantGatewayResponse map(String responseBody) throws Exception {
+        JsonNode root = (JsonNode) parseResponseBody.invoke(client, responseBody);
+        return (ChatAssistantGatewayResponse) mapResponse.invoke(client, root);
+    }
+}

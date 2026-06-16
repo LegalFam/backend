@@ -54,7 +54,8 @@ class ChatQueuedMessageServiceTest {
                 "clear question",
                 List.of("review documents"),
                 false,
-                "GOOD"
+                "GOOD",
+                3
         );
         List<ChatCitationResponse> citations = List.of(new ChatCitationResponse("source", "snippet", "https://example.test"));
         ChatAssistantGatewayResponse response = new ChatAssistantGatewayResponse("respuesta", citations, metadata);

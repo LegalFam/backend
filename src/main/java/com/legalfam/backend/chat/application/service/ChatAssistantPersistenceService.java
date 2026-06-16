@@ -101,6 +101,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         assistantMessage = IChatPersistencePort.saveMessage(assistantMessage);
 
         persistCitations(assistantMessage, citations);
+        consumeTokensForAssistantResult(chatSession.getUserId(), userMessageId, metadata);
         markUserMessageCompleted(userMessageId, now);
 
         chatSession.touch(now);
@@ -221,6 +222,12 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                 safeMetadata.specialistSupportRecommended(),
                 safeMetadata.citationSupportStatus()
         );
+    }
+
+    private void consumeTokensForAssistantResult(UUID userId, UUID userMessageId, ChatAssistantMetadata metadata) {
+        ChatAssistantMetadata safeMetadata = metadata == null ? ChatAssistantMetadata.empty() : metadata;
+        int agentTokenCost = safeMetadata.agentTokenCost() == null ? 1 : safeMetadata.agentTokenCost();
+        IChatTokenPort.consumeChatTokensForAssistantResult(userId, userMessageId, agentTokenCost);
     }
 
     private void markUserMessageCompleted(UUID userMessageId, Instant now) {

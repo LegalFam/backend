@@ -206,8 +206,17 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
                 readText(root, "confidenceReason"),
                 readStringArray(root.get("nextSteps")),
                 readBoolean(root, "specialistSupportRecommended"),
-                citationSupportStatus
+                citationSupportStatus,
+                readAgentTokenCost(root)
         );
+    }
+
+    private Integer readAgentTokenCost(JsonNode root) {
+        Integer explicitCost = readInteger(root, "agentTokenCost");
+        if (explicitCost != null && (explicitCost == 1 || explicitCost == 3)) {
+            return explicitCost;
+        }
+        return 1;
     }
 
     private String readCitationSupportStatus(JsonNode root) {
@@ -257,6 +266,27 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         }
         if ("false".equalsIgnoreCase(text)) {
             return false;
+        }
+        return null;
+    }
+
+    private Integer readInteger(JsonNode node, String key) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        JsonNode child = node.get(key);
+        if (child == null || child.isNull()) {
+            return null;
+        }
+        if (child.isIntegralNumber()) {
+            return child.asInt();
+        }
+        if (child.isTextual()) {
+            try {
+                return Integer.parseInt(child.asText().trim());
+            } catch (NumberFormatException ex) {
+                return null;
+            }
         }
         return null;
     }

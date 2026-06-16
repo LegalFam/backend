@@ -80,7 +80,7 @@ public class ChatExceptionHandler {
         return buildResponse(
                 HttpStatus.CONFLICT,
                 "chat_state_error",
-                "assistant_receipt_pending",
+                "message_processing_pending",
                 ex.getMessage(),
                 request.getRequestURI()
         );
