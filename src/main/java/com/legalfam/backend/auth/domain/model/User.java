@@ -10,6 +10,21 @@ public class User {
     private String name;
     private String phone;
 
+    public static User create(String email, String passwordHash, String name, String phone) {
+        User user = new User();
+        user.email = email;
+        user.password = passwordHash;
+        user.name = name;
+        user.phone = phone;
+        return user;
+    }
+
+    public static User restore(UUID id, String email, String passwordHash, String name, String phone) {
+        User user = create(email, passwordHash, name, phone);
+        user.id = id;
+        return user;
+    }
+
     public UUID getId() {
         return id;
     }

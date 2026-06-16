@@ -3,7 +3,6 @@ package com.legalfam.backend.chat.infrastructure.worker;
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
-import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.infrastructure.config.ChatOutboxRelayProperties;
 import java.time.Duration;
 import java.time.Instant;
@@ -53,7 +52,7 @@ public class ChatDeliveryRetryWorker {
     }
 
     private void relaySingleEvent(ChatOutboxEvent event) {
-        if (event.getStatus() == ChatOutboxEventStatus.READ) {
+        if (event.isRead()) {
             return;
         }
 

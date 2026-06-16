@@ -56,7 +56,7 @@ class ChatServiceTest {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
 
-        ChatSession session = ChatSession.rehydrate(sessionId, userId, null, Instant.now(), Instant.now());
+        ChatSession session = ChatSession.restore(sessionId, userId, null, Instant.now(), Instant.now());
 
         when(chatAccessPolicy.requireSessionOwner(userId, sessionId)).thenReturn(session);
         when(IChatPersistencePort.findActiveMessageProcessingByUserId(userId)).thenReturn(Optional.empty());

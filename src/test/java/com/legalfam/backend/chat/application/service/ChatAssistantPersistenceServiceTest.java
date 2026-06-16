@@ -42,7 +42,7 @@ class ChatAssistantPersistenceServiceTest {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
         UUID userMessageId = UUID.randomUUID();
-        ChatSession session = ChatSession.rehydrate(sessionId, userId, null, Instant.now(), Instant.now());
+        ChatSession session = ChatSession.restore(sessionId, userId, null, Instant.now(), Instant.now());
         ChatMessage userMessage = ChatMessage.userMessage(sessionId, "hola", Instant.now());
         ChatAssistantMetadata metadata = new ChatAssistantMetadata(
                 "MEDIUM",

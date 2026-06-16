@@ -15,6 +15,39 @@ public class ChatMessageProcessing {
     private Instant createdAt;
     private Instant updatedAt;
 
+    public static ChatMessageProcessing queued(UUID userMessageId, Instant now) {
+        ChatMessageProcessing processing = new ChatMessageProcessing();
+        processing.userMessageId = userMessageId;
+        processing.status = ChatMessageProcessingStatus.QUEUED;
+        processing.createdAt = now;
+        processing.updatedAt = now;
+        return processing;
+    }
+
+    public static ChatMessageProcessing restore(
+            UUID id,
+            UUID userMessageId,
+            ChatMessageProcessingStatus status,
+            String errorCode,
+            String errorMessage,
+            Instant startedAt,
+            Instant finishedAt,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+        ChatMessageProcessing processing = new ChatMessageProcessing();
+        processing.id = id;
+        processing.userMessageId = userMessageId;
+        processing.status = status;
+        processing.errorCode = errorCode;
+        processing.errorMessage = errorMessage;
+        processing.startedAt = startedAt;
+        processing.finishedAt = finishedAt;
+        processing.createdAt = createdAt;
+        processing.updatedAt = updatedAt;
+        return processing;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -85,5 +118,76 @@ public class ChatMessageProcessing {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public boolean isTerminal() {
+        return status == ChatMessageProcessingStatus.COMPLETED
+                || status == ChatMessageProcessingStatus.FAILED
+                || status == ChatMessageProcessingStatus.EXPIRED;
+    }
+
+    public boolean isProcessing() {
+        return status == ChatMessageProcessingStatus.PROCESSING;
+    }
+
+    public boolean start(Instant now) {
+        if (isTerminal()) {
+            return false;
+        }
+        if (isProcessing()) {
+            return true;
+        }
+        status = ChatMessageProcessingStatus.PROCESSING;
+        startedAt = now;
+        finishedAt = null;
+        errorCode = null;
+        errorMessage = null;
+        updatedAt = now;
+        return true;
+    }
+
+    public boolean complete(Instant now) {
+        if (isTerminal()) {
+            return false;
+        }
+        status = ChatMessageProcessingStatus.COMPLETED;
+        ensureStartedAt(now);
+        finishedAt = now;
+        errorCode = null;
+        errorMessage = null;
+        updatedAt = now;
+        return true;
+    }
+
+    public boolean fail(String errorCode, String errorMessage, Instant now) {
+        if (isTerminal()) {
+            return false;
+        }
+        status = ChatMessageProcessingStatus.FAILED;
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+        ensureStartedAt(now);
+        finishedAt = now;
+        updatedAt = now;
+        return true;
+    }
+
+    public boolean expire(String errorCode, String errorMessage, Instant now) {
+        if (isTerminal()) {
+            return false;
+        }
+        status = ChatMessageProcessingStatus.EXPIRED;
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+        ensureStartedAt(now);
+        finishedAt = now;
+        updatedAt = now;
+        return true;
+    }
+
+    private void ensureStartedAt(Instant now) {
+        if (startedAt == null) {
+            startedAt = now;
+        }
     }
 }

@@ -2,7 +2,6 @@ package com.legalfam.backend.chat.infrastructure.adapter.out;
 
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
-import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -24,12 +23,9 @@ public class ChatOutboxRelayTransactionService {
         List<ChatOutboxEvent> events = IChatPersistencePort.lockReadyOutboxEvents(now, batchSize);
         Instant nextAvailableAt = now.plus(retryDelay);
         for (ChatOutboxEvent event : events) {
-            if (event.getStatus() == ChatOutboxEventStatus.READ) {
-                continue;
+            if (event.reserveForRelay(nextAvailableAt, now)) {
+                IChatPersistencePort.saveOutboxEvent(event);
             }
-            event.setAvailableAt(nextAvailableAt);
-            event.setUpdatedAt(now);
-            IChatPersistencePort.saveOutboxEvent(event);
         }
         return events;
     }
@@ -37,24 +33,22 @@ public class ChatOutboxRelayTransactionService {
     @Transactional
     public void recordPublishSuccess(UUID aggregateId, Instant now) {
         IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(aggregateId)
-                .filter(event -> event.getStatus() != ChatOutboxEventStatus.READ)
+                .filter(event -> !event.isRead())
                 .ifPresent(event -> {
-                    event.setLastError(null);
-                    event.setUpdatedAt(now);
-                    IChatPersistencePort.saveOutboxEvent(event);
+                    if (event.recordRelaySuccess(now)) {
+                        IChatPersistencePort.saveOutboxEvent(event);
+                    }
                 });
     }
 
     @Transactional
     public void recordPublishFailure(UUID aggregateId, Instant now, Duration retryDelay, String errorMessage) {
         IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(aggregateId)
-                .filter(event -> event.getStatus() != ChatOutboxEventStatus.READ)
+                .filter(event -> !event.isRead())
                 .ifPresent(event -> {
-                    event.setStatus(ChatOutboxEventStatus.PENDING);
-                    event.setAvailableAt(now.plus(retryDelay));
-                    event.setLastError(errorMessage);
-                    event.setUpdatedAt(now);
-                    IChatPersistencePort.saveOutboxEvent(event);
+                    if (event.recordRelayFailure(now.plus(retryDelay), errorMessage, now)) {
+                        IChatPersistencePort.saveOutboxEvent(event);
+                    }
                 });
     }
 }

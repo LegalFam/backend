@@ -11,6 +11,25 @@ public class RefreshToken {
     private boolean revoked;
     private UUID userId;
 
+    public static RefreshToken issue(String tokenHash, UUID userId, Instant expiresAt) {
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.token = tokenHash;
+        refreshToken.userId = userId;
+        refreshToken.expiresAt = expiresAt;
+        refreshToken.revoked = false;
+        return refreshToken;
+    }
+
+    public static RefreshToken restore(UUID id, String tokenHash, Instant expiresAt, boolean revoked, UUID userId) {
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.id = id;
+        refreshToken.token = tokenHash;
+        refreshToken.expiresAt = expiresAt;
+        refreshToken.revoked = revoked;
+        refreshToken.userId = userId;
+        return refreshToken;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -49,5 +68,13 @@ public class RefreshToken {
 
     public void setUserId(UUID userId) {
         this.userId = userId;
+    }
+
+    public boolean canBeRotatedAt(Instant now) {
+        return !revoked && expiresAt != null && !expiresAt.isBefore(now);
+    }
+
+    public void revoke() {
+        revoked = true;
     }
 }

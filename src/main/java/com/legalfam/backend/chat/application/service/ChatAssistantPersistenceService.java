@@ -14,7 +14,6 @@ import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
-import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatSession;
 import java.time.Instant;
@@ -60,22 +59,15 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
 
         ChatMessageProcessing processing = IChatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
                 .orElseGet(() -> initializeProcessingRecord(userMessageId, Instant.now()));
-        if (processing.getStatus() == ChatMessageProcessingStatus.COMPLETED
-                || processing.getStatus() == ChatMessageProcessingStatus.FAILED
-                || processing.getStatus() == ChatMessageProcessingStatus.EXPIRED) {
+        if (processing.isTerminal()) {
             return false;
         }
-        if (processing.getStatus() == ChatMessageProcessingStatus.PROCESSING) {
+        if (processing.isProcessing()) {
             return true;
         }
 
         Instant now = Instant.now();
-        processing.setStatus(ChatMessageProcessingStatus.PROCESSING);
-        processing.setStartedAt(now);
-        processing.setFinishedAt(null);
-        processing.setErrorCode(null);
-        processing.setErrorMessage(null);
-        processing.setUpdatedAt(now);
+        processing.start(now);
         IChatPersistencePort.saveMessageProcessing(processing);
         return true;
     }
@@ -181,21 +173,13 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         }
         ChatMessageProcessing processing = IChatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
                 .orElseGet(() -> initializeProcessingRecord(userMessageId, now));
-        if (processing.getStatus() == ChatMessageProcessingStatus.COMPLETED
-                || processing.getStatus() == ChatMessageProcessingStatus.FAILED
-                || processing.getStatus() == ChatMessageProcessingStatus.EXPIRED) {
+        if (processing.isTerminal()) {
             return;
         }
 
-        processing.setStatus(ChatMessageProcessingStatus.EXPIRED);
-        processing.setErrorCode(errorCode);
-        processing.setErrorMessage(errorMessage);
-        if (processing.getStartedAt() == null) {
-            processing.setStartedAt(now);
+        if (processing.expire(errorCode, errorMessage, now)) {
+            IChatPersistencePort.saveMessageProcessing(processing);
         }
-        processing.setFinishedAt(now);
-        processing.setUpdatedAt(now);
-        IChatPersistencePort.saveMessageProcessing(processing);
     }
 
     private void persistCitations(ChatMessage assistantMessage, List<ChatCitationResponse> citations) {
@@ -237,15 +221,9 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         }
         ChatMessageProcessing processing = IChatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
                 .orElseGet(() -> initializeProcessingRecord(userMessageId, now));
-        processing.setStatus(ChatMessageProcessingStatus.COMPLETED);
-        processing.setFinishedAt(now);
-        processing.setErrorCode(null);
-        processing.setErrorMessage(null);
-        if (processing.getStartedAt() == null) {
-            processing.setStartedAt(now);
+        if (processing.complete(now)) {
+            IChatPersistencePort.saveMessageProcessing(processing);
         }
-        processing.setUpdatedAt(now);
-        IChatPersistencePort.saveMessageProcessing(processing);
     }
 
     private void markUserMessageFailed(UUID userMessageId, String errorCode, String errorMessage, Instant now) {
@@ -255,24 +233,13 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         }
         ChatMessageProcessing processing = IChatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
                 .orElseGet(() -> initializeProcessingRecord(userMessageId, now));
-        processing.setStatus(ChatMessageProcessingStatus.FAILED);
-        processing.setErrorCode(errorCode);
-        processing.setErrorMessage(errorMessage);
-        if (processing.getStartedAt() == null) {
-            processing.setStartedAt(now);
+        if (processing.fail(errorCode, errorMessage, now)) {
+            IChatPersistencePort.saveMessageProcessing(processing);
         }
-        processing.setFinishedAt(now);
-        processing.setUpdatedAt(now);
-        IChatPersistencePort.saveMessageProcessing(processing);
     }
 
     private ChatMessageProcessing initializeProcessingRecord(UUID userMessageId, Instant now) {
-        ChatMessageProcessing processing = new ChatMessageProcessing();
-        processing.setUserMessageId(userMessageId);
-        processing.setStatus(ChatMessageProcessingStatus.QUEUED);
-        processing.setCreatedAt(now);
-        processing.setUpdatedAt(now);
-        return processing;
+        return ChatMessageProcessing.queued(userMessageId, now);
     }
 
 }

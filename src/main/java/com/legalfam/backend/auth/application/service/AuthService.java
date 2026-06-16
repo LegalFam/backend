@@ -57,11 +57,7 @@ public class AuthService implements IAuthUseCase {
             throw new EmailAlreadyExistsException(email);
         }
 
-        User user = new User();
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(rawPassword));
-        user.setName(name);
-        user.setPhone(phone);
+        User user = User.create(email, passwordEncoder.encode(rawPassword), name, phone);
 
         User savedUser = IUserPort.save(user);
         IAuthEventPublisherPort.publishUserRegistered(new UserRegisteredEvent(savedUser.getId()));
@@ -90,11 +86,11 @@ public class AuthService implements IAuthUseCase {
                 .findByToken(tokenHash)
                 .orElseThrow(InvalidRefreshTokenException::new);
 
-        if (refreshToken.isRevoked() || refreshToken.getExpiresAt().isBefore(Instant.now())) {
+        if (!refreshToken.canBeRotatedAt(Instant.now())) {
             throw new InvalidRefreshTokenException();
         }
 
-        refreshToken.setRevoked(true);
+        refreshToken.revoke();
         IRefreshTokenPort.save(refreshToken);
 
         User user = IUserPort.findById(refreshToken.getUserId())
@@ -120,11 +116,11 @@ public class AuthService implements IAuthUseCase {
         String tokenValue = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
         String tokenHash = hashRefreshToken(tokenValue);
 
-        RefreshToken refreshToken = new RefreshToken();
-        refreshToken.setToken(tokenHash);
-        refreshToken.setRevoked(false);
-        refreshToken.setExpiresAt(Instant.now().plusMillis(refreshTokenExpirationMs));
-        refreshToken.setUserId(user.getId());
+        RefreshToken refreshToken = RefreshToken.issue(
+                tokenHash,
+                user.getId(),
+                Instant.now().plusMillis(refreshTokenExpirationMs)
+        );
 
         IRefreshTokenPort.save(refreshToken);
         return tokenValue;

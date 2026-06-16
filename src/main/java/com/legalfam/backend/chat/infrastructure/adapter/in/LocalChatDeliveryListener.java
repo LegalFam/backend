@@ -4,7 +4,6 @@ import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEv
 import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
-import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import java.time.Duration;
 import java.time.Instant;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -38,18 +37,13 @@ public class LocalChatDeliveryListener {
     public void process(ChatAssistantDeliveryQueuedEvent event) {
         ChatOutboxEvent outboxEvent = IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(event.assistantMessageId())
                 .orElse(null);
-        if (outboxEvent == null || outboxEvent.getStatus() == ChatOutboxEventStatus.READ) {
+        if (outboxEvent == null || outboxEvent.isRead()) {
             return;
         }
 
         Instant now = Instant.now();
         boolean delivered = IChatAssistantDeliveryPort.dispatchAssistantMessage(event.userId(), event.chatSessionId(), event.event());
-        outboxEvent.setAttemptCount(outboxEvent.getAttemptCount() + 1);
-        outboxEvent.setAvailableAt(now.plus(RETRY_DELAY));
-        outboxEvent.setStatus(delivered ? ChatOutboxEventStatus.PUBLISHED : ChatOutboxEventStatus.PENDING);
-        outboxEvent.setPublishedAt(delivered ? now : outboxEvent.getPublishedAt());
-        outboxEvent.setLastError(delivered ? null : "No active SSE subscriber available");
-        outboxEvent.setUpdatedAt(now);
+        outboxEvent.recordDeliveryAttempt(delivered, now.plus(RETRY_DELAY), "No active SSE subscriber available", now);
         IChatPersistencePort.saveOutboxEvent(outboxEvent);
     }
 }

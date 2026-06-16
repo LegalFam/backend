@@ -22,7 +22,7 @@ final class ChatEntityMapper {
     }
 
     static ChatSession toDomain(ChatSessionEntity entity) {
-        return ChatSession.rehydrate(
+        return ChatSession.restore(
                 entity.getId(),
                 entity.getUserId(),
                 entity.getTitle(),
@@ -42,7 +42,7 @@ final class ChatEntityMapper {
     }
 
     static ChatMessage toDomain(ChatMessageEntity entity) {
-        return ChatMessage.rehydrate(
+        return ChatMessage.restore(
                 entity.getId(),
                 entity.getChatSessionId(),
                 entity.getRole(),
@@ -78,17 +78,17 @@ final class ChatEntityMapper {
     }
 
     static ChatMessageProcessing toDomain(ChatMessageProcessingEntity entity) {
-        ChatMessageProcessing processing = new ChatMessageProcessing();
-        processing.setId(entity.getId());
-        processing.setUserMessageId(entity.getUserMessageId());
-        processing.setStatus(entity.getStatus());
-        processing.setErrorCode(entity.getErrorCode());
-        processing.setErrorMessage(entity.getErrorMessage());
-        processing.setStartedAt(entity.getStartedAt());
-        processing.setFinishedAt(entity.getFinishedAt());
-        processing.setCreatedAt(entity.getCreatedAt());
-        processing.setUpdatedAt(entity.getUpdatedAt());
-        return processing;
+        return ChatMessageProcessing.restore(
+                entity.getId(),
+                entity.getUserMessageId(),
+                entity.getStatus(),
+                entity.getErrorCode(),
+                entity.getErrorMessage(),
+                entity.getStartedAt(),
+                entity.getFinishedAt(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
     }
 
     static ChatMessageProcessingEntity toEntity(ChatMessageProcessing domain) {
@@ -106,21 +106,21 @@ final class ChatEntityMapper {
     }
 
     static ChatOutboxEvent toDomain(ChatOutboxEventEntity entity) {
-        ChatOutboxEvent event = new ChatOutboxEvent();
-        event.setId(entity.getId());
-        event.setEventType(entity.getEventType());
-        event.setAggregateId(entity.getAggregateId());
-        event.setChatSessionId(entity.getChatSessionId());
-        event.setPayload(entity.getPayload());
-        event.setStatus(entity.getStatus());
-        event.setAttemptCount(entity.getAttemptCount());
-        event.setAvailableAt(entity.getAvailableAt());
-        event.setPublishedAt(entity.getPublishedAt());
-        event.setReadAt(entity.getReadAt());
-        event.setLastError(entity.getLastError());
-        event.setCreatedAt(entity.getCreatedAt());
-        event.setUpdatedAt(entity.getUpdatedAt());
-        return event;
+        return ChatOutboxEvent.restore(
+                entity.getId(),
+                entity.getEventType(),
+                entity.getAggregateId(),
+                entity.getChatSessionId(),
+                entity.getPayload(),
+                entity.getStatus(),
+                entity.getAttemptCount(),
+                entity.getAvailableAt(),
+                entity.getPublishedAt(),
+                entity.getReadAt(),
+                entity.getLastError(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
     }
 
     static ChatOutboxEventEntity toEntity(ChatOutboxEvent domain) {

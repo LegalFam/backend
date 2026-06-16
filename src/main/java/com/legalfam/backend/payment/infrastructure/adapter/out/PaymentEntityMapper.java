@@ -15,7 +15,7 @@ final class PaymentEntityMapper {
     }
 
     static Subscription toDomain(SubscriptionEntity entity) {
-        return Subscription.rehydrate(
+        return Subscription.restore(
                 entity.getId(),
                 entity.getUserId(),
                 SubscriptionPlanCode.valueOf(entity.getPlanCode()),
@@ -53,16 +53,16 @@ final class PaymentEntityMapper {
     }
 
     static TokenTransaction toDomain(TokenTransactionEntity entity) {
-        TokenTransaction transaction = new TokenTransaction();
-        transaction.setId(entity.getId());
-        transaction.setSubscriptionId(entity.getSubscriptionId());
-        transaction.setUserId(entity.getUserId());
-        transaction.setChatMessageId(entity.getChatMessageId());
-        transaction.setType(TokenTransactionType.valueOf(entity.getType()));
-        transaction.setTokenDelta(entity.getTokenDelta());
-        transaction.setDescription(entity.getDescription());
-        transaction.setCreatedAt(entity.getCreatedAt());
-        return transaction;
+        return TokenTransaction.restore(
+                entity.getId(),
+                entity.getSubscriptionId(),
+                entity.getUserId(),
+                entity.getChatMessageId(),
+                TokenTransactionType.valueOf(entity.getType()),
+                entity.getTokenDelta(),
+                entity.getDescription(),
+                entity.getCreatedAt()
+        );
     }
 
     static TokenTransactionEntity toEntity(TokenTransaction domain) {

@@ -9,13 +9,13 @@ final class RefreshTokenEntityMapper {
     }
 
     static RefreshToken toDomain(RefreshTokenEntity entity) {
-        RefreshToken token = new RefreshToken();
-        token.setId(entity.getId());
-        token.setToken(entity.getToken());
-        token.setExpiresAt(entity.getExpiresAt());
-        token.setRevoked(entity.isRevoked());
-        token.setUserId(entity.getUserId());
-        return token;
+        return RefreshToken.restore(
+                entity.getId(),
+                entity.getToken(),
+                entity.getExpiresAt(),
+                entity.isRevoked(),
+                entity.getUserId()
+        );
     }
 
     static RefreshTokenEntity toEntity(RefreshToken domain) {

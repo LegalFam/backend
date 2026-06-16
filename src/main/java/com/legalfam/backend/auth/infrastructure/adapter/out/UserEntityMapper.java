@@ -9,13 +9,13 @@ final class UserEntityMapper {
     }
 
     static User toDomain(UserEntity entity) {
-        User user = new User();
-        user.setId(entity.getId());
-        user.setEmail(entity.getEmail());
-        user.setPassword(entity.getPassword());
-        user.setName(entity.getName());
-        user.setPhone(entity.getPhone());
-        return user;
+        return User.restore(
+                entity.getId(),
+                entity.getEmail(),
+                entity.getPassword(),
+                entity.getName(),
+                entity.getPhone()
+        );
     }
 
     static UserEntity toEntity(User domain) {

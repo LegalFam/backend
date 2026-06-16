@@ -25,7 +25,7 @@ public class ChatSession {
         return session;
     }
 
-    public static ChatSession rehydrate(
+    public static ChatSession restore(
             UUID id,
             UUID userId,
             String title,

@@ -32,7 +32,7 @@ public class Subscription {
         return subscription;
     }
 
-    public static Subscription rehydrate(
+    public static Subscription restore(
             UUID id,
             UUID userId,
             SubscriptionPlanCode planCode,

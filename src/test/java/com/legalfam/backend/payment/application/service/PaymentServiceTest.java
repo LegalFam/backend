@@ -154,7 +154,7 @@ class PaymentServiceTest {
     }
 
     private Subscription subscription(UUID subscriptionId, UUID userId, int remainingTokens, int monthlyTokenLimit) {
-        return Subscription.rehydrate(
+        return Subscription.restore(
                 subscriptionId,
                 userId,
                 SubscriptionPlanCode.FREE,

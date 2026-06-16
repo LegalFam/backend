@@ -55,7 +55,7 @@ public class ChatMessage {
         return message;
     }
 
-    public static ChatMessage rehydrate(
+    public static ChatMessage restore(
             UUID id,
             UUID chatSessionId,
             ChatMessageRole role,

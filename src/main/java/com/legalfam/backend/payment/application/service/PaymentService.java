@@ -472,14 +472,15 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             int tokenDelta,
             String description
     ) {
-        TokenTransaction transaction = new TokenTransaction();
-        transaction.setSubscriptionId(subscription.getId());
-        transaction.setUserId(subscription.getUserId());
-        transaction.setChatMessageId(chatMessageId);
-        transaction.setType(type);
-        transaction.setTokenDelta(tokenDelta);
-        transaction.setDescription(description);
-        transaction.setCreatedAt(now());
+        TokenTransaction transaction = TokenTransaction.create(
+                subscription.getId(),
+                subscription.getUserId(),
+                chatMessageId,
+                type,
+                tokenDelta,
+                description,
+                now()
+        );
         IPaymentPersistencePort.saveTokenTransaction(transaction);
     }
 

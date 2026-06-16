@@ -20,10 +20,8 @@ import com.legalfam.backend.chat.domain.exception.PendingAssistantMessageExcepti
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
-import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
-import com.legalfam.backend.chat.domain.model.ChatOutboxEventStatus;
 import com.legalfam.backend.chat.domain.model.ChatSession;
 import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
@@ -85,12 +83,7 @@ public class ChatService implements IChatUseCase {
 
         userMessage = IChatPersistencePort.saveMessage(userMessage);
 
-        ChatMessageProcessing messageProcessing = new ChatMessageProcessing();
-        messageProcessing.setUserMessageId(userMessage.getId());
-        messageProcessing.setStatus(ChatMessageProcessingStatus.QUEUED);
-        messageProcessing.setCreatedAt(now);
-        messageProcessing.setUpdatedAt(now);
-        IChatPersistencePort.saveMessageProcessing(messageProcessing);
+        IChatPersistencePort.saveMessageProcessing(ChatMessageProcessing.queued(userMessage.getId(), now));
 
         chatSession.touch(now);
         IChatPersistencePort.saveSession(chatSession);
@@ -211,9 +204,7 @@ public class ChatService implements IChatUseCase {
                 .orElseThrow(() -> new ChatNotFoundException("Assistant delivery event not found"));
 
         Instant now = Instant.now();
-        outboxEvent.setStatus(ChatOutboxEventStatus.READ);
-        outboxEvent.setReadAt(now);
-        outboxEvent.setUpdatedAt(now);
+        outboxEvent.markRead(now);
         IChatPersistencePort.saveOutboxEvent(outboxEvent);
 
         messageSession.touch(now);
