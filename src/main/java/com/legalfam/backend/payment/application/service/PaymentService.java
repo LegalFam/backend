@@ -213,44 +213,6 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         );
     }
 
-    @Override
-    @Transactional
-    public void refundChatToken(UUID chatMessageId) {
-        if (chatMessageId == null) {
-            return;
-        }
-        if (IPaymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(chatMessageId, TokenTransactionType.CHAT_REFUND)) {
-            return;
-        }
-
-        TokenTransaction consumption = IPaymentPersistencePort.findTokenTransactionByChatMessageIdAndType(
-                chatMessageId,
-                TokenTransactionType.CHAT_CONSUMPTION
-        ).orElse(null);
-        if (consumption == null) {
-            return;
-        }
-
-        Subscription subscription = IPaymentPersistencePort.findSubscriptionByIdForUpdate(consumption.getSubscriptionId()).orElse(null);
-        if (subscription == null) {
-            return;
-        }
-        if (IPaymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(chatMessageId, TokenTransactionType.CHAT_REFUND)) {
-            return;
-        }
-
-        int consumedTokens = Math.max(-consumption.getTokenDelta(), 0);
-        int delta = subscription.refundChatTokens(consumedTokens, now());
-        subscription = IPaymentPersistencePort.saveSubscription(subscription);
-        saveTokenTransaction(
-                subscription,
-                chatMessageId,
-                TokenTransactionType.CHAT_REFUND,
-                delta,
-                "Refunded chat token after assistant processing failure"
-        );
-    }
-
     private PaymentSubscriptionResponse toSubscriptionResponse(Subscription subscription) {
         return new PaymentSubscriptionResponse(
                 subscription.getPlanCode().name(),

@@ -24,8 +24,6 @@ public interface IPaymentPersistencePort {
 
     TokenTransaction saveTokenTransaction(TokenTransaction tokenTransaction);
 
-    Optional<TokenTransaction> findTokenTransactionByChatMessageIdAndType(UUID chatMessageId, TokenTransactionType type);
-
     boolean existsTokenTransactionByChatMessageIdAndType(UUID chatMessageId, TokenTransactionType type);
 
     boolean tryRecordProcessedWebhookEvent(String eventId, String eventType, Instant processedAt);

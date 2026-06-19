@@ -2,7 +2,7 @@ package com.legalfam.backend.payment.infrastructure.adapter.in;
 
 import static org.mockito.Mockito.verify;
 
-import com.legalfam.backend.common.event.UserRegisteredEvent;
+import com.legalfam.backend.common.identity.event.UserRegisteredEvent;
 import com.legalfam.backend.payment.application.port.in.IPaymentProvisioningUseCase;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;

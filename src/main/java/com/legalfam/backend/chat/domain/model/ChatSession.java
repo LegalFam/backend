@@ -61,7 +61,7 @@ public class ChatSession {
         return updatedAt;
     }
 
-    public void touch(Instant now) {
+    public void onUpdate(Instant now) {
         this.updatedAt = now;
     }
 

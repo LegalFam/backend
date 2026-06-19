@@ -1,7 +1,7 @@
 package com.legalfam.backend.auth.infrastructure.adapter.out;
 
 import com.legalfam.backend.auth.application.port.out.IAuthEventPublisherPort;
-import com.legalfam.backend.common.event.UserRegisteredEvent;
+import com.legalfam.backend.common.identity.event.UserRegisteredEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 

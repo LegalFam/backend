@@ -201,8 +201,8 @@ curl -X POST http://localhost:8080/api/v1/auth/refresh \
 ### Send chat message (protected, async)
 
 Configure `N8N_WEBHOOK_URL` (`N8N_AUTH_TOKEN` optional).  
-By default this request writes the user message, token consumption, session update, and an outbox row in the same database transaction. A relay then publishes the queued event asynchronously to RabbitMQ (or local async processing when Rabbit is disabled).
-`sessionId` is required and each accepted request consumes `1` monthly token. If assistant processing fails later, that token is refunded automatically.
+By default this request writes the user message, session update, and an outbox row in the same database transaction. A relay then publishes the queued event asynchronously to RabbitMQ (or local async processing when Rabbit is disabled).
+`sessionId` is required. Chat tokens are consumed only after the assistant response is resolved and persisted.
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/chat/send \
@@ -422,8 +422,7 @@ Refresh token rotation is enabled: each successful refresh revokes the old refre
 - `BASIC`: `500` monthly tokens, `PEN 14.99`, reset on the Mercado Pago billing cycle.
 - `PREMIUM`: `2500` monthly tokens, `PEN 49.99`, reset on the Mercado Pago billing cycle.
 - Users start on `FREE` immediately after signup.
-- Chat tokens are deducted when `POST /api/v1/chat/send` is accepted.
-- Failed assistant processing refunds the token tied to that user message.
+- Chat tokens are deducted after the assistant response is resolved and persisted.
 
 ## Chat Delivery Model
 

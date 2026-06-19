@@ -1,4 +1,4 @@
-package com.legalfam.backend.common.event;
+package com.legalfam.backend.common.identity.event;
 
 import java.util.UUID;
 

@@ -67,25 +67,6 @@ class SubscriptionTest {
     }
 
     @Test
-    void refundChatTokensCapsAtMonthlyLimit() {
-        Instant now = Instant.parse("2026-01-01T00:00:00Z");
-        Subscription subscription = Subscription.createFree(
-                UUID.randomUUID(),
-                SubscriptionPlanCode.FREE,
-                3,
-                now,
-                Instant.parse("2026-02-01T00:00:00Z"),
-                now
-        );
-        subscription.consumeChatToken(Instant.parse("2026-01-01T00:01:00Z"));
-
-        int delta = subscription.refundChatTokens(3, Instant.parse("2026-01-01T00:02:00Z"));
-
-        assertEquals(1, delta);
-        assertEquals(3, subscription.getRemainingTokens());
-    }
-
-    @Test
     void syncGatewaySubscriptionPreservesUsedTokensOnPlanChange() {
         Instant now = Instant.parse("2026-01-01T00:00:00Z");
         Subscription subscription = Subscription.createFree(

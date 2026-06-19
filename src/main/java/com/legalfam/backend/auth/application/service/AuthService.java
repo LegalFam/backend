@@ -5,7 +5,7 @@ import com.legalfam.backend.auth.application.port.out.IAccessTokenPort;
 import com.legalfam.backend.auth.application.port.out.IAuthEventPublisherPort;
 import com.legalfam.backend.auth.application.port.out.IRefreshTokenPort;
 import com.legalfam.backend.auth.application.port.out.IUserPort;
-import com.legalfam.backend.common.event.UserRegisteredEvent;
+import com.legalfam.backend.common.identity.event.UserRegisteredEvent;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;

@@ -96,7 +96,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         consumeTokensForAssistantResult(chatSession.getUserId(), userMessageId, metadata);
         markUserMessageCompleted(userMessageId, now);
 
-        chatSession.touch(now);
+        chatSession.onUpdate(now);
         IChatPersistencePort.saveSession(chatSession);
 
         ChatAssistantMessageEvent assistantMessageEvent = new ChatAssistantMessageEvent(
@@ -146,9 +146,8 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         failureMessage = IChatPersistencePort.saveMessage(failureMessage);
         markUserMessageFailed(userMessageId, errorCode, errorMessage, now);
 
-        chatSession.touch(now);
+        chatSession.onUpdate(now);
         IChatPersistencePort.saveSession(chatSession);
-        IChatTokenPort.refundChatToken(userMessageId);
 
         return new ChatAssistantErrorDispatch(
                 chatSession.getUserId(),

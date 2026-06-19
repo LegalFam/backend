@@ -75,15 +75,6 @@ public class JpaPaymentPersistenceAdapter implements IPaymentPersistencePort {
     }
 
     @Override
-    public Optional<TokenTransaction> findTokenTransactionByChatMessageIdAndType(
-            UUID chatMessageId,
-            TokenTransactionType type
-    ) {
-        return ITokenTransactionRepository.findByChatMessageIdAndType(chatMessageId, type.name())
-                .map(PaymentEntityMapper::toDomain);
-    }
-
-    @Override
     public boolean existsTokenTransactionByChatMessageIdAndType(UUID chatMessageId, TokenTransactionType type) {
         return ITokenTransactionRepository.existsByChatMessageIdAndType(chatMessageId, type.name());
     }

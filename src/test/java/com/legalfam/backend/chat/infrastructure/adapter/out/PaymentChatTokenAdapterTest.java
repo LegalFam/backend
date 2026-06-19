@@ -28,13 +28,4 @@ class PaymentChatTokenAdapterTest {
 
         verify(IPaymentTokenUseCase).consumeChatTokensForAssistantResult(userId, chatMessageId, 3);
     }
-
-    @Test
-    void refundChatTokenDelegatesToPaymentUseCase() {
-        UUID chatMessageId = UUID.randomUUID();
-
-        paymentChatTokenAdapter.refundChatToken(chatMessageId);
-
-        verify(IPaymentTokenUseCase).refundChatToken(chatMessageId);
-    }
 }

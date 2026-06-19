@@ -1,6 +1,5 @@
 package com.legalfam.backend.payment.domain.model;
 
-import com.legalfam.backend.payment.domain.exception.InsufficientTokensException;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import com.legalfam.backend.payment.domain.exception.SubscriptionInactiveException;
 import java.time.Instant;
@@ -123,15 +122,6 @@ public class Subscription {
         return updatedAt;
     }
 
-    public void consumeChatToken(Instant now) {
-        assertActive();
-        if (remainingTokens <= 0) {
-            throw new InsufficientTokensException("No chat tokens remaining for the current period");
-        }
-        remainingTokens -= 1;
-        updatedAt = now;
-    }
-
     public int consumeAvailableChatTokens(int requestedTokens, Instant now) {
         assertActive();
         if (requestedTokens <= 0 || remainingTokens <= 0) {
@@ -143,24 +133,8 @@ public class Subscription {
         return consumedTokens;
     }
 
-    public int refundChatToken(Instant now) {
-        return refundChatTokens(1, now);
-    }
-
-    public int refundChatTokens(int tokenCount, Instant now) {
-        if (tokenCount <= 0) {
-            return 0;
-        }
-        int nextRemainingTokens = Math.min(monthlyTokenLimit, remainingTokens + tokenCount);
-        int delta = nextRemainingTokens - remainingTokens;
-        remainingTokens = nextRemainingTokens;
-        updatedAt = now;
-        return delta;
-    }
-
     public boolean shouldRefreshFreePeriodAt(Instant now) {
-        return provider == PaymentProvider.FREE
-                && (currentPeriodEnd == null || !now.isBefore(currentPeriodEnd));
+        return provider == PaymentProvider.FREE && (currentPeriodEnd == null || !now.isBefore(currentPeriodEnd));
     }
 
     public void assertCheckoutAllowedFor(SubscriptionPlanCode targetPlanCode) {
@@ -191,9 +165,7 @@ public class Subscription {
         this.cancelAtPeriodEnd = false;
         this.monthlyTokenLimit = tokenLimit;
         this.remainingTokens = tokenLimit;
-        if (createdAt == null) {
-            createdAt = now;
-        }
+        if (createdAt == null) { createdAt = now; }
         updatedAt = now;
     }
 
@@ -233,9 +205,7 @@ public class Subscription {
         this.cancelAtPeriodEnd = cancelAtPeriodEnd;
         this.monthlyTokenLimit = monthlyTokenLimit;
 
-        if (createdAt == null) {
-            createdAt = now;
-        }
+        if (createdAt == null) { createdAt = now; }
         if (resetPeriodTokens) {
             remainingTokens = monthlyTokenLimit;
         } else if (previousPlan != planCode) {
@@ -252,14 +222,10 @@ public class Subscription {
     }
 
     public boolean hasGatewaySubscription() {
-        return provider == PaymentProvider.MERCADO_PAGO
-                && gatewaySubscriptionId != null
-                && !gatewaySubscriptionId.isBlank();
+        return provider == PaymentProvider.MERCADO_PAGO && gatewaySubscriptionId != null && !gatewaySubscriptionId.isBlank();
     }
 
     private void assertActive() {
-        if (status != SubscriptionStatus.ACTIVE) {
-            throw new SubscriptionInactiveException("Subscription is not active");
-        }
+        if (status != SubscriptionStatus.ACTIVE) { throw new SubscriptionInactiveException("Subscription is not active"); }
     }
 }

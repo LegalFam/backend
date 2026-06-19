@@ -83,7 +83,7 @@ public class ChatService implements IChatUseCase {
 
         IChatPersistencePort.saveMessageProcessing(ChatMessageProcessing.queued(userMessage.getId(), now));
 
-        chatSession.touch(now);
+        chatSession.onUpdate(now);
         IChatPersistencePort.saveSession(chatSession);
         IChatEventPublisherPort.publishMessageQueued(new ChatMessageQueuedEvent(
                 chatSession.getId(),
@@ -205,7 +205,7 @@ public class ChatService implements IChatUseCase {
         outboxEvent.markRead(now);
         IChatPersistencePort.saveOutboxEvent(outboxEvent);
 
-        messageSession.touch(now);
+        messageSession.onUpdate(now);
         IChatPersistencePort.saveSession(messageSession);
     }
 

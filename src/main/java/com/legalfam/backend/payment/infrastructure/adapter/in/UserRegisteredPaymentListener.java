@@ -1,6 +1,6 @@
 package com.legalfam.backend.payment.infrastructure.adapter.in;
 
-import com.legalfam.backend.common.event.UserRegisteredEvent;
+import com.legalfam.backend.common.identity.event.UserRegisteredEvent;
 import com.legalfam.backend.payment.application.port.in.IPaymentProvisioningUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;

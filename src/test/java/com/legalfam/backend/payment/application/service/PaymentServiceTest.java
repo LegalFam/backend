@@ -129,30 +129,6 @@ class PaymentServiceTest {
         verify(paymentPersistencePort, never()).saveTokenTransaction(any());
     }
 
-    @Test
-    void refundChatTokenRefundsConsumption() {
-        UUID userId = UUID.randomUUID();
-        UUID subscriptionId = UUID.randomUUID();
-        UUID chatMessageId = UUID.randomUUID();
-        Subscription subscription = subscription(subscriptionId, userId, 0, 5);
-        TokenTransaction consumption = tokenTransaction(subscriptionId, userId, chatMessageId, -3);
-        when(paymentPersistencePort.findTokenTransactionByChatMessageIdAndType(
-                chatMessageId,
-                TokenTransactionType.CHAT_CONSUMPTION
-        )).thenReturn(Optional.of(consumption));
-        when(paymentPersistencePort.findSubscriptionByIdForUpdate(subscriptionId)).thenReturn(Optional.of(subscription));
-        when(paymentPersistencePort.saveSubscription(any(Subscription.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        paymentService.refundChatToken(chatMessageId);
-
-        assertEquals(3, subscription.getRemainingTokens());
-        ArgumentCaptor<TokenTransaction> transactionCaptor = ArgumentCaptor.forClass(TokenTransaction.class);
-        verify(paymentPersistencePort).saveTokenTransaction(transactionCaptor.capture());
-        TokenTransaction transaction = transactionCaptor.getValue();
-        assertEquals(TokenTransactionType.CHAT_REFUND, transaction.getType());
-        assertEquals(3, transaction.getTokenDelta());
-    }
-
     private Subscription subscription(UUID subscriptionId, UUID userId, int remainingTokens, int monthlyTokenLimit) {
         return Subscription.restore(
                 subscriptionId,
@@ -172,15 +148,4 @@ class PaymentServiceTest {
         );
     }
 
-    private TokenTransaction tokenTransaction(UUID subscriptionId, UUID userId, UUID chatMessageId, int tokenDelta) {
-        TokenTransaction transaction = new TokenTransaction();
-        transaction.setSubscriptionId(subscriptionId);
-        transaction.setUserId(userId);
-        transaction.setChatMessageId(chatMessageId);
-        transaction.setType(TokenTransactionType.CHAT_CONSUMPTION);
-        transaction.setTokenDelta(tokenDelta);
-        transaction.setDescription("test");
-        transaction.setCreatedAt(NOW);
-        return transaction;
-    }
 }
