@@ -54,7 +54,7 @@ public class AuthService implements IAuthUseCase {
     @Transactional
     public TokenResponse signup(String email, String rawPassword, String name, String phone) {
         if (IUserPort.existsByEmail(email)) {
-            throw new EmailAlreadyExistsException(email);
+            throw EmailAlreadyExistsException.forEmail(email);
         }
 
         User user = User.create(email, passwordEncoder.encode(rawPassword), name, phone);
@@ -69,10 +69,10 @@ public class AuthService implements IAuthUseCase {
     public TokenResponse login(String email, String rawPassword) {
         User user = IUserPort
                 .findByEmail(email)
-                .orElseThrow(InvalidCredentialsException::new);
+                .orElseThrow(InvalidCredentialsException::invalidCredentials);
 
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
-            throw new InvalidCredentialsException();
+            throw InvalidCredentialsException.invalidCredentials();
         }
 
         return issueTokens(user);
@@ -84,17 +84,17 @@ public class AuthService implements IAuthUseCase {
         String tokenHash = hashRefreshToken(refreshTokenValue);
         RefreshToken refreshToken = IRefreshTokenPersistencePort
                 .findByToken(tokenHash)
-                .orElseThrow(InvalidRefreshTokenException::new);
+                .orElseThrow(InvalidRefreshTokenException::invalidRefreshToken);
 
         if (!refreshToken.canBeRotatedAt(Instant.now())) {
-            throw new InvalidRefreshTokenException();
+            throw InvalidRefreshTokenException.invalidRefreshToken();
         }
 
         refreshToken.revoke();
         IRefreshTokenPersistencePort.save(refreshToken);
 
         User user = IUserPort.findById(refreshToken.getUserId())
-                .orElseThrow(InvalidRefreshTokenException::new);
+                .orElseThrow(InvalidRefreshTokenException::invalidRefreshToken);
         return issueTokens(user);
     }
 

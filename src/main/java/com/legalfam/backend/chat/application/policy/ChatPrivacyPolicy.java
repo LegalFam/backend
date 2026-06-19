@@ -1,5 +1,6 @@
 package com.legalfam.backend.chat.application.policy;
 
+import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
@@ -23,9 +24,7 @@ public class ChatPrivacyPolicy {
                 || PHONE_PATTERN.matcher(messageInput).find()
                 || DNI_PATTERN.matcher(messageInput).find()
                 || ADDRESS_PATTERN.matcher(messageInput).find()) {
-            throw new InvalidChatRequestException(
-                    "Evita enviar datos personales como DNI, telefono, correo o direccion. Describe la situacion de forma general."
-            );
+            throw InvalidChatRequestException.of(ChatApiError.PERSONAL_DATA_NOT_ALLOWED);
         }
     }
 }

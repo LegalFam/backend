@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.legalfam.backend.chat.domain.exception.PendingAssistantMessageException;
+import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import com.legalfam.backend.chat.infrastructure.api.handler.ChatExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,8 +33,8 @@ class ChatExceptionHandlerTest {
         mockMvc.perform(get("/api/v1/chat/errors/upstream"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.type", is("upstream_error")))
-                .andExpect(jsonPath("$.code", is("UPSTREAM_UNAVAILABLE")))
-                .andExpect(jsonPath("$.message", is("El servicio de respuesta no esta disponible.")))
+                .andExpect(jsonPath("$.code", is("upstream_unavailable")))
+                .andExpect(jsonPath("$.message", is("Assistant service is unavailable")))
                 .andExpect(jsonPath("$.status", is(502)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/errors/upstream")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
@@ -44,7 +45,7 @@ class ChatExceptionHandlerTest {
         mockMvc.perform(get("/api/v1/chat/errors/pending"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.type", is("chat_state_error")))
-                .andExpect(jsonPath("$.code", is("message_processing_pending")))
+                .andExpect(jsonPath("$.code", is("assistant_receipt_pending")))
                 .andExpect(jsonPath("$.message", is("Assistant receipt confirmation is still pending for this session")))
                 .andExpect(jsonPath("$.status", is(409)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/errors/pending")))
@@ -56,12 +57,12 @@ class ChatExceptionHandlerTest {
 
         @GetMapping("/api/v1/chat/errors/upstream")
         String upstream() {
-            throw new ChatUpstreamException("UPSTREAM_UNAVAILABLE", "El servicio de respuesta no esta disponible.");
+            throw ChatUpstreamException.of(ChatApiError.UPSTREAM_UNAVAILABLE);
         }
 
         @GetMapping("/api/v1/chat/errors/pending")
         String pending() {
-            throw new PendingAssistantMessageException("Assistant receipt confirmation is still pending for this session");
+            throw PendingAssistantMessageException.receiptPending();
         }
     }
 }

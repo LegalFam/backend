@@ -21,6 +21,7 @@ import com.legalfam.backend.payment.application.dto.PaymentSubscriptionResponse;
 import com.legalfam.backend.payment.application.service.PaymentService;
 import com.legalfam.backend.payment.domain.exception.InsufficientTokensException;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
+import com.legalfam.backend.payment.domain.exception.PaymentApiError;
 import com.legalfam.backend.payment.infrastructure.api.PaymentController;
 import com.legalfam.backend.payment.infrastructure.api.PaymentWebhookController;
 import com.legalfam.backend.payment.infrastructure.api.handler.PaymentExceptionHandler;
@@ -144,7 +145,7 @@ class PaymentControllerTest {
     void cancelSubscriptionReturnsForbiddenWhenTokensAreMissing() throws Exception {
         UUID userId = UUID.randomUUID();
         authenticateAs(userId.toString());
-        doThrow(new InsufficientTokensException("No chat tokens remaining for the current period"))
+        doThrow(InsufficientTokensException.insufficientTokens())
                 .when(paymentService)
                 .cancelSubscription(userId);
 
@@ -156,7 +157,7 @@ class PaymentControllerTest {
 
     @Test
     void webhookReturnsBadRequestWhenPayloadIsMissing() throws Exception {
-        doThrow(new InvalidPaymentRequestException("Webhook payload is required"))
+        doThrow(InvalidPaymentRequestException.of(PaymentApiError.WEBHOOK_PAYLOAD_REQUIRED))
                 .when(paymentService)
                 .handleWebhook(any(), any(), any(), any());
 

@@ -28,6 +28,9 @@ public class ChatMessageEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "error_code")
+    private String errorCode;
+
     @Column(nullable = true)
     private Integer rating;
 
@@ -85,6 +88,14 @@ public class ChatMessageEntity {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
+    }
+
+    public void setErrorCode(String errorCode) {
+        this.errorCode = errorCode;
     }
 
     public Integer getRating() {

@@ -80,7 +80,7 @@ class ChatControllerTest {
                         .content("{\"message\":\"   \"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
-                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.code", is("message_required")))
                 .andExpect(jsonPath("$.message", is("Message is required")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/send")))
@@ -98,7 +98,7 @@ class ChatControllerTest {
                         .content("{\"message\":\"hola\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
-                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.code", is("session_id_required")))
                 .andExpect(jsonPath("$.message", is("Session id is required")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/send")))
@@ -234,6 +234,7 @@ class ChatControllerTest {
                         messageId,
                         "ASSISTANT",
                         "Hola",
+                        null,
                         5,
                         "util",
                         Instant.parse("2026-01-01T00:00:01Z"),

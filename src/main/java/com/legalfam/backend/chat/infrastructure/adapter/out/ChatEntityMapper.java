@@ -47,6 +47,7 @@ final class ChatEntityMapper {
                 entity.getChatSessionId(),
                 entity.getRole(),
                 entity.getContent(),
+                entity.getErrorCode(),
                 entity.getRating(),
                 entity.getFeedbackComment(),
                 entity.getFeedbackSubmittedAt(),
@@ -65,6 +66,7 @@ final class ChatEntityMapper {
         entity.setChatSessionId(domain.getChatSessionId());
         entity.setRole(domain.getRole());
         entity.setContent(domain.getContent());
+        entity.setErrorCode(domain.getErrorCode());
         entity.setRating(domain.getRating());
         entity.setFeedbackComment(domain.getFeedbackComment());
         entity.setFeedbackSubmittedAt(domain.getFeedbackSubmittedAt());

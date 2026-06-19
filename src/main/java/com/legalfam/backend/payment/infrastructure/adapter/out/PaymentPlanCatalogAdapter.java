@@ -3,6 +3,7 @@ package com.legalfam.backend.payment.infrastructure.adapter.out;
 import com.legalfam.backend.payment.application.dto.PaymentPlanDefinition;
 import com.legalfam.backend.payment.application.port.out.IPaymentPlanCatalogPort;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
+import com.legalfam.backend.payment.domain.exception.PaymentApiError;
 import com.legalfam.backend.payment.domain.model.SubscriptionPlanCode;
 import com.legalfam.backend.payment.infrastructure.config.PaymentPlanProperties;
 import java.util.List;
@@ -41,22 +42,22 @@ public class PaymentPlanCatalogAdapter implements IPaymentPlanCatalogPort {
         SubscriptionPlanCode normalizedCode = parseCode(code);
         PaymentPlanDefinition plan = plansByCode.get(normalizedCode);
         if (plan == null || plan.isFree()) {
-            throw new InvalidPaymentRequestException("Paid plan is required");
+            throw InvalidPaymentRequestException.of(PaymentApiError.PAID_PLAN_REQUIRED);
         }
         if (!plan.isPurchasable()) {
-            throw new InvalidPaymentRequestException("Selected plan is not configured for checkout");
+            throw InvalidPaymentRequestException.of(PaymentApiError.PLAN_NOT_PURCHASABLE);
         }
         return plan;
     }
 
     private SubscriptionPlanCode parseCode(String code) {
         if (code == null || code.isBlank()) {
-            throw new InvalidPaymentRequestException("Plan code is required");
+            throw InvalidPaymentRequestException.of(PaymentApiError.PLAN_CODE_REQUIRED);
         }
         try {
             return SubscriptionPlanCode.valueOf(code.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            throw new InvalidPaymentRequestException("Plan code is invalid");
+            throw InvalidPaymentRequestException.of(PaymentApiError.PLAN_CODE_INVALID);
         }
     }
 

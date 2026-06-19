@@ -1,5 +1,6 @@
 package com.legalfam.backend.chat.domain.model;
 
+import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import java.time.Instant;
 import java.util.UUID;
@@ -47,7 +48,7 @@ public class ChatSession {
 
     public void rename(String title, Instant now) {
         if (title == null || title.isBlank()) {
-            throw new InvalidChatRequestException("Session title is required");
+            throw InvalidChatRequestException.of(ChatApiError.SESSION_TITLE_REQUIRED);
         }
         String normalized = title.trim();
         this.title = normalized.length() > MAX_TITLE_LENGTH

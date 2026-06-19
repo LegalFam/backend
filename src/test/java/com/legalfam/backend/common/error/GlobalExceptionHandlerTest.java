@@ -54,7 +54,7 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
                 .andExpect(jsonPath("$.code", is("invalid_request")))
-                .andExpect(jsonPath("$.message", is("Value is required")))
+                .andExpect(jsonPath("$.message", is("Request validation failed")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/errors/validation")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));

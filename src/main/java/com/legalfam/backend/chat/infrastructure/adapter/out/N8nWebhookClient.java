@@ -5,6 +5,7 @@ import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
+import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import com.legalfam.backend.chat.infrastructure.config.N8nProperties;
 import org.slf4j.Logger;
@@ -66,7 +67,7 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
 
         if (webhookUrl == null || webhookUrl.isBlank()) {
             log.warn("Skipping n8n call because app.n8n.webhook-url is empty");
-            throw new ChatUpstreamException("UPSTREAM_NOT_CONFIGURED", "El servicio de respuesta no esta configurado.");
+            throw ChatUpstreamException.of(ChatApiError.UPSTREAM_NOT_CONFIGURED);
         }
 
         validateWebhookUrl(webhookUrl);
@@ -89,13 +90,13 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
             throw buildStatusException(statusCode, ex.getResponseBodyAsString());
         } catch (ResourceAccessException ex) {
             if (isTimeout(ex)) {
-                throw new ChatUpstreamException("UPSTREAM_TIMEOUT", "La respuesta esta tardando mas de lo esperado.");
+                throw ChatUpstreamException.of(ChatApiError.UPSTREAM_TIMEOUT);
             }
             log.error("Failed to reach n8n webhook", ex);
-            throw new ChatUpstreamException("UPSTREAM_UNAVAILABLE", "No se pudo conectar con el servicio de respuesta.");
+            throw ChatUpstreamException.of(ChatApiError.UPSTREAM_UNAVAILABLE);
         } catch (RuntimeException ex) {
             log.error("Unexpected error while calling n8n webhook", ex);
-            throw new ChatUpstreamException("UPSTREAM_UNAVAILABLE", "El servicio de respuesta no esta disponible.");
+            throw ChatUpstreamException.of(ChatApiError.UPSTREAM_UNAVAILABLE);
         }
 
         if (!response.getStatusCode().is2xxSuccessful()) {
@@ -115,7 +116,7 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         try {
             URI.create(url.trim());
         } catch (IllegalArgumentException ex) {
-            throw new ChatUpstreamException("UPSTREAM_NOT_CONFIGURED", "El servicio de respuesta esta mal configurado.");
+            throw ChatUpstreamException.of(ChatApiError.UPSTREAM_NOT_CONFIGURED);
         }
     }
 
@@ -147,13 +148,13 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (Exception ex) {
-            throw new ChatUpstreamException("UPSTREAM_REQUEST_INVALID", "No se pudo preparar la consulta para el servicio de respuesta.");
+            throw ChatUpstreamException.of(ChatApiError.UPSTREAM_REQUEST_INVALID);
         }
     }
 
     private JsonNode parseResponseBody(String responseBody) {
         if (responseBody == null || responseBody.isBlank()) {
-            throw new ChatUpstreamException("UPSTREAM_EMPTY_RESPONSE", "No se recibio una respuesta valida.");
+            throw ChatUpstreamException.of(ChatApiError.UPSTREAM_EMPTY_RESPONSE);
         }
 
         try {
@@ -314,18 +315,18 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
     private ChatUpstreamException buildStatusException(int statusCode, String responseBody) {
         UpstreamError upstreamError = parseUpstreamError(responseBody);
         if (upstreamError != null) {
-            return new ChatUpstreamException(upstreamError.code(), upstreamError.message());
+            return ChatUpstreamException.fromExternalCode(upstreamError.code());
         }
         if (statusCode == 408 || statusCode == 504) {
-            return new ChatUpstreamException("UPSTREAM_TIMEOUT", "La respuesta esta tardando mas de lo esperado.");
+            return ChatUpstreamException.of(ChatApiError.UPSTREAM_TIMEOUT);
         }
         if (statusCode >= 500) {
-            return new ChatUpstreamException("UPSTREAM_UNAVAILABLE", "El servicio de respuesta no esta disponible.");
+            return ChatUpstreamException.of(ChatApiError.UPSTREAM_UNAVAILABLE);
         }
         if (statusCode == 422) {
-            return new ChatUpstreamException("AGENT_VALIDATION_FAILED", "No se pudo validar la respuesta generada.");
+            return ChatUpstreamException.of(ChatApiError.AGENT_VALIDATION_FAILED);
         }
-        return new ChatUpstreamException("UPSTREAM_ERROR", "No se pudo completar la consulta.");
+        return ChatUpstreamException.of(ChatApiError.UPSTREAM_ERROR);
     }
 
     private UpstreamError parseUpstreamError(String responseBody) {
@@ -345,8 +346,8 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
                 return null;
             }
             return new UpstreamError(
-                    code == null ? "UPSTREAM_ERROR" : code,
-                    message == null ? "No se pudo completar la consulta." : message
+                    code == null ? ChatApiError.UPSTREAM_ERROR.code() : code,
+                    message == null ? ChatApiError.UPSTREAM_ERROR.message() : message
             );
         } catch (Exception ex) {
             return null;

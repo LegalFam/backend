@@ -9,6 +9,7 @@ import com.legalfam.backend.payment.application.dto.PaymentPlanResponse;
 import com.legalfam.backend.payment.application.dto.PaymentSubscriptionResponse;
 import com.legalfam.backend.payment.application.port.in.IPaymentUseCase;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
+import com.legalfam.backend.payment.domain.exception.PaymentApiError;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -76,7 +77,7 @@ public class PaymentController {
             @Valid @RequestBody(required = false) CreateCheckoutSessionRequest request
     ) {
         if (request == null) {
-            throw new InvalidPaymentRequestException("Checkout request is required");
+            throw InvalidPaymentRequestException.of(PaymentApiError.CHECKOUT_REQUEST_REQUIRED);
         }
         return ResponseEntity.ok(IPaymentUseCase.createCheckoutSession(authenticatedUserResolver.requireUserId(principalUserId), request));
     }

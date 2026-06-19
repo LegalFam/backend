@@ -141,7 +141,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         }
 
         Instant now = Instant.now();
-        ChatMessage failureMessage = ChatMessage.systemMessage(chatSession.getId(), errorMessage, now);
+        ChatMessage failureMessage = ChatMessage.systemMessage(chatSession.getId(), errorMessage, errorCode, now);
         failureMessage = IChatPersistencePort.saveMessage(failureMessage);
         markUserMessageFailed(userMessageId, errorCode, errorMessage, now);
         chatSession.recordActivity(now);

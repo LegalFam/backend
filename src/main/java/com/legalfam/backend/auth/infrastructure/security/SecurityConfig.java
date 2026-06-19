@@ -2,7 +2,9 @@ package com.legalfam.backend.auth.infrastructure.security;
 
 import com.legalfam.backend.auth.infrastructure.config.CorsProperties;
 import com.legalfam.backend.common.error.ApiError;
+import com.legalfam.backend.common.error.ApiErrorDescriptor;
 import com.legalfam.backend.common.error.ApiErrorFactory;
+import com.legalfam.backend.common.error.CommonApiError;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -10,7 +12,6 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -62,23 +63,9 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) ->
-                                writeSecurityError(
-                                        response,
-                                        HttpStatus.UNAUTHORIZED,
-                                        "authentication_error",
-                                        "unauthorized",
-                                        "Authentication is required",
-                                        request.getRequestURI()
-                                ))
+                                writeSecurityError(response, CommonApiError.UNAUTHORIZED, request.getRequestURI()))
                         .accessDeniedHandler((request, response, accessDeniedException) ->
-                                writeSecurityError(
-                                        response,
-                                        HttpStatus.FORBIDDEN,
-                                        "authorization_error",
-                                        "forbidden",
-                                        "Access is forbidden",
-                                        request.getRequestURI()
-                                ))
+                                writeSecurityError(response, CommonApiError.FORBIDDEN, request.getRequestURI()))
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -112,19 +99,16 @@ public class SecurityConfig {
 
     private void writeSecurityError(
             HttpServletResponse response,
-            HttpStatus status,
-            String type,
-            String code,
-            String message,
+            ApiErrorDescriptor error,
             String path
     ) throws IOException {
         if (response.isCommitted()) {
             return;
         }
 
-        ApiError error = ApiErrorFactory.build(status, type, code, message, path);
-        response.setStatus(status.value());
+        ApiError apiError = ApiErrorFactory.build(error, path);
+        response.setStatus(error.status());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write(objectMapper.writeValueAsString(error));
+        response.getWriter().write(objectMapper.writeValueAsString(apiError));
     }
 }

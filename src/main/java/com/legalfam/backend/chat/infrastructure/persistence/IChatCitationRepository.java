@@ -7,10 +7,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface IChatCitationRepository extends JpaRepository<ChatCitationEntity, UUID> {
-    List<ChatCitationEntity> findByChatMessageIdOrderByIdAsc(UUID chatMessageId);
-
     List<ChatCitationEntity> findByChatMessageIdInOrderByChatMessageIdAscIdAsc(List<UUID> chatMessageIds);
-
     long deleteByChatMessageIdIn(Collection<UUID> chatMessageIds);
 }
 

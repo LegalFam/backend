@@ -10,11 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface IChatMessageRepository extends JpaRepository<ChatMessageEntity, UUID> {
     List<ChatMessageEntity> findByChatSessionIdOrderByCreatedAtAsc(UUID chatSessionId);
-
-    Slice<ChatMessageEntity> findByChatSessionIdOrderByCreatedAtAsc(UUID chatSessionId, Pageable pageable);
-
     Slice<ChatMessageEntity> findByChatSessionIdOrderByCreatedAtDesc(UUID chatSessionId, Pageable pageable);
-
     Slice<ChatMessageEntity> findByChatSessionIdAndRoleInOrderByCreatedAtDesc(
             UUID chatSessionId,
             List<ChatMessageRole> roles,

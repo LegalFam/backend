@@ -41,7 +41,7 @@ class ChatMessageProcessingTest {
     void terminalProcessingCannotBeStartedOrCompletedAgain() {
         Instant now = Instant.parse("2026-01-01T00:00:00Z");
         ChatMessageProcessing processing = ChatMessageProcessing.queued(UUID.randomUUID(), now);
-        assertTrue(processing.fail("UPSTREAM_ERROR", "failed", now.plusSeconds(1)));
+        assertTrue(processing.fail("upstream_error", "failed", now.plusSeconds(1)));
 
         assertFalse(processing.start(now.plusSeconds(2)));
         assertFalse(processing.complete(now.plusSeconds(3)));

@@ -15,6 +15,7 @@ import com.legalfam.backend.payment.application.port.out.IPaymentGatewayPort;
 import com.legalfam.backend.payment.application.port.out.IPaymentPlanCatalogPort;
 import com.legalfam.backend.payment.application.port.out.IPaymentPersistencePort;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
+import com.legalfam.backend.payment.domain.exception.PaymentApiError;
 import com.legalfam.backend.payment.domain.exception.PaymentWebhookException;
 import com.legalfam.backend.payment.domain.exception.SubscriptionNotFoundException;
 import com.legalfam.backend.payment.domain.model.Subscription;
@@ -96,7 +97,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     @Transactional
     public CreateCheckoutSessionResponse createCheckoutSession(UUID userId, CreateCheckoutSessionRequest request) {
         if (request == null) {
-            throw new InvalidPaymentRequestException("Checkout request is required");
+            throw InvalidPaymentRequestException.of(PaymentApiError.CHECKOUT_REQUEST_REQUIRED);
         }
         PaymentPlanDefinition plan = IPaymentPlanCatalogPort.getPaidPlanOrThrow(request.planCode());
         UserIdentity user = getRequiredUser(userId);
@@ -121,7 +122,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         refreshFreeSubscriptionIfNeeded(subscription);
 
         if (!subscription.hasGatewaySubscription()) {
-            throw new InvalidPaymentRequestException("No Mercado Pago subscription is available to cancel");
+            throw InvalidPaymentRequestException.of(PaymentApiError.NO_GATEWAY_SUBSCRIPTION_TO_CANCEL);
         }
 
         IPaymentGatewayPort.cancelSubscription(subscription.getGatewaySubscriptionId());
@@ -132,7 +133,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     @Transactional
     public void handleWebhook(String payload, String signatureHeader, String requestId, String dataId) {
         if (payload == null || payload.isBlank()) {
-            throw new InvalidPaymentRequestException("Webhook payload is required");
+            throw InvalidPaymentRequestException.of(PaymentApiError.WEBHOOK_PAYLOAD_REQUIRED);
         }
 
         PaymentWebhookNotification notification = IPaymentGatewayPort.parseVerifiedWebhook(
@@ -387,7 +388,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         }
         if (subscription == null) {
             if (notification.userId() == null) {
-                throw new PaymentWebhookException("Payment webhook cannot be matched to a local user");
+                throw PaymentWebhookException.of(PaymentApiError.PAYMENT_WEBHOOK_UNMATCHED_USER);
             }
             subscription = createFreeSubscription(notification.userId(), now());
         }
@@ -435,7 +436,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
 
     private UserIdentity getRequiredUser(UUID userId) {
         return IUserIdentityPort.findUserIdentityById(userId)
-                .orElseThrow(() -> new SubscriptionNotFoundException("Authenticated user not found"));
+                .orElseThrow(SubscriptionNotFoundException::notFound);
     }
 
     private Instant now() {

@@ -8,10 +8,10 @@ public final class ChatSendPolicy {
 
     public static void assertCanSend(boolean hasActiveMessageProcessing, boolean hasUnreadAssistantMessage) {
         if (hasActiveMessageProcessing) {
-            throw new PendingAssistantMessageException("Message processing is already pending");
+            throw PendingAssistantMessageException.processingPending();
         }
         if (hasUnreadAssistantMessage) {
-            throw new PendingAssistantMessageException("Assistant receipt confirmation is still pending for this session");
+            throw PendingAssistantMessageException.receiptPending();
         }
     }
 }

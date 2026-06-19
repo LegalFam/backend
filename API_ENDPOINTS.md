@@ -344,6 +344,7 @@ Success response `200`:
       "id": "uuid",
       "role": "USER",
       "content": "Hola",
+      "errorCode": null,
       "rating": null,
       "createdAt": "2026-04-19T10:00:00Z",
       "citations": []
@@ -352,6 +353,7 @@ Success response `200`:
       "id": "uuid",
       "role": "ASSISTANT",
       "content": "Hola, en que puedo ayudarte?",
+      "errorCode": null,
       "rating": 5,
       "createdAt": "2026-04-19T10:00:02Z",
       "receiptStatus": "PUBLISHED",
@@ -368,7 +370,7 @@ Common errors:
 - `404` session not found
 
 Failure behavior:
-- If upstream n8n fails (for example `404`), backend persists a `SYSTEM` message in the chat with an error text.
+- If upstream n8n fails (for example `404`), backend persists a `SYSTEM` message with a stable `errorCode` and an English fallback message.
 - The same failure is emitted over SSE as `assistant_error`.
 
 ### `PATCH /api/v1/chat/messages/{messageId}/rating`
@@ -404,13 +406,126 @@ All error responses return:
 ```json
 {
   "type": "validation_error",
-  "code": "invalid_request",
+  "code": "message_required",
   "message": "Message is required",
   "status": 400,
   "path": "/api/v1/chat/send",
   "timestamp": "2026-04-19T12:00:00.000Z"
 }
 ```
+
+`message` is an English fallback only. Frontend custom copy should be keyed from `code`.
+
+Backend error definitions are owned by their bounded context: shared transport/security errors live in `common`, while auth, chat, and payment codes live in their respective modules.
+
+## Error Code Catalog
+
+Global and security:
+
+| Code | HTTP | Type | Fallback message |
+| --- | ---: | --- | --- |
+| `unauthorized` | 401 | `authentication_error` | Authentication is required |
+| `forbidden` | 403 | `authorization_error` | Access is forbidden |
+| `malformed_json` | 400 | `validation_error` | Malformed request body |
+| `invalid_request` | 400 | `validation_error` | Request validation failed |
+| `max_upload_size_exceeded` | 413 | `validation_error` | File exceeds configured upload size limit |
+| `internal_server_error` | 500 | `internal_error` | An unexpected error occurred |
+
+Request validation:
+
+| Code | HTTP | Type | Fallback message |
+| --- | ---: | --- | --- |
+| `email_required` | 400 | `validation_error` | Email is required |
+| `email_invalid` | 400 | `validation_error` | Valid email is required |
+| `email_too_long` | 400 | `validation_error` | Email must be at most 255 characters |
+| `password_required` | 400 | `validation_error` | Password is required |
+| `password_length_invalid` | 400 | `validation_error` | Password length is invalid |
+| `name_required` | 400 | `validation_error` | Name is required |
+| `name_too_long` | 400 | `validation_error` | Name must be at most 120 characters |
+| `phone_required` | 400 | `validation_error` | Phone is required |
+| `phone_too_long` | 400 | `validation_error` | Phone must be at most 30 characters |
+| `refresh_token_required` | 400 | `validation_error` | Refresh token is required |
+| `message_required` | 400 | `validation_error` | Message is required |
+| `message_too_long` | 400 | `validation_error` | Message must be at most 4000 characters |
+| `session_id_required` | 400 | `validation_error` | Session id is required |
+| `session_title_required` | 400 | `validation_error` | Session title is required |
+| `session_title_too_long` | 400 | `validation_error` | Session title must be at most 120 characters |
+| `rating_required` | 400 | `validation_error` | Rating is required |
+| `rating_out_of_range` | 400 | `validation_error` | Rating must be between 1 and 5 |
+| `feedback_comment_too_long` | 400 | `validation_error` | Feedback comment must be at most 1000 characters |
+| `plan_code_required` | 400 | `validation_error` | Plan code is required |
+| `plan_code_too_long` | 400 | `validation_error` | Plan code must be at most 40 characters |
+| `plan_code_invalid` | 400 | `validation_error` | Plan code is invalid |
+| `success_url_too_long` | 400 | `validation_error` | Success URL must be at most 2048 characters |
+| `success_url_invalid` | 400 | `validation_error` | Success URL must be an HTTP URL |
+| `cancel_url_too_long` | 400 | `validation_error` | Cancel URL must be at most 2048 characters |
+| `cancel_url_invalid` | 400 | `validation_error` | Cancel URL must be an HTTP URL |
+
+Auth:
+
+| Code | HTTP | Type | Fallback message |
+| --- | ---: | --- | --- |
+| `email_already_exists` | 409 | `conflict_error` | Email already exists |
+| `invalid_credentials` | 401 | `authentication_error` | Invalid credentials |
+| `invalid_refresh_token` | 401 | `authentication_error` | Invalid refresh token |
+| `signup_request_required` | 400 | `validation_error` | Signup request body is required |
+| `login_request_required` | 400 | `validation_error` | Login request body is required |
+
+Chat:
+
+| Code | HTTP | Type | Fallback message |
+| --- | ---: | --- | --- |
+| `chat_session_not_found` | 404 | `resource_error` | Chat session not found |
+| `chat_message_not_found` | 404 | `resource_error` | Chat message not found |
+| `assistant_delivery_event_not_found` | 404 | `resource_error` | Assistant delivery event not found |
+| `message_processing_pending` | 409 | `chat_state_error` | Message processing is already pending |
+| `assistant_receipt_pending` | 409 | `chat_state_error` | Assistant receipt confirmation is still pending for this session |
+| `personal_data_not_allowed` | 400 | `validation_error` | Personal data is not allowed in chat messages |
+| `metadata_only_assistant` | 400 | `validation_error` | Metadata can only be applied to assistant messages |
+| `only_assistant_messages_can_be_rated` | 400 | `validation_error` | Only assistant messages can be rated |
+| `receipt_only_assistant_messages` | 400 | `validation_error` | Receipt can only be confirmed for assistant messages |
+| `cursor_invalid` | 400 | `validation_error` | Cursor query is invalid |
+| `upstream_error` | 502 | `upstream_error` | Assistant service failed to prepare a response |
+| `upstream_timeout` | 502 | `upstream_error` | Assistant service timed out |
+| `upstream_empty_response` | 502 | `upstream_error` | Assistant service returned an empty response |
+| `upstream_invalid_response` | 502 | `upstream_error` | Assistant service returned an invalid response |
+| `upstream_not_configured` | 502 | `upstream_error` | Assistant service is not configured |
+| `upstream_unavailable` | 502 | `upstream_error` | Assistant service is unavailable |
+| `upstream_request_invalid` | 502 | `upstream_error` | Assistant service request could not be prepared |
+| `agent_validation_failed` | 502 | `upstream_error` | Assistant response validation failed |
+
+Payment:
+
+| Code | HTTP | Type | Fallback message |
+| --- | ---: | --- | --- |
+| `checkout_request_required` | 400 | `validation_error` | Checkout request body is required |
+| `paid_plan_required` | 400 | `validation_error` | Paid plan is required |
+| `plan_not_purchasable` | 400 | `validation_error` | Selected plan is not configured for checkout |
+| `checkout_plan_already_active` | 403 | `payment_error` | User is already subscribed to the selected plan |
+| `checkout_active_gateway_subscription` | 403 | `payment_error` | Cancel the current gateway subscription before changing plans |
+| `no_gateway_subscription_to_cancel` | 400 | `payment_error` | No gateway subscription is available to cancel |
+| `subscription_not_found` | 404 | `payment_error` | Subscription not found |
+| `subscription_inactive` | 403 | `payment_error` | Subscription is not active |
+| `insufficient_tokens` | 403 | `payment_error` | Insufficient tokens |
+| `webhook_payload_required` | 400 | `payment_error` | Webhook payload is required |
+| `payment_webhook_unmatched_user` | 400 | `payment_error` | Payment webhook cannot be matched to a local user |
+| `webhook_payload_invalid` | 400 | `payment_error` | Webhook payload is invalid |
+| `webhook_user_reference_invalid` | 400 | `payment_error` | Webhook user reference is invalid |
+| `webhook_request_id_required` | 400 | `payment_error` | Webhook request id is required |
+| `webhook_data_id_required` | 400 | `payment_error` | Webhook data id is required |
+| `webhook_signature_invalid` | 400 | `payment_error` | Webhook signature is invalid |
+| `webhook_signature_required` | 400 | `payment_error` | Webhook signature is required |
+| `webhook_signature_unverifiable` | 400 | `payment_error` | Webhook signature cannot be verified |
+| `payment_gateway_unavailable` | 503 | `payment_error` | Payment gateway is unavailable |
+| `payment_gateway_empty_response` | 503 | `payment_error` | Payment gateway returned an empty response |
+| `payment_gateway_misconfigured` | 503 | `payment_error` | Payment gateway is misconfigured |
+| `payment_gateway_payer_email_required` | 503 | `payment_error` | Payment gateway requires a payer email |
+| `payment_gateway_checkout_url_missing` | 503 | `payment_error` | Payment gateway did not return a checkout URL |
+| `payment_gateway_subscription_id_required` | 503 | `payment_error` | Payment gateway subscription id is required |
+
+Async chat failures:
+
+`assistant_error` SSE payloads and failed `SYSTEM` messages expose the same lowercase `errorCode` values as the chat upstream codes above. Historical rows created before this contract may still contain older uppercase codes or Spanish text.
 
 ## Frontend Integration Notes
 

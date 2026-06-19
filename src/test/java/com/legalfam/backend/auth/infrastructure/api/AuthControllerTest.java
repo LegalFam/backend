@@ -48,7 +48,7 @@ class AuthControllerTest {
                         .content("{\"email\":\"   \",\"password\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
-                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.code", is("email_required")))
                 .andExpect(jsonPath("$.message", is("Email is required")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/auth/signup")))
@@ -64,7 +64,7 @@ class AuthControllerTest {
                         .content("{\"email\":\"invalid-email\",\"password\":\"secret123\",\"name\":\"Name\",\"phone\":\"900000000\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
-                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.code", is("email_invalid")))
                 .andExpect(jsonPath("$.message", is("Valid email is required")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/auth/signup")))
@@ -91,7 +91,7 @@ class AuthControllerTest {
     @Test
     void signupReturnsConflictWhenEmailAlreadyExists() throws Exception {
         when(authService.signup(anyString(), anyString(), anyString(), anyString()))
-                .thenThrow(new EmailAlreadyExistsException("user@example.com"));
+                .thenThrow(EmailAlreadyExistsException.forEmail("user@example.com"));
 
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -107,7 +107,7 @@ class AuthControllerTest {
 
     @Test
     void loginReturnsUnauthorizedForInvalidCredentials() throws Exception {
-        when(authService.login(anyString(), anyString())).thenThrow(new InvalidCredentialsException());
+        when(authService.login(anyString(), anyString())).thenThrow(InvalidCredentialsException.invalidCredentials());
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,7 +128,7 @@ class AuthControllerTest {
                         .content("{\"email\":\"invalid-email\",\"password\":\"secret123\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
-                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.code", is("email_invalid")))
                 .andExpect(jsonPath("$.message", is("Valid email is required")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/auth/login")))
@@ -144,7 +144,7 @@ class AuthControllerTest {
                         .content("{\"refreshToken\":\"  \"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.type", is("validation_error")))
-                .andExpect(jsonPath("$.code", is("invalid_request")))
+                .andExpect(jsonPath("$.code", is("refresh_token_required")))
                 .andExpect(jsonPath("$.message", is("Refresh token is required")))
                 .andExpect(jsonPath("$.status", is(400)))
                 .andExpect(jsonPath("$.path", is("/api/v1/auth/refresh")))
@@ -153,7 +153,7 @@ class AuthControllerTest {
 
     @Test
     void refreshReturnsUnauthorizedForInvalidRefreshToken() throws Exception {
-        when(authService.refresh(anyString())).thenThrow(new InvalidRefreshTokenException());
+        when(authService.refresh(anyString())).thenThrow(InvalidRefreshTokenException.invalidRefreshToken());
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)

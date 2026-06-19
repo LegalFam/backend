@@ -8,6 +8,7 @@ public record ChatMessageResponse(
         UUID id,
         String role,
         String content,
+        String errorCode,
         Integer rating,
         String feedbackComment,
         Instant feedbackSubmittedAt,

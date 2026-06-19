@@ -8,7 +8,9 @@ import com.legalfam.backend.chat.application.port.in.IChatAssistantPersistenceUs
 import com.legalfam.backend.chat.application.port.in.IChatQueuedMessageUseCase;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
+import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
+import com.legalfam.backend.common.error.ApiErrorDescriptor;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,8 +54,7 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
             persistAndDispatchFailure(
                     chatSessionId,
                     userMessageId,
-                    ex.getCode(),
-                    buildFailureMessage(ex.getCode())
+                    ex.error()
             );
             return;
         } catch (RuntimeException ex) {
@@ -61,8 +62,7 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
             persistAndDispatchFailure(
                     chatSessionId,
                     userMessageId,
-                    "UPSTREAM_ERROR",
-                    buildFailureMessage("UPSTREAM_ERROR")
+                    ChatApiError.UPSTREAM_ERROR
             );
             return;
         }
@@ -72,8 +72,7 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
             persistAndDispatchFailure(
                     chatSessionId,
                     userMessageId,
-                    "UPSTREAM_EMPTY_RESPONSE",
-                    buildFailureMessage("UPSTREAM_EMPTY_RESPONSE")
+                    ChatApiError.UPSTREAM_EMPTY_RESPONSE
             );
             return;
         }
@@ -93,35 +92,18 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
     private void persistAndDispatchFailure(
             UUID chatSessionId,
             UUID userMessageId,
-            String errorCode,
-            String errorMessage
+            ApiErrorDescriptor error
     ) {
         ChatAssistantErrorDispatch dispatch = IChatAssistantPersistenceUseCase.persistAssistantFailure(
                 chatSessionId,
                 userMessageId,
-                errorCode,
-                errorMessage
+                error.code(),
+                error.message()
         );
         if (dispatch == null) {
             return;
         }
         IChatAssistantDeliveryPort.dispatchAssistantError(dispatch.userId(), dispatch.chatSessionId(), dispatch.event());
-    }
-
-    private String buildFailureMessage(String errorCode) {
-        if ("UPSTREAM_TIMEOUT".equals(errorCode)) {
-            return "No pude preparar la respuesta porque el servicio tardo demasiado. Puedes intentar nuevamente.";
-        }
-        if ("UPSTREAM_EMPTY_RESPONSE".equals(errorCode) || "UPSTREAM_INVALID_RESPONSE".equals(errorCode)) {
-            return "No pude preparar una respuesta valida. Puedes intentar nuevamente.";
-        }
-        if ("AGENT_VALIDATION_FAILED".equals(errorCode)) {
-            return "No pude validar la respuesta generada. Puedes intentar nuevamente.";
-        }
-        if ("UPSTREAM_NOT_CONFIGURED".equals(errorCode)) {
-            return "El servicio de respuesta no esta disponible en este momento.";
-        }
-        return "No pude preparar la respuesta por un problema temporal. Puedes intentar nuevamente.";
     }
 
     private boolean isBlank(String value) {

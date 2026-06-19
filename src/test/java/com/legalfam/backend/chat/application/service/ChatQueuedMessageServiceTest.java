@@ -15,6 +15,7 @@ import com.legalfam.backend.chat.application.port.in.IChatAssistantPersistenceUs
 import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
+import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -90,20 +91,20 @@ class ChatQueuedMessageServiceTest {
         ChatAssistantErrorEvent errorEvent = new ChatAssistantErrorEvent(
                 sessionId,
                 failureMessageId,
-                "UPSTREAM_TIMEOUT",
-                "No pude preparar la respuesta porque el servicio tardo demasiado. Puedes intentar nuevamente.",
+                "upstream_timeout",
+                "Assistant service timed out",
                 Instant.now()
         );
         ChatAssistantErrorDispatch dispatch = new ChatAssistantErrorDispatch(userId, sessionId, errorEvent);
 
         when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);
         when(IChatAssistantGatewayPort.sendMessage("hola", sessionId, List.of()))
-                .thenThrow(new ChatUpstreamException("UPSTREAM_TIMEOUT", "timeout"));
+                .thenThrow(ChatUpstreamException.of(ChatApiError.UPSTREAM_TIMEOUT));
         when(IChatAssistantPersistenceUseCase.persistAssistantFailure(
                 sessionId,
                 userMessageId,
-                "UPSTREAM_TIMEOUT",
-                "No pude preparar la respuesta porque el servicio tardo demasiado. Puedes intentar nuevamente."
+                "upstream_timeout",
+                "Assistant service timed out"
         )).thenReturn(dispatch);
 
         chatQueuedMessageService.process(event);
@@ -111,8 +112,8 @@ class ChatQueuedMessageServiceTest {
         verify(IChatAssistantPersistenceUseCase).persistAssistantFailure(
                 sessionId,
                 userMessageId,
-                "UPSTREAM_TIMEOUT",
-                "No pude preparar la respuesta porque el servicio tardo demasiado. Puedes intentar nuevamente."
+                "upstream_timeout",
+                "Assistant service timed out"
         );
         verify(IChatAssistantDeliveryPort).dispatchAssistantError(userId, sessionId, errorEvent);
     }

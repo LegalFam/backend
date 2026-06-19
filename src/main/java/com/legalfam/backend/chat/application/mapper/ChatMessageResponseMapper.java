@@ -26,6 +26,7 @@ public class ChatMessageResponseMapper {
                 message.getId(),
                 message.getRole().name(),
                 message.getContent(),
+                message.getErrorCode(),
                 message.getRating(),
                 message.getFeedbackComment(),
                 message.getFeedbackSubmittedAt(),

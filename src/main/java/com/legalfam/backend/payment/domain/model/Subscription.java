@@ -1,6 +1,7 @@
 package com.legalfam.backend.payment.domain.model;
 
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
+import com.legalfam.backend.payment.domain.exception.PaymentApiError;
 import com.legalfam.backend.payment.domain.exception.SubscriptionInactiveException;
 import java.time.Instant;
 import java.util.UUID;
@@ -84,10 +85,10 @@ public class Subscription {
         if (planCode == targetPlanCode
                 && provider == PaymentProvider.MERCADO_PAGO
                 && status == SubscriptionStatus.ACTIVE) {
-            throw new InvalidPaymentRequestException("User is already subscribed to the selected plan");
+            throw InvalidPaymentRequestException.of(PaymentApiError.CHECKOUT_PLAN_ALREADY_ACTIVE);
         }
         if (hasActiveGatewaySubscription()) {
-            throw new InvalidPaymentRequestException("Cancel the current Mercado Pago subscription before changing plans");
+            throw InvalidPaymentRequestException.of(PaymentApiError.CHECKOUT_ACTIVE_GATEWAY_SUBSCRIPTION);
         }
     }
 
@@ -225,6 +226,6 @@ public class Subscription {
     }
 
     private void assertActive() {
-        if (status != SubscriptionStatus.ACTIVE) { throw new SubscriptionInactiveException("Subscription is not active"); }
+        if (status != SubscriptionStatus.ACTIVE) { throw SubscriptionInactiveException.inactive(); }
     }
 }

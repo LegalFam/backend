@@ -44,7 +44,7 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<TokenResponse> signup(@Valid @RequestBody(required = false) SignupRequest request) {
         if (request == null) {
-            throw new InvalidAuthRequestException("Email, password, name and phone are required");
+            throw InvalidAuthRequestException.signupRequestRequired();
         }
 
         TokenResponse tokens = IAuthUseCase.signup(
@@ -68,7 +68,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody(required = false) LoginRequest request) {
         if (request == null) {
-            throw new InvalidAuthRequestException("Email and password are required");
+            throw InvalidAuthRequestException.loginRequestRequired();
         }
 
         TokenResponse tokens = IAuthUseCase.login(request.email().trim(), request.password());
@@ -87,7 +87,7 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody(required = false) RefreshTokenRequest request) {
         if (request == null) {
-            throw new InvalidAuthRequestException("Refresh token is required");
+            throw InvalidAuthRequestException.refreshTokenRequired();
         }
 
         TokenResponse tokens = IAuthUseCase.refresh(request.refreshToken().trim());

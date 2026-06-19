@@ -1,5 +1,6 @@
 package com.legalfam.backend.chat.domain.model;
 
+import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import java.time.Instant;
 import java.util.List;
@@ -12,6 +13,7 @@ public class ChatMessage {
     private UUID chatSessionId;
     private ChatMessageRole role;
     private String content;
+    private String errorCode;
     private Integer rating;
     private String feedbackComment;
     private Instant feedbackSubmittedAt;
@@ -46,11 +48,16 @@ public class ChatMessage {
     }
 
     public static ChatMessage systemMessage(UUID chatSessionId, String content, Instant createdAt) {
+        return systemMessage(chatSessionId, content, null, createdAt);
+    }
+
+    public static ChatMessage systemMessage(UUID chatSessionId, String content, String errorCode, Instant createdAt) {
         ChatMessage message = new ChatMessage();
         message.id = UUID.randomUUID();
         message.chatSessionId = chatSessionId;
         message.role = ChatMessageRole.SYSTEM;
         message.content = content;
+        message.errorCode = normalizeBlank(errorCode);
         message.createdAt = createdAt;
         return message;
     }
@@ -60,6 +67,7 @@ public class ChatMessage {
             UUID chatSessionId,
             ChatMessageRole role,
             String content,
+            String errorCode,
             Integer rating,
             String feedbackComment,
             Instant feedbackSubmittedAt,
@@ -75,6 +83,7 @@ public class ChatMessage {
         message.chatSessionId = chatSessionId;
         message.role = role;
         message.content = content;
+        message.errorCode = normalizeBlank(errorCode);
         message.rating = rating;
         message.feedbackComment = feedbackComment;
         message.feedbackSubmittedAt = feedbackSubmittedAt;
@@ -95,7 +104,7 @@ public class ChatMessage {
             String citationSupportStatus
     ) {
         if (role != ChatMessageRole.ASSISTANT) {
-            throw new InvalidChatRequestException("Metadata can only be applied to assistant messages");
+            throw InvalidChatRequestException.of(ChatApiError.METADATA_ONLY_ASSISTANT);
         }
         this.confidenceStatus = normalizeBlank(confidenceStatus);
         this.confidenceReason = normalizeBlank(confidenceReason);
@@ -106,10 +115,10 @@ public class ChatMessage {
 
     public void submitFeedback(int rating, String comment, Instant submittedAt) {
         if (role != ChatMessageRole.ASSISTANT) {
-            throw new InvalidChatRequestException("Only assistant messages can be rated");
+            throw InvalidChatRequestException.of(ChatApiError.ONLY_ASSISTANT_MESSAGES_CAN_BE_RATED);
         }
         if (rating < 1 || rating > 5) {
-            throw new InvalidChatRequestException("Rating must be between 1 and 5");
+            throw InvalidChatRequestException.of(ChatApiError.RATING_OUT_OF_RANGE);
         }
         this.rating = rating;
         this.feedbackComment = normalizeFeedbackComment(comment);
@@ -130,6 +139,10 @@ public class ChatMessage {
 
     public String getContent() {
         return content;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
     }
 
     public Integer getRating() {
@@ -174,12 +187,12 @@ public class ChatMessage {
         }
         String normalized = comment.trim();
         if (normalized.length() > 1000) {
-            throw new InvalidChatRequestException("Feedback comment must be at most 1000 characters");
+            throw InvalidChatRequestException.of(ChatApiError.FEEDBACK_COMMENT_TOO_LONG);
         }
         return normalized;
     }
 
-    private String normalizeBlank(String value) {
+    private static String normalizeBlank(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 

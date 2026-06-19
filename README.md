@@ -394,18 +394,22 @@ All API errors use a standardized JSON shape:
 ```
 
 Examples of error codes:
-- `invalid_request`
 - `malformed_json`
+- `message_required`
+- `session_id_required`
 - `email_already_exists`
 - `invalid_credentials`
 - `invalid_refresh_token`
 - `unauthorized`
 - `forbidden`
-- `upstream_service_unavailable`
+- `upstream_unavailable`
+- `upstream_timeout`
 - `subscription_inactive`
 - `insufficient_tokens`
 - `payment_gateway_unavailable`
-- `invalid_webhook`
+- `webhook_signature_invalid`
+
+The complete frontend-facing error catalog is maintained in `API_ENDPOINTS.md`.
 
 ## Token Expiration Defaults
 

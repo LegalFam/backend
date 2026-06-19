@@ -8,6 +8,7 @@ import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
+import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
 import com.legalfam.backend.common.error.ApiError;
@@ -140,7 +141,7 @@ public class ChatController {
     ) {
         if (request == null) {
             log.warn("Chat request rejected: blank message");
-            throw new InvalidChatRequestException("Message is required");
+            throw InvalidChatRequestException.of(ChatApiError.MESSAGE_REQUIRED);
         }
 
         UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
@@ -242,7 +243,7 @@ public class ChatController {
         try {
             return CursorQuery.of(cursor, size);
         } catch (IllegalArgumentException ex) {
-            throw new InvalidChatRequestException(ex.getMessage());
+            throw InvalidChatRequestException.of(ChatApiError.CURSOR_INVALID);
         }
     }
 

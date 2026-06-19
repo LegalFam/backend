@@ -15,6 +15,7 @@ import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
+import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
@@ -65,7 +66,7 @@ public class ChatService implements IChatUseCase {
     @Transactional
     public ChatSendAcceptedResponse send(UUID userId, String messageInput, UUID sessionId) {
         if (sessionId == null) {
-            throw new InvalidChatRequestException("Session id is required");
+            throw InvalidChatRequestException.of(ChatApiError.SESSION_ID_REQUIRED);
         }
         chatPrivacyPolicy.assertAllowed(messageInput);
         chatAccessPolicy.assertUserExists(userId);
@@ -124,7 +125,7 @@ public class ChatService implements IChatUseCase {
     @Transactional
     public ChatSessionResponse updateSession(UUID userId, UUID sessionId, ChatUpdateSessionRequest request) {
         if (request == null) {
-            throw new InvalidChatRequestException("Session title is required");
+            throw InvalidChatRequestException.of(ChatApiError.SESSION_TITLE_REQUIRED);
         }
 
         ChatSession session = chatAccessPolicy.requireSessionOwner(userId, sessionId);
@@ -177,11 +178,11 @@ public class ChatService implements IChatUseCase {
     @Transactional
     public void rateMessage(UUID userId, UUID messageId, ChatRateMessageRequest request) {
         if (request == null || request.rating() == null) {
-            throw new InvalidChatRequestException("Rating is required");
+            throw InvalidChatRequestException.of(ChatApiError.RATING_REQUIRED);
         }
 
         ChatMessage message = IChatPersistencePort.findMessageById(messageId)
-                .orElseThrow(() -> new ChatNotFoundException("Chat message not found"));
+                .orElseThrow(ChatNotFoundException::message);
         chatAccessPolicy.requireMessageSessionOwner(userId, message);
         message.submitFeedback(request.rating(), request.comment(), Instant.now());
         IChatPersistencePort.saveMessage(message);
@@ -191,14 +192,14 @@ public class ChatService implements IChatUseCase {
     @Transactional
     public void confirmAssistantReceipt(UUID userId, UUID messageId) {
         ChatMessage message = IChatPersistencePort.findMessageById(messageId)
-                .orElseThrow(() -> new ChatNotFoundException("Chat message not found"));
+                .orElseThrow(ChatNotFoundException::message);
         if (message.getRole() != ChatMessageRole.ASSISTANT) {
-            throw new InvalidChatRequestException("Receipt can only be confirmed for assistant messages");
+            throw InvalidChatRequestException.of(ChatApiError.RECEIPT_ONLY_ASSISTANT_MESSAGES);
         }
 
         ChatSession messageSession = chatAccessPolicy.requireSessionOwner(userId, message.getChatSessionId());
         ChatOutboxEvent outboxEvent = IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(messageId)
-                .orElseThrow(() -> new ChatNotFoundException("Assistant delivery event not found"));
+                .orElseThrow(ChatNotFoundException::assistantDeliveryEvent);
 
         Instant now = Instant.now();
         outboxEvent.markRead(now);

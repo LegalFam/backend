@@ -5,6 +5,7 @@ import com.legalfam.backend.payment.application.dto.PaymentSubscriptionSnapshot;
 import com.legalfam.backend.payment.application.dto.PaymentWebhookNotification;
 import com.legalfam.backend.payment.application.port.out.IPaymentGatewayPort;
 import com.legalfam.backend.payment.domain.exception.PaymentGatewayException;
+import com.legalfam.backend.payment.domain.exception.PaymentApiError;
 import com.legalfam.backend.payment.domain.exception.PaymentWebhookException;
 import com.legalfam.backend.payment.infrastructure.config.MercadoPagoProperties;
 import java.math.BigDecimal;
@@ -61,7 +62,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
     ) {
         requireAccessToken();
         if (email == null || email.isBlank()) {
-            throw new PaymentGatewayException("Mercado Pago requires a payer email");
+            throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_PAYER_EMAIL_REQUIRED);
         }
 
         ObjectNode payload = objectMapper.createObjectNode();
@@ -80,7 +81,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
         JsonNode response = exchangeJson(HttpMethod.POST, "/preapproval", payload.toString());
         String url = firstNonBlank(readText(response, "init_point"), readText(response, "sandbox_init_point"));
         if (url == null) {
-            throw new PaymentGatewayException("Mercado Pago did not return a checkout URL");
+            throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_CHECKOUT_URL_MISSING);
         }
         return url;
     }
@@ -89,7 +90,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
     public void cancelSubscription(String subscriptionId) {
         requireAccessToken();
         if (subscriptionId == null || subscriptionId.isBlank()) {
-            throw new PaymentGatewayException("Subscription id is required");
+            throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_SUBSCRIPTION_ID_REQUIRED);
         }
 
         ObjectNode payload = objectMapper.createObjectNode();
@@ -144,7 +145,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
     public PaymentSubscriptionSnapshot fetchSubscriptionSnapshot(String subscriptionId) {
         requireAccessToken();
         if (subscriptionId == null || subscriptionId.isBlank()) {
-            throw new PaymentGatewayException("Subscription id is required");
+            throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_SUBSCRIPTION_ID_REQUIRED);
         }
         JsonNode root = exchangeJson(HttpMethod.GET, "/preapproval/" + subscriptionId.trim(), null);
         return toSubscriptionSnapshot(root, null);
@@ -217,13 +218,13 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
         try {
             ResponseEntity<String> response = restTemplate.exchange(url, method, request, String.class);
             if (response.getBody() == null || response.getBody().isBlank()) {
-                throw new PaymentGatewayException("Payment gateway returned an empty response");
+                throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_EMPTY_RESPONSE);
             }
             return readTree(response.getBody());
         } catch (HttpStatusCodeException ex) {
-            throw new PaymentGatewayException("Payment gateway request failed with status " + ex.getStatusCode().value(), ex);
+            throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_UNAVAILABLE, ex);
         } catch (ResourceAccessException ex) {
-            throw new PaymentGatewayException("Payment gateway is unavailable", ex);
+            throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_UNAVAILABLE, ex);
         }
     }
 
@@ -231,7 +232,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
         try {
             return objectMapper.readTree(payload);
         } catch (Exception ex) {
-            throw new PaymentWebhookException("Webhook payload is invalid", ex);
+            throw PaymentWebhookException.of(PaymentApiError.WEBHOOK_PAYLOAD_INVALID, ex);
         }
     }
 
@@ -257,7 +258,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
                 try {
                     userId = UUID.fromString(value);
                 } catch (IllegalArgumentException ignored) {
-                    throw new PaymentWebhookException("Webhook user reference is invalid");
+                    throw PaymentWebhookException.of(PaymentApiError.WEBHOOK_USER_REFERENCE_INVALID);
                 }
             }
             if (key.equals("planCode")) {
@@ -330,7 +331,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
 
     private void requireAccessToken() {
         if (accessToken.isBlank()) {
-            throw new PaymentGatewayException("Mercado Pago access token is not configured");
+            throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_MISCONFIGURED);
         }
     }
 
@@ -340,10 +341,10 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
         }
         SignatureParts signatureParts = parseSignature(signatureHeader);
         if (requestId == null || requestId.isBlank()) {
-            throw new PaymentWebhookException("Mercado Pago request id is required");
+            throw PaymentWebhookException.of(PaymentApiError.WEBHOOK_REQUEST_ID_REQUIRED);
         }
         if (dataId == null || dataId.isBlank()) {
-            throw new PaymentWebhookException("Mercado Pago data id is required");
+            throw PaymentWebhookException.of(PaymentApiError.WEBHOOK_DATA_ID_REQUIRED);
         }
 
         String manifest = "id:" + normalizeDataId(dataId)
@@ -352,13 +353,13 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
                 + ";";
         String expectedSignature = hmacSha256Hex(manifest, webhookSecret);
         if (!constantTimeEquals(expectedSignature, signatureParts.signature())) {
-            throw new PaymentWebhookException("Webhook signature is invalid");
+            throw PaymentWebhookException.of(PaymentApiError.WEBHOOK_SIGNATURE_INVALID);
         }
     }
 
     private SignatureParts parseSignature(String signatureHeader) {
         if (signatureHeader == null || signatureHeader.isBlank()) {
-            throw new PaymentWebhookException("Webhook signature is required");
+            throw PaymentWebhookException.of(PaymentApiError.WEBHOOK_SIGNATURE_REQUIRED);
         }
         String timestamp = null;
         String signature = null;
@@ -377,7 +378,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
             }
         }
         if (timestamp == null || timestamp.isBlank() || signature == null || signature.isBlank()) {
-            throw new PaymentWebhookException("Webhook signature is invalid");
+            throw PaymentWebhookException.of(PaymentApiError.WEBHOOK_SIGNATURE_INVALID);
         }
         return new SignatureParts(timestamp, signature);
     }
@@ -398,7 +399,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
             }
             return hex.toString();
         } catch (Exception ex) {
-            throw new PaymentWebhookException("Webhook signature cannot be verified", ex);
+            throw PaymentWebhookException.of(PaymentApiError.WEBHOOK_SIGNATURE_UNVERIFIABLE, ex);
         }
     }
 

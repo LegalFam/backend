@@ -55,12 +55,12 @@ class AuthExceptionHandlerTest {
     private static class ThrowingAuthController {
         @GetMapping("/auth-errors/conflict")
         String conflict() {
-            throw new EmailAlreadyExistsException("user@example.com");
+            throw EmailAlreadyExistsException.forEmail("user@example.com");
         }
 
         @GetMapping("/auth-errors/invalid-credentials")
         String invalidCredentials() {
-            throw new InvalidCredentialsException();
+            throw InvalidCredentialsException.invalidCredentials();
         }
     }
 }
