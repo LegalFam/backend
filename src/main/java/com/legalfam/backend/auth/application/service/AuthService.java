@@ -3,7 +3,7 @@ package com.legalfam.backend.auth.application.service;
 import com.legalfam.backend.auth.application.port.in.IAuthUseCase;
 import com.legalfam.backend.auth.application.port.out.IAccessTokenPort;
 import com.legalfam.backend.auth.application.port.out.IAuthEventPublisherPort;
-import com.legalfam.backend.auth.application.port.out.IRefreshTokenPort;
+import com.legalfam.backend.auth.application.port.out.IRefreshTokenPersistencePort;
 import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.common.identity.event.UserRegisteredEvent;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService implements IAuthUseCase {
 
     private final IUserPort IUserPort;
-    private final IRefreshTokenPort IRefreshTokenPort;
+    private final IRefreshTokenPersistencePort IRefreshTokenPersistencePort;
     private final PasswordEncoder passwordEncoder;
     private final IAccessTokenPort IAccessTokenPort;
     private final IAuthEventPublisherPort IAuthEventPublisherPort;
@@ -36,14 +36,14 @@ public class AuthService implements IAuthUseCase {
 
     public AuthService(
             IUserPort IUserPort,
-            IRefreshTokenPort IRefreshTokenPort,
+            IRefreshTokenPersistencePort IRefreshTokenPersistencePort,
             PasswordEncoder passwordEncoder,
             IAccessTokenPort IAccessTokenPort,
             IAuthEventPublisherPort IAuthEventPublisherPort,
             AuthTokenProperties authTokenProperties
     ) {
         this.IUserPort = IUserPort;
-        this.IRefreshTokenPort = IRefreshTokenPort;
+        this.IRefreshTokenPersistencePort = IRefreshTokenPersistencePort;
         this.passwordEncoder = passwordEncoder;
         this.IAccessTokenPort = IAccessTokenPort;
         this.IAuthEventPublisherPort = IAuthEventPublisherPort;
@@ -82,7 +82,7 @@ public class AuthService implements IAuthUseCase {
     @Transactional
     public TokenResponse refresh(String refreshTokenValue) {
         String tokenHash = hashRefreshToken(refreshTokenValue);
-        RefreshToken refreshToken = IRefreshTokenPort
+        RefreshToken refreshToken = IRefreshTokenPersistencePort
                 .findByToken(tokenHash)
                 .orElseThrow(InvalidRefreshTokenException::new);
 
@@ -91,7 +91,7 @@ public class AuthService implements IAuthUseCase {
         }
 
         refreshToken.revoke();
-        IRefreshTokenPort.save(refreshToken);
+        IRefreshTokenPersistencePort.save(refreshToken);
 
         User user = IUserPort.findById(refreshToken.getUserId())
                 .orElseThrow(InvalidRefreshTokenException::new);
@@ -122,7 +122,7 @@ public class AuthService implements IAuthUseCase {
                 Instant.now().plusMillis(refreshTokenExpirationMs)
         );
 
-        IRefreshTokenPort.save(refreshToken);
+        IRefreshTokenPersistencePort.save(refreshToken);
         return tokenValue;
     }
 

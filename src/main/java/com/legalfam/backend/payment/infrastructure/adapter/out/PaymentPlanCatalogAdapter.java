@@ -37,11 +37,6 @@ public class PaymentPlanCatalogAdapter implements IPaymentPlanCatalogPort {
     }
 
     @Override
-    public PaymentPlanDefinition getPlan(SubscriptionPlanCode code) {
-        return plansByCode.get(code);
-    }
-
-    @Override
     public PaymentPlanDefinition getPaidPlanOrThrow(String code) {
         SubscriptionPlanCode normalizedCode = parseCode(code);
         PaymentPlanDefinition plan = plansByCode.get(normalizedCode);

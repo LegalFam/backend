@@ -1,17 +1,17 @@
 package com.legalfam.backend.auth.infrastructure.adapter.out;
 
-import com.legalfam.backend.auth.application.port.out.IRefreshTokenPort;
+import com.legalfam.backend.auth.application.port.out.IRefreshTokenPersistencePort;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.infrastructure.persistence.IRefreshTokenRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 @Component
-public class JpaRefreshTokenAdapter implements IRefreshTokenPort {
+public class JpaRefreshTokenPersistenceAdapter implements IRefreshTokenPersistencePort {
 
     private final IRefreshTokenRepository IRefreshTokenRepository;
 
-    public JpaRefreshTokenAdapter(IRefreshTokenRepository IRefreshTokenRepository) {
+    public JpaRefreshTokenPersistenceAdapter(IRefreshTokenRepository IRefreshTokenRepository) {
         this.IRefreshTokenRepository = IRefreshTokenRepository;
     }
 

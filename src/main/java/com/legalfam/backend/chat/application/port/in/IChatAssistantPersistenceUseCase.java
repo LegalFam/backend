@@ -24,6 +24,4 @@ public interface IChatAssistantPersistenceUseCase {
             String errorCode,
             String errorMessage
     );
-
-    void expireUserMessage(UUID userMessageId, String errorCode, String errorMessage);
 }

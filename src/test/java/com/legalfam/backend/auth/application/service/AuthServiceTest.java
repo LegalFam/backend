@@ -16,7 +16,7 @@ import static org.mockito.Mockito.when;
 import com.legalfam.backend.auth.application.port.out.IAccessTokenPort;
 import com.legalfam.backend.auth.application.port.out.IAuthEventPublisherPort;
 import com.legalfam.backend.auth.application.port.out.IUserPort;
-import com.legalfam.backend.auth.application.port.out.IRefreshTokenPort;
+import com.legalfam.backend.auth.application.port.out.IRefreshTokenPersistencePort;
 import com.legalfam.backend.common.identity.event.UserRegisteredEvent;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
@@ -49,7 +49,7 @@ class AuthServiceTest {
     @Mock
     private IUserPort IUserPort;
     @Mock
-    private IRefreshTokenPort IRefreshTokenPort;
+    private IRefreshTokenPersistencePort IRefreshTokenPersistencePort;
     @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
@@ -68,7 +68,7 @@ class AuthServiceTest {
     void setUp() {
         authService = new AuthService(
                 IUserPort,
-                IRefreshTokenPort,
+                IRefreshTokenPersistencePort,
                 passwordEncoder,
                 IAccessTokenPort,
                 IAuthEventPublisherPort,
@@ -99,7 +99,7 @@ class AuthServiceTest {
         });
         when(IAccessTokenPort.generateAccessToken(eq(userId), eq("user@example.com"))).thenReturn("access-123");
         when(IAccessTokenPort.getAccessTokenExpirationSeconds()).thenReturn(900L);
-        when(IRefreshTokenPort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(IRefreshTokenPersistencePort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         TokenResponse response = authService.signup("user@example.com", "secret", "Juan", "900000000");
 
@@ -111,7 +111,7 @@ class AuthServiceTest {
         assertEquals("900000000", savedUser.getPhone());
         verify(IAuthEventPublisherPort).publishUserRegistered(new UserRegisteredEvent(userId));
 
-        verify(IRefreshTokenPort).save(refreshTokenCaptor.capture());
+        verify(IRefreshTokenPersistencePort).save(refreshTokenCaptor.capture());
         RefreshToken refreshToken = refreshTokenCaptor.getValue();
         assertNotNull(refreshToken.getToken());
         assertNotEquals(response.refreshToken(), refreshToken.getToken());
@@ -154,14 +154,14 @@ class AuthServiceTest {
         String rawToken = "revoked-token";
         RefreshToken existing = RefreshToken.issue(hashRefreshToken(rawToken), user.getId(), Instant.now().plusSeconds(60));
         existing.revoke();
-        when(IRefreshTokenPort.findByToken(hashRefreshToken(rawToken))).thenReturn(Optional.of(existing));
+        when(IRefreshTokenPersistencePort.findByToken(hashRefreshToken(rawToken))).thenReturn(Optional.of(existing));
 
         assertThrows(
                 InvalidRefreshTokenException.class,
                 () -> authService.refresh(rawToken)
         );
 
-        verify(IRefreshTokenPort, never()).save(any(RefreshToken.class));
+        verify(IRefreshTokenPersistencePort, never()).save(any(RefreshToken.class));
     }
 
     @Test
@@ -169,14 +169,14 @@ class AuthServiceTest {
         User user = User.restore(UUID.randomUUID(), "user@example.com", "stored-hash", "Juan", "900000000");
         String rawToken = "expired-token";
         RefreshToken existing = RefreshToken.issue(hashRefreshToken(rawToken), user.getId(), Instant.now().minusSeconds(60));
-        when(IRefreshTokenPort.findByToken(hashRefreshToken(rawToken))).thenReturn(Optional.of(existing));
+        when(IRefreshTokenPersistencePort.findByToken(hashRefreshToken(rawToken))).thenReturn(Optional.of(existing));
 
         assertThrows(
                 InvalidRefreshTokenException.class,
                 () -> authService.refresh(rawToken)
         );
 
-        verify(IRefreshTokenPort, never()).save(any(RefreshToken.class));
+        verify(IRefreshTokenPersistencePort, never()).save(any(RefreshToken.class));
     }
 
     @Test
@@ -185,15 +185,15 @@ class AuthServiceTest {
         String oldRefreshRaw = "old-refresh";
         String oldRefreshHashed = hashRefreshToken(oldRefreshRaw);
         RefreshToken existing = RefreshToken.issue(oldRefreshHashed, user.getId(), Instant.now().plusSeconds(60));
-        when(IRefreshTokenPort.findByToken(oldRefreshHashed)).thenReturn(Optional.of(existing));
+        when(IRefreshTokenPersistencePort.findByToken(oldRefreshHashed)).thenReturn(Optional.of(existing));
         when(IUserPort.findById(user.getId())).thenReturn(Optional.of(user));
-        when(IRefreshTokenPort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(IRefreshTokenPersistencePort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(IAccessTokenPort.generateAccessToken(eq(user.getId()), eq("user@example.com"))).thenReturn("new-access");
         when(IAccessTokenPort.getAccessTokenExpirationSeconds()).thenReturn(900L);
 
         TokenResponse response = authService.refresh(oldRefreshRaw);
 
-        verify(IRefreshTokenPort, times(2)).save(refreshTokenCaptor.capture());
+        verify(IRefreshTokenPersistencePort, times(2)).save(refreshTokenCaptor.capture());
         List<RefreshToken> savedTokens = refreshTokenCaptor.getAllValues();
         RefreshToken revokedOldToken = savedTokens.get(0);
         RefreshToken newToken = savedTokens.get(1);

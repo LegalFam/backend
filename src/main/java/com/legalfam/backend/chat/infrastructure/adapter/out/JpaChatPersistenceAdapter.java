@@ -20,7 +20,6 @@ import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -133,8 +132,18 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
     }
 
     @Override
-    public ChatCitation saveCitation(ChatCitation chatCitation) {
-        return ChatEntityMapper.toDomain(IChatCitationRepository.save(ChatEntityMapper.toEntity(chatCitation)));
+    public List<ChatCitation> saveCitations(List<ChatCitation> chatCitations) {
+        if (chatCitations.isEmpty()) {
+            return List.of();
+        }
+        return IChatCitationRepository.saveAll(
+                        chatCitations.stream()
+                                .map(ChatEntityMapper::toEntity)
+                                .toList()
+                )
+                .stream()
+                .map(ChatEntityMapper::toDomain)
+                .toList();
     }
 
     @Override
@@ -212,14 +221,6 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
     @Override
     public long deleteOutboxEventsByStatusAndReadAtBefore(ChatOutboxEventStatus status, Instant threshold) {
         return IChatOutboxEventRepository.deleteByStatusAndReadAtBefore(status, threshold);
-    }
-
-    @Override
-    public long deleteOutboxEventsByStatusInAndUpdatedAtBefore(
-            Collection<ChatOutboxEventStatus> statuses,
-            Instant threshold
-    ) {
-        return IChatOutboxEventRepository.deleteByStatusInAndUpdatedAtBefore(statuses, threshold);
     }
 
     private <E, D> CursorResult<D> toCursorResult(

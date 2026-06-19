@@ -95,8 +95,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         persistCitations(assistantMessage, citations);
         consumeTokensForAssistantResult(chatSession.getUserId(), userMessageId, metadata);
         markUserMessageCompleted(userMessageId, now);
-
-        chatSession.onUpdate(now);
+        chatSession.recordActivity(now);
         IChatPersistencePort.saveSession(chatSession);
 
         ChatAssistantMessageEvent assistantMessageEvent = new ChatAssistantMessageEvent(
@@ -145,10 +144,8 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         ChatMessage failureMessage = ChatMessage.systemMessage(chatSession.getId(), errorMessage, now);
         failureMessage = IChatPersistencePort.saveMessage(failureMessage);
         markUserMessageFailed(userMessageId, errorCode, errorMessage, now);
-
-        chatSession.onUpdate(now);
+        chatSession.recordActivity(now);
         IChatPersistencePort.saveSession(chatSession);
-
         return new ChatAssistantErrorDispatch(
                 chatSession.getUserId(),
                 chatSession.getId(),
@@ -162,34 +159,17 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         );
     }
 
-    @Transactional
-    @Override
-    public void expireUserMessage(UUID userMessageId, String errorCode, String errorMessage) {
-        Instant now = Instant.now();
-        ChatMessage userMessage = IChatPersistencePort.findMessageById(userMessageId).orElse(null);
-        if (userMessage == null || userMessage.getRole() != ChatMessageRole.USER) {
-            return;
-        }
-        ChatMessageProcessing processing = IChatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
-                .orElseGet(() -> initializeProcessingRecord(userMessageId, now));
-        if (processing.isTerminal()) {
-            return;
-        }
-
-        if (processing.expire(errorCode, errorMessage, now)) {
-            IChatPersistencePort.saveMessageProcessing(processing);
-        }
-    }
-
     private void persistCitations(ChatMessage assistantMessage, List<ChatCitationResponse> citations) {
-        for (ChatCitationResponse citation : citations) {
-            IChatPersistencePort.saveCitation(ChatCitation.create(
+        List<ChatCitation> chatCitations = citations.stream()
+                .map(citation -> ChatCitation.create(
                     assistantMessage.getId(),
                     defaultString(citation.sourceTitle()),
                     defaultString(citation.sourceSnippet()),
                     citation.sourceUrl()
-            ));
-        }
+                ))
+                .toList();
+
+        IChatPersistencePort.saveCitations(chatCitations);
     }
 
     private String defaultString(String value) {

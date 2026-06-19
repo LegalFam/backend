@@ -41,7 +41,7 @@ public class ChatSession {
         return session;
     }
 
-    public void onUpdate(Instant now) {
+    public void recordActivity(Instant now) {
         this.updatedAt = now;
     }
 

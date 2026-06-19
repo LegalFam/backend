@@ -32,16 +32,6 @@ public class JpaPaymentPersistenceAdapter implements IPaymentPersistencePort {
     }
 
     @Override
-    public Optional<Subscription> findSubscriptionById(UUID subscriptionId) {
-        return ISubscriptionRepository.findById(subscriptionId).map(PaymentEntityMapper::toDomain);
-    }
-
-    @Override
-    public Optional<Subscription> findSubscriptionByIdForUpdate(UUID subscriptionId) {
-        return ISubscriptionRepository.findByIdForUpdate(subscriptionId).map(PaymentEntityMapper::toDomain);
-    }
-
-    @Override
     public Optional<Subscription> findSubscriptionByUserId(UUID userId) {
         return ISubscriptionRepository.findByUserId(userId).map(PaymentEntityMapper::toDomain);
     }

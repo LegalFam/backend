@@ -8,10 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface IPaymentPersistencePort {
-    Optional<Subscription> findSubscriptionById(UUID subscriptionId);
-
-    Optional<Subscription> findSubscriptionByIdForUpdate(UUID subscriptionId);
-
     Optional<Subscription> findSubscriptionByUserId(UUID userId);
 
     Optional<Subscription> findSubscriptionByUserIdForUpdate(UUID userId);

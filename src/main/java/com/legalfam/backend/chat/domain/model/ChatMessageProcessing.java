@@ -50,8 +50,7 @@ public class ChatMessageProcessing {
 
     public boolean isTerminal() {
         return status == ChatMessageProcessingStatus.COMPLETED
-                || status == ChatMessageProcessingStatus.FAILED
-                || status == ChatMessageProcessingStatus.EXPIRED;
+                || status == ChatMessageProcessingStatus.FAILED;
     }
 
     public boolean isProcessing() {
@@ -88,19 +87,6 @@ public class ChatMessageProcessing {
             return false;
         }
         status = ChatMessageProcessingStatus.FAILED;
-        this.errorCode = errorCode;
-        this.errorMessage = errorMessage;
-        if (startedAt == null) startedAt = now;
-        finishedAt = now;
-        updatedAt = now;
-        return true;
-    }
-
-    public boolean expire(String errorCode, String errorMessage, Instant now) {
-        if (isTerminal()) {
-            return false;
-        }
-        status = ChatMessageProcessingStatus.EXPIRED;
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         if (startedAt == null) startedAt = now;

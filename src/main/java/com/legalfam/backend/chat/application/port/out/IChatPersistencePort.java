@@ -9,7 +9,6 @@ import com.legalfam.backend.chat.domain.model.ChatSession;
 import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,7 +32,7 @@ public interface IChatPersistencePort {
 
     List<ChatCitation> findCitationsByMessageIdsOrderByMessageIdAndId(List<UUID> messageIds);
 
-    ChatCitation saveCitation(ChatCitation chatCitation);
+    List<ChatCitation> saveCitations(List<ChatCitation> chatCitations);
 
     ChatMessageProcessing saveMessageProcessing(ChatMessageProcessing chatMessageProcessing);
 
@@ -56,6 +55,4 @@ public interface IChatPersistencePort {
     List<ChatOutboxEvent> lockReadyOutboxEvents(Instant now, int batchSize);
 
     long deleteOutboxEventsByStatusAndReadAtBefore(ChatOutboxEventStatus status, Instant threshold);
-
-    long deleteOutboxEventsByStatusInAndUpdatedAtBefore(Collection<ChatOutboxEventStatus> statuses, Instant threshold);
 }

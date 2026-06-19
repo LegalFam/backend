@@ -177,7 +177,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         if (chatMessageId == null || tokenCost <= 0) {
             return;
         }
-        int requestedTotalCost = Math.min(Math.max(tokenCost, 1), 3);
+        int requestedTotalCost = Math.clamp(tokenCost, 1, 3);
 
         if (IPaymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(
                 chatMessageId,

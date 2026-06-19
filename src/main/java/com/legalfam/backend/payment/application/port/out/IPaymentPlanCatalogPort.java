@@ -9,7 +9,5 @@ public interface IPaymentPlanCatalogPort {
 
     PaymentPlanDefinition getFreePlan();
 
-    PaymentPlanDefinition getPlan(SubscriptionPlanCode code);
-
     PaymentPlanDefinition getPaidPlanOrThrow(String code);
 }
