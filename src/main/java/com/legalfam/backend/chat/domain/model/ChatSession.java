@@ -41,26 +41,6 @@ public class ChatSession {
         return session;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
     public void onUpdate(Instant now) {
         this.updatedAt = now;
     }
@@ -74,5 +54,21 @@ public class ChatSession {
                 ? normalized.substring(0, MAX_TITLE_LENGTH)
                 : normalized;
         this.updatedAt = now;
+    }
+
+    public UUID getId() {
+        return id;
+    }
+    public UUID getUserId() {
+        return userId;
+    }
+    public String getTitle() {
+        return title;
+    }
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }

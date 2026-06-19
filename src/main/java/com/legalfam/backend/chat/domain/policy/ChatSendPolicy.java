@@ -4,8 +4,7 @@ import com.legalfam.backend.chat.domain.exception.PendingAssistantMessageExcepti
 
 public final class ChatSendPolicy {
 
-    private ChatSendPolicy() {
-    }
+    private ChatSendPolicy() {}
 
     public static void assertCanSend(boolean hasActiveMessageProcessing, boolean hasUnreadAssistantMessage) {
         if (hasActiveMessageProcessing) {

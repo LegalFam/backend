@@ -183,12 +183,12 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
 
     private void persistCitations(ChatMessage assistantMessage, List<ChatCitationResponse> citations) {
         for (ChatCitationResponse citation : citations) {
-            ChatCitation entity = new ChatCitation();
-            entity.setChatMessageId(assistantMessage.getId());
-            entity.setSourceTitle(defaultString(citation.sourceTitle()));
-            entity.setSourceSnippet(defaultString(citation.sourceSnippet()));
-            entity.setSourceUrl(citation.sourceUrl());
-            IChatPersistencePort.saveCitation(entity);
+            IChatPersistencePort.saveCitation(ChatCitation.create(
+                    assistantMessage.getId(),
+                    defaultString(citation.sourceTitle()),
+                    defaultString(citation.sourceSnippet()),
+                    citation.sourceUrl()
+            ));
         }
     }
 

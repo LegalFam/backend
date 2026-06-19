@@ -116,17 +116,21 @@ class ChatDeliveryRetryWorkerTest {
                 assistantMessageEvent
         );
 
-        ChatOutboxEvent event = new ChatOutboxEvent();
-        event.setId(UUID.randomUUID());
-        event.setEventType(ChatOutboxEvent.ASSISTANT_DELIVERY_EVENT_TYPE);
-        event.setAggregateId(assistantMessageId);
-        event.setChatSessionId(sessionId);
-        event.setPayload(new ObjectMapper().writeValueAsString(deliveryEvent));
-        event.setStatus(ChatOutboxEventStatus.PENDING);
-        event.setAttemptCount(0);
-        event.setAvailableAt(Instant.now());
-        event.setCreatedAt(Instant.now());
-        event.setUpdatedAt(Instant.now());
-        return event;
+        Instant now = Instant.now();
+        return ChatOutboxEvent.restore(
+                UUID.randomUUID(),
+                ChatOutboxEvent.ASSISTANT_DELIVERY_EVENT_TYPE,
+                assistantMessageId,
+                sessionId,
+                new ObjectMapper().writeValueAsString(deliveryEvent),
+                ChatOutboxEventStatus.PENDING,
+                0,
+                now,
+                null,
+                null,
+                null,
+                now,
+                now
+        );
     }
 }

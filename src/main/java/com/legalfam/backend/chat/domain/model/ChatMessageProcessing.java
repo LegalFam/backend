@@ -48,78 +48,6 @@ public class ChatMessageProcessing {
         return processing;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public UUID getUserMessageId() {
-        return userMessageId;
-    }
-
-    public void setUserMessageId(UUID userMessageId) {
-        this.userMessageId = userMessageId;
-    }
-
-    public ChatMessageProcessingStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(ChatMessageProcessingStatus status) {
-        this.status = status;
-    }
-
-    public String getErrorCode() {
-        return errorCode;
-    }
-
-    public void setErrorCode(String errorCode) {
-        this.errorCode = errorCode;
-    }
-
-    public String getErrorMessage() {
-        return errorMessage;
-    }
-
-    public void setErrorMessage(String errorMessage) {
-        this.errorMessage = errorMessage;
-    }
-
-    public Instant getStartedAt() {
-        return startedAt;
-    }
-
-    public void setStartedAt(Instant startedAt) {
-        this.startedAt = startedAt;
-    }
-
-    public Instant getFinishedAt() {
-        return finishedAt;
-    }
-
-    public void setFinishedAt(Instant finishedAt) {
-        this.finishedAt = finishedAt;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
     public boolean isTerminal() {
         return status == ChatMessageProcessingStatus.COMPLETED
                 || status == ChatMessageProcessingStatus.FAILED
@@ -131,12 +59,8 @@ public class ChatMessageProcessing {
     }
 
     public boolean start(Instant now) {
-        if (isTerminal()) {
-            return false;
-        }
-        if (isProcessing()) {
-            return true;
-        }
+        if (isTerminal()) { return false; }
+        if (isProcessing()) { return true; }
         status = ChatMessageProcessingStatus.PROCESSING;
         startedAt = now;
         finishedAt = null;
@@ -151,7 +75,7 @@ public class ChatMessageProcessing {
             return false;
         }
         status = ChatMessageProcessingStatus.COMPLETED;
-        ensureStartedAt(now);
+        if (startedAt == null) startedAt = now;
         finishedAt = now;
         errorCode = null;
         errorMessage = null;
@@ -166,7 +90,7 @@ public class ChatMessageProcessing {
         status = ChatMessageProcessingStatus.FAILED;
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
-        ensureStartedAt(now);
+        if (startedAt == null) startedAt = now;
         finishedAt = now;
         updatedAt = now;
         return true;
@@ -179,15 +103,37 @@ public class ChatMessageProcessing {
         status = ChatMessageProcessingStatus.EXPIRED;
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
-        ensureStartedAt(now);
+        if (startedAt == null) startedAt = now;
         finishedAt = now;
         updatedAt = now;
         return true;
     }
 
-    private void ensureStartedAt(Instant now) {
-        if (startedAt == null) {
-            startedAt = now;
-        }
+    public UUID getId() {
+        return id;
+    }
+    public UUID getUserMessageId() {
+        return userMessageId;
+    }
+    public ChatMessageProcessingStatus getStatus() {
+        return status;
+    }
+    public String getErrorCode() {
+        return errorCode;
+    }
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+    public Instant getStartedAt() {
+        return startedAt;
+    }
+    public Instant getFinishedAt() {
+        return finishedAt;
+    }
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }

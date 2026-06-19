@@ -53,110 +53,6 @@ public class ChatOutboxEvent {
         return event;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public String getEventType() {
-        return eventType;
-    }
-
-    public void setEventType(String eventType) {
-        this.eventType = eventType;
-    }
-
-    public UUID getAggregateId() {
-        return aggregateId;
-    }
-
-    public void setAggregateId(UUID aggregateId) {
-        this.aggregateId = aggregateId;
-    }
-
-    public UUID getChatSessionId() {
-        return chatSessionId;
-    }
-
-    public void setChatSessionId(UUID chatSessionId) {
-        this.chatSessionId = chatSessionId;
-    }
-
-    public String getPayload() {
-        return payload;
-    }
-
-    public void setPayload(String payload) {
-        this.payload = payload;
-    }
-
-    public ChatOutboxEventStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(ChatOutboxEventStatus status) {
-        this.status = status;
-    }
-
-    public int getAttemptCount() {
-        return attemptCount;
-    }
-
-    public void setAttemptCount(int attemptCount) {
-        this.attemptCount = attemptCount;
-    }
-
-    public Instant getAvailableAt() {
-        return availableAt;
-    }
-
-    public void setAvailableAt(Instant availableAt) {
-        this.availableAt = availableAt;
-    }
-
-    public Instant getPublishedAt() {
-        return publishedAt;
-    }
-
-    public void setPublishedAt(Instant publishedAt) {
-        this.publishedAt = publishedAt;
-    }
-
-    public Instant getReadAt() {
-        return readAt;
-    }
-
-    public void setReadAt(Instant readAt) {
-        this.readAt = readAt;
-    }
-
-    public String getLastError() {
-        return lastError;
-    }
-
-    public void setLastError(String lastError) {
-        this.lastError = lastError;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
     public boolean isRead() {
         return status == ChatOutboxEventStatus.READ;
     }
@@ -226,12 +122,50 @@ public class ChatOutboxEvent {
     }
 
     public boolean markRead(Instant now) {
-        if (isRead()) {
-            return false;
-        }
+        if (isRead()) { return false; }
         status = ChatOutboxEventStatus.READ;
         readAt = now;
         updatedAt = now;
         return true;
+    }
+
+    public UUID getId() {
+        return id;
+    }
+    public String getEventType() {
+        return eventType;
+    }
+    public UUID getAggregateId() {
+        return aggregateId;
+    }
+    public UUID getChatSessionId() {
+        return chatSessionId;
+    }
+    public String getPayload() {
+        return payload;
+    }
+    public ChatOutboxEventStatus getStatus() {
+        return status;
+    }
+    public int getAttemptCount() {
+        return attemptCount;
+    }
+    public Instant getAvailableAt() {
+        return availableAt;
+    }
+    public Instant getPublishedAt() {
+        return publishedAt;
+    }
+    public Instant getReadAt() {
+        return readAt;
+    }
+    public String getLastError() {
+        return lastError;
+    }
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }

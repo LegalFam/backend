@@ -10,43 +10,51 @@ public class ChatCitation {
     private String sourceSnippet;
     private String sourceUrl;
 
-    public UUID getId() {
-        return id;
+    private ChatCitation() {}
+
+    public static ChatCitation create(
+            UUID chatMessageId,
+            String sourceTitle,
+            String sourceSnippet,
+            String sourceUrl
+    ) {
+        ChatCitation citation = new ChatCitation();
+        citation.chatMessageId = chatMessageId;
+        citation.sourceTitle = sourceTitle;
+        citation.sourceSnippet = sourceSnippet;
+        citation.sourceUrl = sourceUrl;
+        return citation;
     }
 
-    public void setId(UUID id) {
-        this.id = id;
+    public static ChatCitation restore(
+            UUID id,
+            UUID chatMessageId,
+            String sourceTitle,
+            String sourceSnippet,
+            String sourceUrl
+    ) {
+        ChatCitation citation = create(chatMessageId, sourceTitle, sourceSnippet, sourceUrl);
+        citation.id = id;
+        return citation;
+    }
+
+    public UUID getId() {
+        return id;
     }
 
     public UUID getChatMessageId() {
         return chatMessageId;
     }
 
-    public void setChatMessageId(UUID chatMessageId) {
-        this.chatMessageId = chatMessageId;
-    }
-
     public String getSourceTitle() {
         return sourceTitle;
-    }
-
-    public void setSourceTitle(String sourceTitle) {
-        this.sourceTitle = sourceTitle;
     }
 
     public String getSourceSnippet() {
         return sourceSnippet;
     }
 
-    public void setSourceSnippet(String sourceSnippet) {
-        this.sourceSnippet = sourceSnippet;
-    }
-
     public String getSourceUrl() {
         return sourceUrl;
-    }
-
-    public void setSourceUrl(String sourceUrl) {
-        this.sourceUrl = sourceUrl;
     }
 }

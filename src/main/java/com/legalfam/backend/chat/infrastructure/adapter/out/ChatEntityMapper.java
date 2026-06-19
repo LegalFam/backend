@@ -142,13 +142,13 @@ final class ChatEntityMapper {
     }
 
     static ChatCitation toDomain(ChatCitationEntity entity) {
-        ChatCitation citation = new ChatCitation();
-        citation.setId(entity.getId());
-        citation.setChatMessageId(entity.getChatMessageId());
-        citation.setSourceTitle(entity.getSourceTitle());
-        citation.setSourceSnippet(entity.getSourceSnippet());
-        citation.setSourceUrl(entity.getSourceUrl());
-        return citation;
+        return ChatCitation.restore(
+                entity.getId(),
+                entity.getChatMessageId(),
+                entity.getSourceTitle(),
+                entity.getSourceSnippet(),
+                entity.getSourceUrl()
+        );
     }
 
     static ChatCitationEntity toEntity(ChatCitation domain) {

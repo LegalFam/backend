@@ -58,8 +58,7 @@ class ChatOutboxRelayTransactionServiceTest {
     void recordPublishSuccessClearsLastErrorWhenEventIsUnread() {
         UUID aggregateId = UUID.randomUUID();
         Instant now = Instant.parse("2026-06-07T05:00:00Z");
-        ChatOutboxEvent event = event(ChatOutboxEventStatus.PENDING);
-        event.setLastError("previous failure");
+        ChatOutboxEvent event = event(ChatOutboxEventStatus.PENDING, "previous failure");
 
         when(IChatPersistencePort.findOutboxEventByAggregateIdForUpdate(aggregateId)).thenReturn(Optional.of(event));
 
@@ -117,13 +116,25 @@ class ChatOutboxRelayTransactionServiceTest {
     }
 
     private ChatOutboxEvent event(ChatOutboxEventStatus status) {
+        return event(status, null);
+    }
+
+    private ChatOutboxEvent event(ChatOutboxEventStatus status, String lastError) {
         Instant past = Instant.parse("2026-06-07T04:00:00Z");
-        ChatOutboxEvent event = new ChatOutboxEvent();
-        event.setId(UUID.randomUUID());
-        event.setAggregateId(UUID.randomUUID());
-        event.setStatus(status);
-        event.setAvailableAt(past);
-        event.setUpdatedAt(past);
-        return event;
+        return ChatOutboxEvent.restore(
+                UUID.randomUUID(),
+                ChatOutboxEvent.ASSISTANT_DELIVERY_EVENT_TYPE,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "{}",
+                status,
+                0,
+                past,
+                null,
+                null,
+                lastError,
+                past,
+                past
+        );
     }
 }

@@ -87,6 +87,35 @@ public class ChatMessage {
         return message;
     }
 
+    public void applyAssistantMetadata(
+            String confidenceStatus,
+            String confidenceReason,
+            List<String> nextSteps,
+            Boolean specialistSupportRecommended,
+            String citationSupportStatus
+    ) {
+        if (role != ChatMessageRole.ASSISTANT) {
+            throw new InvalidChatRequestException("Metadata can only be applied to assistant messages");
+        }
+        this.confidenceStatus = normalizeBlank(confidenceStatus);
+        this.confidenceReason = normalizeBlank(confidenceReason);
+        this.nextSteps = nextSteps == null ? List.of() : List.copyOf(nextSteps);
+        this.specialistSupportRecommended = specialistSupportRecommended;
+        this.citationSupportStatus = normalizeCitationSupportStatus(citationSupportStatus);
+    }
+
+    public void submitFeedback(int rating, String comment, Instant submittedAt) {
+        if (role != ChatMessageRole.ASSISTANT) {
+            throw new InvalidChatRequestException("Only assistant messages can be rated");
+        }
+        if (rating < 1 || rating > 5) {
+            throw new InvalidChatRequestException("Rating must be between 1 and 5");
+        }
+        this.rating = rating;
+        this.feedbackComment = normalizeFeedbackComment(comment);
+        this.feedbackSubmittedAt = submittedAt;
+    }
+
     public UUID getId() {
         return id;
     }
@@ -137,35 +166,6 @@ public class ChatMessage {
 
     public Instant getCreatedAt() {
         return createdAt;
-    }
-
-    public void applyAssistantMetadata(
-            String confidenceStatus,
-            String confidenceReason,
-            List<String> nextSteps,
-            Boolean specialistSupportRecommended,
-            String citationSupportStatus
-    ) {
-        if (role != ChatMessageRole.ASSISTANT) {
-            throw new InvalidChatRequestException("Metadata can only be applied to assistant messages");
-        }
-        this.confidenceStatus = normalizeBlank(confidenceStatus);
-        this.confidenceReason = normalizeBlank(confidenceReason);
-        this.nextSteps = nextSteps == null ? List.of() : List.copyOf(nextSteps);
-        this.specialistSupportRecommended = specialistSupportRecommended;
-        this.citationSupportStatus = normalizeCitationSupportStatus(citationSupportStatus);
-    }
-
-    public void submitFeedback(int rating, String comment, Instant submittedAt) {
-        if (role != ChatMessageRole.ASSISTANT) {
-            throw new InvalidChatRequestException("Only assistant messages can be rated");
-        }
-        if (rating < 1 || rating > 5) {
-            throw new InvalidChatRequestException("Rating must be between 1 and 5");
-        }
-        this.rating = rating;
-        this.feedbackComment = normalizeFeedbackComment(comment);
-        this.feedbackSubmittedAt = submittedAt;
     }
 
     private String normalizeFeedbackComment(String comment) {

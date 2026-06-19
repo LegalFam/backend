@@ -74,11 +74,17 @@ class ChatAssistantPersistenceServiceTest {
     }
 
     private ChatMessageProcessing processing(UUID userMessageId) {
-        ChatMessageProcessing processing = new ChatMessageProcessing();
-        processing.setUserMessageId(userMessageId);
-        processing.setStatus(ChatMessageProcessingStatus.PROCESSING);
-        processing.setCreatedAt(Instant.now());
-        processing.setUpdatedAt(Instant.now());
-        return processing;
+        Instant now = Instant.now();
+        return ChatMessageProcessing.restore(
+                UUID.randomUUID(),
+                userMessageId,
+                ChatMessageProcessingStatus.PROCESSING,
+                null,
+                null,
+                now,
+                null,
+                now,
+                now
+        );
     }
 }
