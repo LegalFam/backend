@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.legalfam.backend.payment.domain.exception.InsufficientTokensException;
 import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import java.time.Instant;
 import java.util.UUID;
@@ -14,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class SubscriptionTest {
 
     @Test
-    void consumeChatTokenDecrementsRemainingTokens() {
+    void consumeAvailableChatTokensDecrementsRemainingTokens() {
         Instant now = Instant.parse("2026-01-01T00:00:00Z");
         Subscription subscription = Subscription.createFree(
                 UUID.randomUUID(),
@@ -25,8 +24,9 @@ class SubscriptionTest {
                 now
         );
 
-        subscription.consumeChatToken(Instant.parse("2026-01-01T00:01:00Z"));
+        int consumed = subscription.consumeAvailableChatTokens(1, Instant.parse("2026-01-01T00:01:00Z"));
 
+        assertEquals(1, consumed);
         assertEquals(1, subscription.getRemainingTokens());
         assertEquals(Instant.parse("2026-01-01T00:01:00Z"), subscription.getUpdatedAt());
     }
@@ -42,7 +42,7 @@ class SubscriptionTest {
                 Instant.parse("2026-02-01T00:00:00Z"),
                 now
         );
-        subscription.consumeChatToken(Instant.parse("2026-01-01T00:01:00Z"));
+        subscription.consumeAvailableChatTokens(1, Instant.parse("2026-01-01T00:01:00Z"));
 
         int consumed = subscription.consumeAvailableChatTokens(2, Instant.parse("2026-01-01T00:02:00Z"));
 
@@ -52,7 +52,7 @@ class SubscriptionTest {
     }
 
     @Test
-    void consumeChatTokenRejectsEmptyBalance() {
+    void consumeAvailableChatTokensReturnsZeroForEmptyBalance() {
         Instant now = Instant.parse("2026-01-01T00:00:00Z");
         Subscription subscription = Subscription.createFree(
                 UUID.randomUUID(),
@@ -63,7 +63,11 @@ class SubscriptionTest {
                 now
         );
 
-        assertThrows(InsufficientTokensException.class, () -> subscription.consumeChatToken(now));
+        int consumed = subscription.consumeAvailableChatTokens(1, Instant.parse("2026-01-01T00:01:00Z"));
+
+        assertEquals(0, consumed);
+        assertEquals(0, subscription.getRemainingTokens());
+        assertEquals(now, subscription.getUpdatedAt());
     }
 
     @Test
@@ -77,7 +81,7 @@ class SubscriptionTest {
                 Instant.parse("2026-02-01T00:00:00Z"),
                 now
         );
-        subscription.consumeChatToken(Instant.parse("2026-01-01T00:01:00Z"));
+        subscription.consumeAvailableChatTokens(1, Instant.parse("2026-01-01T00:01:00Z"));
 
         subscription.syncGatewaySubscription(
                 SubscriptionPlanCode.BASIC,
