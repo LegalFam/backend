@@ -22,8 +22,7 @@ public class Subscription {
     private Instant createdAt;
     private Instant updatedAt;
 
-    private Subscription() {
-    }
+    private Subscription() {}
 
     public static Subscription createFree(UUID userId, SubscriptionPlanCode planCode, int tokenLimit, Instant periodStart, Instant periodEnd, Instant now) {
         Subscription subscription = new Subscription();
@@ -64,62 +63,6 @@ public class Subscription {
         subscription.createdAt = createdAt;
         subscription.updatedAt = updatedAt;
         return subscription;
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public SubscriptionPlanCode getPlanCode() {
-        return planCode;
-    }
-
-    public SubscriptionStatus getStatus() {
-        return status;
-    }
-
-    public PaymentProvider getProvider() {
-        return provider;
-    }
-
-    public String getGatewayCustomerId() {
-        return gatewayCustomerId;
-    }
-
-    public String getGatewaySubscriptionId() {
-        return gatewaySubscriptionId;
-    }
-
-    public Instant getCurrentPeriodStart() {
-        return currentPeriodStart;
-    }
-
-    public Instant getCurrentPeriodEnd() {
-        return currentPeriodEnd;
-    }
-
-    public boolean isCancelAtPeriodEnd() {
-        return cancelAtPeriodEnd;
-    }
-
-    public int getMonthlyTokenLimit() {
-        return monthlyTokenLimit;
-    }
-
-    public int getRemainingTokens() {
-        return remainingTokens;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
     }
 
     public int consumeAvailableChatTokens(int requestedTokens, Instant now) {
@@ -223,6 +166,62 @@ public class Subscription {
 
     public boolean hasGatewaySubscription() {
         return provider == PaymentProvider.MERCADO_PAGO && gatewaySubscriptionId != null && !gatewaySubscriptionId.isBlank();
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public SubscriptionPlanCode getPlanCode() {
+        return planCode;
+    }
+
+    public SubscriptionStatus getStatus() {
+        return status;
+    }
+
+    public PaymentProvider getProvider() {
+        return provider;
+    }
+
+    public String getGatewayCustomerId() {
+        return gatewayCustomerId;
+    }
+
+    public String getGatewaySubscriptionId() {
+        return gatewaySubscriptionId;
+    }
+
+    public Instant getCurrentPeriodStart() {
+        return currentPeriodStart;
+    }
+
+    public Instant getCurrentPeriodEnd() {
+        return currentPeriodEnd;
+    }
+
+    public boolean isCancelAtPeriodEnd() {
+        return cancelAtPeriodEnd;
+    }
+
+    public int getMonthlyTokenLimit() {
+        return monthlyTokenLimit;
+    }
+
+    public int getRemainingTokens() {
+        return remainingTokens;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     private void assertActive() {

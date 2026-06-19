@@ -90,14 +90,14 @@ class AuthServiceTest {
 
     @Test
     void signupCreatesUserAndReturnsTokens() {
+        UUID userId = UUID.randomUUID();
         when(IUserPort.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode("secret")).thenReturn("hashed-password");
         when(IUserPort.save(any(User.class))).thenAnswer(invocation -> {
-            User saved = invocation.getArgument(0);
-            saved.setId(UUID.randomUUID());
-            return saved;
+            User user = invocation.getArgument(0);
+            return User.restore(userId, user.getEmail(), user.getPassword(), user.getName(), user.getPhone());
         });
-        when(IAccessTokenPort.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("access-123");
+        when(IAccessTokenPort.generateAccessToken(eq(userId), eq("user@example.com"))).thenReturn("access-123");
         when(IAccessTokenPort.getAccessTokenExpirationSeconds()).thenReturn(900L);
         when(IRefreshTokenPort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -109,7 +109,7 @@ class AuthServiceTest {
         assertEquals("hashed-password", savedUser.getPassword());
         assertEquals("Juan", savedUser.getName());
         assertEquals("900000000", savedUser.getPhone());
-        verify(IAuthEventPublisherPort).publishUserRegistered(new UserRegisteredEvent(savedUser.getId()));
+        verify(IAuthEventPublisherPort).publishUserRegistered(new UserRegisteredEvent(userId));
 
         verify(IRefreshTokenPort).save(refreshTokenCaptor.capture());
         RefreshToken refreshToken = refreshTokenCaptor.getValue();
@@ -117,7 +117,7 @@ class AuthServiceTest {
         assertNotEquals(response.refreshToken(), refreshToken.getToken());
         assertEquals(hashRefreshToken(response.refreshToken()), refreshToken.getToken());
         assertFalse(refreshToken.isRevoked());
-        assertEquals(savedUser.getId(), refreshToken.getUserId());
+        assertEquals(userId, refreshToken.getUserId());
         assertTrue(refreshToken.getExpiresAt().isAfter(Instant.now()));
 
         assertEquals("access-123", response.accessToken());
@@ -138,7 +138,7 @@ class AuthServiceTest {
 
     @Test
     void loginThrowsWhenPasswordDoesNotMatch() {
-        User user = createUser("user@example.com", "stored-hash");
+        User user = User.restore(UUID.randomUUID(), "user@example.com", "stored-hash", "Juan", "900000000");
         when(IUserPort.findByEmail("user@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong-password", "stored-hash")).thenReturn(false);
 
@@ -150,9 +150,10 @@ class AuthServiceTest {
 
     @Test
     void refreshThrowsWhenTokenIsRevoked() {
-        User user = createUser("user@example.com", "stored-hash");
+        User user = User.restore(UUID.randomUUID(), "user@example.com", "stored-hash", "Juan", "900000000");
         String rawToken = "revoked-token";
-        RefreshToken existing = createRefreshToken(hashRefreshToken(rawToken), user, Instant.now().plusSeconds(60), true);
+        RefreshToken existing = RefreshToken.issue(hashRefreshToken(rawToken), user.getId(), Instant.now().plusSeconds(60));
+        existing.revoke();
         when(IRefreshTokenPort.findByToken(hashRefreshToken(rawToken))).thenReturn(Optional.of(existing));
 
         assertThrows(
@@ -165,9 +166,9 @@ class AuthServiceTest {
 
     @Test
     void refreshThrowsWhenTokenIsExpired() {
-        User user = createUser("user@example.com", "stored-hash");
+        User user = User.restore(UUID.randomUUID(), "user@example.com", "stored-hash", "Juan", "900000000");
         String rawToken = "expired-token";
-        RefreshToken existing = createRefreshToken(hashRefreshToken(rawToken), user, Instant.now().minusSeconds(60), false);
+        RefreshToken existing = RefreshToken.issue(hashRefreshToken(rawToken), user.getId(), Instant.now().minusSeconds(60));
         when(IRefreshTokenPort.findByToken(hashRefreshToken(rawToken))).thenReturn(Optional.of(existing));
 
         assertThrows(
@@ -180,14 +181,14 @@ class AuthServiceTest {
 
     @Test
     void refreshRevokesOldTokenAndIssuesNewOne() {
-        User user = createUser("user@example.com", "stored-hash");
+        User user = User.restore(UUID.randomUUID(), "user@example.com", "stored-hash", "Juan", "900000000");
         String oldRefreshRaw = "old-refresh";
         String oldRefreshHashed = hashRefreshToken(oldRefreshRaw);
-        RefreshToken existing = createRefreshToken(oldRefreshHashed, user, Instant.now().plusSeconds(60), false);
+        RefreshToken existing = RefreshToken.issue(oldRefreshHashed, user.getId(), Instant.now().plusSeconds(60));
         when(IRefreshTokenPort.findByToken(oldRefreshHashed)).thenReturn(Optional.of(existing));
         when(IUserPort.findById(user.getId())).thenReturn(Optional.of(user));
         when(IRefreshTokenPort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(IAccessTokenPort.generateAccessToken(any(UUID.class), eq("user@example.com"))).thenReturn("new-access");
+        when(IAccessTokenPort.generateAccessToken(eq(user.getId()), eq("user@example.com"))).thenReturn("new-access");
         when(IAccessTokenPort.getAccessTokenExpirationSeconds()).thenReturn(900L);
 
         TokenResponse response = authService.refresh(oldRefreshRaw);
@@ -205,25 +206,6 @@ class AuthServiceTest {
 
         assertEquals("new-access", response.accessToken());
         assertNotEquals(newToken.getToken(), response.refreshToken());
-    }
-
-    private static User createUser(String email, String password) {
-        User user = new User();
-        user.setId(UUID.randomUUID());
-        user.setEmail(email);
-        user.setPassword(password);
-        user.setName("Test User");
-        user.setPhone("900000000");
-        return user;
-    }
-
-    private static RefreshToken createRefreshToken(String token, User user, Instant expiresAt, boolean revoked) {
-        RefreshToken refreshToken = new RefreshToken();
-        refreshToken.setToken(token);
-        refreshToken.setUserId(user.getId());
-        refreshToken.setExpiresAt(expiresAt);
-        refreshToken.setRevoked(revoked);
-        return refreshToken;
     }
 
     private static String hashRefreshToken(String rawToken) {

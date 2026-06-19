@@ -33,47 +33,21 @@ public class RefreshToken {
     public UUID getId() {
         return id;
     }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
     public String getToken() {
         return token;
     }
-
-    public void setToken(String token) {
-        this.token = token;
-    }
-
     public Instant getExpiresAt() {
         return expiresAt;
     }
-
-    public void setExpiresAt(Instant expiresAt) {
-        this.expiresAt = expiresAt;
-    }
-
     public boolean isRevoked() {
         return revoked;
     }
-
-    public void setRevoked(boolean revoked) {
-        this.revoked = revoked;
-    }
-
     public UUID getUserId() {
         return userId;
     }
-
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
-
     public boolean canBeRotatedAt(Instant now) {
         return !revoked && expiresAt != null && !expiresAt.isBefore(now);
     }
-
     public void revoke() {
         revoked = true;
     }
