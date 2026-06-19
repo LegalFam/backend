@@ -1,14 +1,14 @@
-package com.legalfam.backend.auth.infrastructure.adapter.out;
+package com.legalfam.backend.auth.infrastructure.persistence.mapper;
 
 import com.legalfam.backend.auth.domain.model.User;
 import com.legalfam.backend.auth.infrastructure.persistence.entity.UserEntity;
 
-final class UserEntityMapper {
+public final class UserEntityMapper {
 
     private UserEntityMapper() {
     }
 
-    static User toDomain(UserEntity entity) {
+    public static User toDomain(UserEntity entity) {
         return User.restore(
                 entity.getId(),
                 entity.getEmail(),
@@ -18,7 +18,7 @@ final class UserEntityMapper {
         );
     }
 
-    static UserEntity toEntity(User domain) {
+    public static UserEntity toEntity(User domain) {
         UserEntity entity = new UserEntity();
         entity.setId(domain.getId());
         entity.setEmail(domain.getEmail());

@@ -1,4 +1,4 @@
-package com.legalfam.backend.chat.infrastructure.adapter.out;
+package com.legalfam.backend.chat.infrastructure.persistence.mapper;
 
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
@@ -14,14 +14,14 @@ import java.util.List;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
-final class ChatEntityMapper {
+public final class ChatEntityMapper {
 
     private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
 
     private ChatEntityMapper() {
     }
 
-    static ChatSession toDomain(ChatSessionEntity entity) {
+    public static ChatSession toDomain(ChatSessionEntity entity) {
         return ChatSession.restore(
                 entity.getId(),
                 entity.getUserId(),
@@ -31,7 +31,7 @@ final class ChatEntityMapper {
         );
     }
 
-    static ChatSessionEntity toEntity(ChatSession domain) {
+    public static ChatSessionEntity toEntity(ChatSession domain) {
         ChatSessionEntity entity = new ChatSessionEntity();
         entity.setId(domain.getId());
         entity.setUserId(domain.getUserId());
@@ -41,7 +41,7 @@ final class ChatEntityMapper {
         return entity;
     }
 
-    static ChatMessage toDomain(ChatMessageEntity entity) {
+    public static ChatMessage toDomain(ChatMessageEntity entity) {
         return ChatMessage.restore(
                 entity.getId(),
                 entity.getChatSessionId(),
@@ -60,7 +60,7 @@ final class ChatEntityMapper {
         );
     }
 
-    static ChatMessageEntity toEntity(ChatMessage domain) {
+    public static ChatMessageEntity toEntity(ChatMessage domain) {
         ChatMessageEntity entity = new ChatMessageEntity();
         entity.setId(domain.getId());
         entity.setChatSessionId(domain.getChatSessionId());
@@ -79,7 +79,7 @@ final class ChatEntityMapper {
         return entity;
     }
 
-    static ChatMessageProcessing toDomain(ChatMessageProcessingEntity entity) {
+    public static ChatMessageProcessing toDomain(ChatMessageProcessingEntity entity) {
         return ChatMessageProcessing.restore(
                 entity.getId(),
                 entity.getUserMessageId(),
@@ -93,7 +93,7 @@ final class ChatEntityMapper {
         );
     }
 
-    static ChatMessageProcessingEntity toEntity(ChatMessageProcessing domain) {
+    public static ChatMessageProcessingEntity toEntity(ChatMessageProcessing domain) {
         ChatMessageProcessingEntity entity = new ChatMessageProcessingEntity();
         entity.setId(domain.getId());
         entity.setUserMessageId(domain.getUserMessageId());
@@ -107,7 +107,7 @@ final class ChatEntityMapper {
         return entity;
     }
 
-    static ChatOutboxEvent toDomain(ChatOutboxEventEntity entity) {
+    public static ChatOutboxEvent toDomain(ChatOutboxEventEntity entity) {
         return ChatOutboxEvent.restore(
                 entity.getId(),
                 entity.getEventType(),
@@ -125,7 +125,7 @@ final class ChatEntityMapper {
         );
     }
 
-    static ChatOutboxEventEntity toEntity(ChatOutboxEvent domain) {
+    public static ChatOutboxEventEntity toEntity(ChatOutboxEvent domain) {
         ChatOutboxEventEntity entity = new ChatOutboxEventEntity();
         entity.setId(domain.getId());
         entity.setEventType(domain.getEventType());
@@ -143,7 +143,7 @@ final class ChatEntityMapper {
         return entity;
     }
 
-    static ChatCitation toDomain(ChatCitationEntity entity) {
+    public static ChatCitation toDomain(ChatCitationEntity entity) {
         return ChatCitation.restore(
                 entity.getId(),
                 entity.getChatMessageId(),
@@ -153,7 +153,7 @@ final class ChatEntityMapper {
         );
     }
 
-    static ChatCitationEntity toEntity(ChatCitation domain) {
+    public static ChatCitationEntity toEntity(ChatCitation domain) {
         ChatCitationEntity entity = new ChatCitationEntity();
         entity.setId(domain.getId());
         entity.setChatMessageId(domain.getChatMessageId());

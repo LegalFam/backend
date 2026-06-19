@@ -3,6 +3,7 @@ package com.legalfam.backend.auth.infrastructure.adapter.out;
 import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.auth.domain.model.User;
 import com.legalfam.backend.auth.infrastructure.persistence.IUserRepository;
+import com.legalfam.backend.auth.infrastructure.persistence.mapper.UserEntityMapper;
 import com.legalfam.backend.common.identity.UserIdentity;
 import com.legalfam.backend.common.identity.application.port.out.IUserIdentityPort;
 import java.util.Optional;

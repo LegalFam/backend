@@ -1,4 +1,4 @@
-package com.legalfam.backend.chat.infrastructure.delivery;
+package com.legalfam.backend.chat.infrastructure.adapter.out;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.event.ChatAssistantErrorEvent;
@@ -18,16 +18,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
-public class ChatSseEmitterRegistry implements IChatAssistantDeliveryPort {
+public class SseChatAssistantDeliveryAdapter implements IChatAssistantDeliveryPort {
 
-    private static final Logger log = LoggerFactory.getLogger(ChatSseEmitterRegistry.class);
+    private static final Logger log = LoggerFactory.getLogger(SseChatAssistantDeliveryAdapter.class);
     private static final long MIN_INTERVAL_MS = 1000L;
 
     private final ConcurrentHashMap<UUID, ConcurrentHashMap<UUID, SseEmitter>> emittersByUser = new ConcurrentHashMap<>();
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final long emitterTimeoutMs;
 
-    public ChatSseEmitterRegistry(ChatSseProperties properties) {
+    public SseChatAssistantDeliveryAdapter(ChatSseProperties properties) {
         this.emitterTimeoutMs = Math.max(properties.safeEmitterTimeoutMs(), MIN_INTERVAL_MS);
         long safeHeartbeatIntervalMs = Math.max(properties.safeHeartbeatIntervalMs(), MIN_INTERVAL_MS);
         heartbeatExecutor.scheduleAtFixedRate(

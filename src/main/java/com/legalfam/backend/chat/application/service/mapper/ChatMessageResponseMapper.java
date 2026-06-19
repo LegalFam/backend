@@ -1,4 +1,4 @@
-package com.legalfam.backend.chat.application.mapper;
+package com.legalfam.backend.chat.application.service.mapper;
 
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;

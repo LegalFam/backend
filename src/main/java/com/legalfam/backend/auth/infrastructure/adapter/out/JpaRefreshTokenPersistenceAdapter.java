@@ -3,6 +3,7 @@ package com.legalfam.backend.auth.infrastructure.adapter.out;
 import com.legalfam.backend.auth.application.port.out.IRefreshTokenPersistencePort;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.infrastructure.persistence.IRefreshTokenRepository;
+import com.legalfam.backend.auth.infrastructure.persistence.mapper.RefreshTokenEntityMapper;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 

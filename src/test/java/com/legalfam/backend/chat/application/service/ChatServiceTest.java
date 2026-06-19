@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
-import com.legalfam.backend.chat.application.mapper.ChatMessageResponseMapper;
+import com.legalfam.backend.chat.application.service.mapper.ChatMessageResponseMapper;
 import com.legalfam.backend.chat.application.policy.ChatAccessPolicy;
 import com.legalfam.backend.chat.application.policy.ChatPrivacyPolicy;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;

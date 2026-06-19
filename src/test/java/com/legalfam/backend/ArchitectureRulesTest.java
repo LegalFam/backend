@@ -1,5 +1,6 @@
 package com.legalfam.backend;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -55,6 +56,11 @@ class ArchitectureRulesTest {
     @ArchTest
     static final ArchRule infrastructure_must_not_use_integration_packages = noClasses()
             .should().resideInAPackage("..infrastructure.integration..");
+
+    @ArchTest
+    static final ArchRule entity_mappers_must_live_with_persistence = classes()
+            .that().haveSimpleNameEndingWith("EntityMapper")
+            .should().resideInAPackage("..infrastructure.persistence.mapper..");
 
     @ArchTest
     static final ArchRule auth_application_must_not_depend_on_other_applications = noClasses()

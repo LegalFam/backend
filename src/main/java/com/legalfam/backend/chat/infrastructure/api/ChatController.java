@@ -10,7 +10,7 @@ import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
-import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
+import com.legalfam.backend.chat.infrastructure.adapter.out.SseChatAssistantDeliveryAdapter;
 import com.legalfam.backend.common.error.ApiError;
 import com.legalfam.backend.common.openapi.ProtectedApiOperation;
 import com.legalfam.backend.common.cursor.CursorQuery;
@@ -49,16 +49,16 @@ public class ChatController {
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
     private final IChatUseCase IChatUseCase;
-    private final ChatSseEmitterRegistry chatSseEmitterRegistry;
+    private final SseChatAssistantDeliveryAdapter sseChatAssistantDeliveryAdapter;
     private final AuthenticatedUserResolver authenticatedUserResolver;
 
     public ChatController(
             IChatUseCase IChatUseCase,
-            ChatSseEmitterRegistry chatSseEmitterRegistry,
+            SseChatAssistantDeliveryAdapter sseChatAssistantDeliveryAdapter,
             AuthenticatedUserResolver authenticatedUserResolver
     ) {
         this.IChatUseCase = IChatUseCase;
-        this.chatSseEmitterRegistry = chatSseEmitterRegistry;
+        this.sseChatAssistantDeliveryAdapter = sseChatAssistantDeliveryAdapter;
         this.authenticatedUserResolver = authenticatedUserResolver;
     }
 
@@ -75,7 +75,7 @@ public class ChatController {
     ) {
         UUID userId = authenticatedUserResolver.requireUserId(principalUserId);
         IChatUseCase.assertSessionOwnershipExists(userId, sessionId);
-        SseEmitter emitter = chatSseEmitterRegistry.subscribe(userId, sessionId);
+        SseEmitter emitter = sseChatAssistantDeliveryAdapter.subscribe(userId, sessionId);
         return ResponseEntity.ok(emitter);
     }
 

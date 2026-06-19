@@ -1,14 +1,14 @@
-package com.legalfam.backend.auth.infrastructure.adapter.out;
+package com.legalfam.backend.auth.infrastructure.persistence.mapper;
 
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.infrastructure.persistence.entity.RefreshTokenEntity;
 
-final class RefreshTokenEntityMapper {
+public final class RefreshTokenEntityMapper {
 
     private RefreshTokenEntityMapper() {
     }
 
-    static RefreshToken toDomain(RefreshTokenEntity entity) {
+    public static RefreshToken toDomain(RefreshTokenEntity entity) {
         return RefreshToken.restore(
                 entity.getId(),
                 entity.getToken(),
@@ -18,7 +18,7 @@ final class RefreshTokenEntityMapper {
         );
     }
 
-    static RefreshTokenEntity toEntity(RefreshToken domain) {
+    public static RefreshTokenEntity toEntity(RefreshToken domain) {
         RefreshTokenEntity entity = new RefreshTokenEntity();
         entity.setId(domain.getId());
         entity.setToken(domain.getToken());

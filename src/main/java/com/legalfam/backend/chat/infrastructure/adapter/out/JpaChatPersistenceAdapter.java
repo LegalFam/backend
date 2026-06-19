@@ -16,6 +16,7 @@ import com.legalfam.backend.chat.infrastructure.persistence.IChatOutboxEventRepo
 import com.legalfam.backend.chat.infrastructure.persistence.IChatSessionRepository;
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatMessageEntity;
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatSessionEntity;
+import com.legalfam.backend.chat.infrastructure.persistence.mapper.ChatEntityMapper;
 import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;

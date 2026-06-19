@@ -18,10 +18,9 @@ import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatProcessingStatusResponse;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
-import com.legalfam.backend.chat.infrastructure.api.ChatController;
 import com.legalfam.backend.chat.infrastructure.api.handler.ChatExceptionHandler;
 import com.legalfam.backend.chat.application.service.ChatService;
-import com.legalfam.backend.chat.infrastructure.delivery.ChatSseEmitterRegistry;
+import com.legalfam.backend.chat.infrastructure.adapter.out.SseChatAssistantDeliveryAdapter;
 import com.legalfam.backend.common.error.handler.GlobalExceptionHandler;
 import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
@@ -50,7 +49,7 @@ class ChatControllerTest {
     private ChatService chatService;
 
     @Mock
-    private ChatSseEmitterRegistry chatSseEmitterRegistry;
+    private SseChatAssistantDeliveryAdapter sseChatAssistantDeliveryAdapter;
 
     private MockMvc mockMvc;
 
@@ -58,7 +57,7 @@ class ChatControllerTest {
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(new ChatController(
                         chatService,
-                        chatSseEmitterRegistry,
+                        sseChatAssistantDeliveryAdapter,
                         new AuthenticatedUserResolver()
                 ))
                 .setControllerAdvice(new ChatExceptionHandler(), new GlobalExceptionHandler())
@@ -86,7 +85,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/send")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
 
-        verifyNoInteractions(chatService, chatSseEmitterRegistry);
+        verifyNoInteractions(chatService, sseChatAssistantDeliveryAdapter);
     }
 
     @Test
@@ -104,7 +103,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/send")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
 
-        verifyNoInteractions(chatService, chatSseEmitterRegistry);
+        verifyNoInteractions(chatService, sseChatAssistantDeliveryAdapter);
     }
 
     @Test
@@ -137,13 +136,13 @@ class ChatControllerTest {
         authenticateAs(userId.toString());
         SseEmitter emitter = new SseEmitter(60000L);
 
-        when(chatSseEmitterRegistry.subscribe(userId, sessionId)).thenReturn(emitter);
+        when(sseChatAssistantDeliveryAdapter.subscribe(userId, sessionId)).thenReturn(emitter);
 
         mockMvc.perform(get("/api/v1/chat/subscribe/{sessionId}", sessionId))
                 .andExpect(status().isOk());
 
         verify(chatService).assertSessionOwnershipExists(userId, sessionId);
-        verify(chatSseEmitterRegistry).subscribe(userId, sessionId);
+        verify(sseChatAssistantDeliveryAdapter).subscribe(userId, sessionId);
     }
 
     @Test
@@ -200,7 +199,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/sessions")))
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
 
-        verifyNoInteractions(chatService, chatSseEmitterRegistry);
+        verifyNoInteractions(chatService, sseChatAssistantDeliveryAdapter);
     }
 
     @Test

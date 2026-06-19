@@ -24,7 +24,7 @@ This document describes how contributors (human or AI agents) should work in thi
   - `infrastructure/api/**` for REST controllers.
   - `infrastructure/worker/**` for scheduled/background workers.
   - `infrastructure/delivery/**` for client delivery infrastructure such as SSE emitter registries.
-  - `infrastructure/persistence/**` for Spring Data repositories and JPA entities.
+  - `infrastructure/persistence/**` for Spring Data repositories, JPA entities, and persistence mappers.
   - `infrastructure/config/**` for module-level Spring configuration/properties.
   - `infrastructure/api/handler/**` for module-specific API exception handlers.
 - Avoid vague catch-all packages such as `integration` for new code. Use adapter direction (`adapter/in` or `adapter/out`) unless the class is not an adapter.
@@ -143,7 +143,7 @@ When changing architecture/package structure:
 
 1. Keep port packages split only by `in` and `out`.
 2. Keep listener/handler adapter implementations under `infrastructure/adapter/in` or outbound adapter implementations under `infrastructure/adapter/out`.
-3. Keep persistence repositories/entities under `infrastructure/persistence`.
+3. Keep persistence repositories/entities and persistence mappers under `infrastructure/persistence`.
 4. Keep configuration under `infrastructure/config` or `common/config`.
 5. Keep REST controllers under `infrastructure/api`.
 6. Keep scheduled/background workers under `infrastructure/worker`.

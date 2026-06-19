@@ -1,4 +1,4 @@
-package com.legalfam.backend.payment.infrastructure.adapter.out;
+package com.legalfam.backend.payment.infrastructure.persistence.mapper;
 
 import com.legalfam.backend.payment.domain.model.PaymentProvider;
 import com.legalfam.backend.payment.domain.model.Subscription;
@@ -9,12 +9,12 @@ import com.legalfam.backend.payment.domain.model.TokenTransactionType;
 import com.legalfam.backend.payment.infrastructure.persistence.entity.SubscriptionEntity;
 import com.legalfam.backend.payment.infrastructure.persistence.entity.TokenTransactionEntity;
 
-final class PaymentEntityMapper {
+public final class PaymentEntityMapper {
 
     private PaymentEntityMapper() {
     }
 
-    static Subscription toDomain(SubscriptionEntity entity) {
+    public static Subscription toDomain(SubscriptionEntity entity) {
         return Subscription.restore(
                 entity.getId(),
                 entity.getUserId(),
@@ -33,7 +33,7 @@ final class PaymentEntityMapper {
         );
     }
 
-    static SubscriptionEntity toEntity(Subscription domain) {
+    public static SubscriptionEntity toEntity(Subscription domain) {
         SubscriptionEntity entity = new SubscriptionEntity();
         entity.setId(domain.getId());
         entity.setUserId(domain.getUserId());
@@ -52,7 +52,7 @@ final class PaymentEntityMapper {
         return entity;
     }
 
-    static TokenTransaction toDomain(TokenTransactionEntity entity) {
+    public static TokenTransaction toDomain(TokenTransactionEntity entity) {
         return TokenTransaction.restore(
                 entity.getId(),
                 entity.getSubscriptionId(),
@@ -65,7 +65,7 @@ final class PaymentEntityMapper {
         );
     }
 
-    static TokenTransactionEntity toEntity(TokenTransaction domain) {
+    public static TokenTransactionEntity toEntity(TokenTransaction domain) {
         TokenTransactionEntity entity = new TokenTransactionEntity();
         entity.setId(domain.getId());
         entity.setSubscriptionId(domain.getSubscriptionId());

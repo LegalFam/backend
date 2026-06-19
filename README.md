@@ -33,7 +33,7 @@ The backend is organized as a modular hexagonal Spring Boot application under `s
 - REST controllers live under `infrastructure/api`.
 - Scheduled/background workers live under `infrastructure/worker`.
 - Client event delivery support lives under responsibility-based infrastructure folders such as `infrastructure/delivery`.
-- Spring Data repositories and JPA entities remain under `infrastructure/persistence`.
+- Spring Data repositories, JPA entities, and persistence mappers remain under `infrastructure/persistence`.
 - Spring configuration remains under `infrastructure/config` or `common/config`.
 
 Project convention: interfaces use the instructor-required `I` prefix, for example `IAuthUseCase`, `IChatPersistencePort`, and `IPaymentGatewayPort`.

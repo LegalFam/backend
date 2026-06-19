@@ -59,8 +59,8 @@ public class RabbitChatEventPublisherAdapter implements IChatEventPublisherPort 
             if (returnedMessage != null) {
                 throw new IllegalStateException("RabbitMQ returned assistant delivery message");
             }
-            if (confirm == null || !confirm.isAck()) {
-                String reason = confirm == null ? "missing broker confirm" : confirm.getReason();
+            if (!confirm.ack()) {
+                String reason = confirm.reason();
                 throw new IllegalStateException("RabbitMQ did not ack assistant delivery message: " + reason);
             }
 

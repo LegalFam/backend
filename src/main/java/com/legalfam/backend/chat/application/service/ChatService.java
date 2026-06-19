@@ -1,7 +1,7 @@
 package com.legalfam.backend.chat.application.service;
 
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
-import com.legalfam.backend.chat.application.mapper.ChatMessageResponseMapper;
+import com.legalfam.backend.chat.application.service.mapper.ChatMessageResponseMapper;
 import com.legalfam.backend.chat.application.policy.ChatAccessPolicy;
 import com.legalfam.backend.chat.application.policy.ChatPrivacyPolicy;
 import com.legalfam.backend.chat.application.port.in.IChatUseCase;
