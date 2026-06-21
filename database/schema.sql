@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS chat_message (
     chat_session_id UUID NOT NULL REFERENCES chat_session(id) ON DELETE CASCADE,
     role VARCHAR(32) NOT NULL CHECK (role IN ('USER', 'ASSISTANT', 'SYSTEM')),
     content TEXT NOT NULL,
+    error_code VARCHAR(255) NULL,
     rating INTEGER NULL CHECK (rating IS NULL OR rating BETWEEN 1 AND 5),
     feedback_comment TEXT NULL,
     feedback_submitted_at TIMESTAMP WITH TIME ZONE NULL,
