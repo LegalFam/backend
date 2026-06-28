@@ -2,11 +2,15 @@ package com.legalfam.backend.chat.application.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
+import com.legalfam.backend.chat.application.dto.ChatRateMessageRequest;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.dto.ChatSendAcceptedResponse;
 import com.legalfam.backend.chat.application.service.mapper.ChatMessageResponseMapper;
@@ -14,6 +18,7 @@ import com.legalfam.backend.chat.application.policy.ChatAccessPolicy;
 import com.legalfam.backend.chat.application.policy.ChatPrivacyPolicy;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
+import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
@@ -97,5 +102,71 @@ class ChatServiceTest {
         assertEquals(sessionId, response.sessionId());
         assertEquals(savedMessage.getId(), response.userMessageId());
         assertEquals("PROCESSING", response.status());
+    }
+
+    @Test
+    void sendRejectsMissingSessionIdBeforePolicyOrPersistenceWork() {
+        UUID userId = UUID.randomUUID();
+
+        InvalidChatRequestException exception = assertThrows(
+                InvalidChatRequestException.class,
+                () -> chatService.send(userId, "hola", null)
+        );
+
+        assertEquals("session_id_required", exception.error().code());
+        verifyNoInteractions(
+                IChatPersistencePort,
+                IChatEventPublisherPort,
+                chatAccessPolicy,
+                chatPrivacyPolicy,
+                chatMessageResponseMapper
+        );
+    }
+
+    @Test
+    void sendClipsPreviousMessagesBeforePublishingAssistantContext() {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        String longContent = "a".repeat(2_050);
+        ChatSession session = ChatSession.restore(sessionId, userId, null, Instant.now(), Instant.now());
+
+        when(chatAccessPolicy.requireSessionOwner(userId, sessionId)).thenReturn(session);
+        when(IChatPersistencePort.findActiveMessageProcessingByUserId(userId)).thenReturn(Optional.empty());
+        when(IChatPersistencePort.existsUnreadAssistantMessageBySessionId(sessionId)).thenReturn(false);
+        when(IChatPersistencePort.findRecentMessagesForAssistantContext(sessionId, 12)).thenReturn(List.of(
+                ChatMessage.userMessage(sessionId, "  " + longContent + "  ", Instant.parse("2026-01-01T00:00:00Z"))
+        ));
+        when(IChatPersistencePort.saveMessage(any(ChatMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(IChatPersistencePort.saveMessageProcessing(any(ChatMessageProcessing.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(IChatPersistencePort.saveSession(any(ChatSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        chatService.send(userId, "hola", sessionId);
+
+        ArgumentCaptor<ChatMessageQueuedEvent> eventCaptor = ArgumentCaptor.forClass(ChatMessageQueuedEvent.class);
+        verify(IChatEventPublisherPort).publishMessageQueued(eventCaptor.capture());
+        String clippedContent = eventCaptor.getValue().previousMessages().getFirst().content();
+        assertEquals(2_003, clippedContent.length());
+        assertEquals("...", clippedContent.substring(2_000));
+    }
+
+    @Test
+    void rateMessageRejectsMissingRequestOrRatingBeforePersistenceLookup() {
+        UUID userId = UUID.randomUUID();
+        UUID messageId = UUID.randomUUID();
+
+        InvalidChatRequestException missingRequest = assertThrows(
+                InvalidChatRequestException.class,
+                () -> chatService.rateMessage(userId, messageId, null)
+        );
+        InvalidChatRequestException missingRating = assertThrows(
+                InvalidChatRequestException.class,
+                () -> chatService.rateMessage(userId, messageId, new ChatRateMessageRequest(null, "comment"))
+        );
+
+        assertEquals("rating_required", missingRequest.error().code());
+        assertEquals("rating_required", missingRating.error().code());
+        verify(IChatPersistencePort, never()).findMessageById(any());
+        verifyNoInteractions(chatAccessPolicy);
     }
 }

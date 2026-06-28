@@ -8,13 +8,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuthenticatedUserResolver {
 
+    private static final String ANONYMOUS_PRINCIPAL = "anonymousUser";
+
     public UUID requireUserId(String principalUserId) {
         return parse(principalUserId)
                 .orElseThrow(() -> new AccessDeniedException("Access is forbidden"));
     }
 
     public Optional<UUID> optionalUserId(String principalUserId) {
-        if (principalUserId == null || principalUserId.isBlank()) {
+        if (principalUserId == null || principalUserId.isBlank() || ANONYMOUS_PRINCIPAL.equals(principalUserId)) {
             return Optional.empty();
         }
         return parse(principalUserId);

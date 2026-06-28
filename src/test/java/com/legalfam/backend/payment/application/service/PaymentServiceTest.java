@@ -1,15 +1,27 @@
 package com.legalfam.backend.payment.application.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.legalfam.backend.common.identity.UserIdentity;
 import com.legalfam.backend.common.identity.application.port.out.IUserIdentityPort;
+import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionRequest;
+import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionResponse;
+import com.legalfam.backend.payment.application.dto.PaymentPlanDefinition;
+import com.legalfam.backend.payment.application.dto.PaymentPlanResponse;
+import com.legalfam.backend.payment.application.dto.PaymentWebhookNotification;
 import com.legalfam.backend.payment.application.port.out.IPaymentGatewayPort;
 import com.legalfam.backend.payment.application.port.out.IPaymentPersistencePort;
 import com.legalfam.backend.payment.application.port.out.IPaymentPlanCatalogPort;
+import com.legalfam.backend.payment.domain.exception.InvalidPaymentRequestException;
 import com.legalfam.backend.payment.domain.model.PaymentProvider;
 import com.legalfam.backend.payment.domain.model.Subscription;
 import com.legalfam.backend.payment.domain.model.SubscriptionPlanCode;
@@ -19,6 +31,7 @@ import com.legalfam.backend.payment.domain.model.TokenTransactionType;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -129,15 +142,128 @@ class PaymentServiceTest {
         verify(paymentPersistencePort, never()).saveTokenTransaction(any());
     }
 
+    @Test
+    void listPlansMarksAuthenticatedUsersCurrentPlan() {
+        UUID userId = UUID.randomUUID();
+        when(paymentPersistencePort.findSubscriptionByUserId(userId)).thenReturn(Optional.of(subscription(
+                UUID.randomUUID(),
+                userId,
+                400,
+                500,
+                SubscriptionPlanCode.BASIC,
+                PaymentProvider.MERCADO_PAGO
+        )));
+        when(paymentPlanCatalogPort.listPlans()).thenReturn(List.of(
+                plan(SubscriptionPlanCode.FREE, 50, 0),
+                plan(SubscriptionPlanCode.BASIC, 500, 1499),
+                plan(SubscriptionPlanCode.PREMIUM, 1500, 2999)
+        ));
+
+        List<PaymentPlanResponse> response = paymentService.listPlans(userId);
+
+        assertFalse(response.get(0).currentPlan());
+        assertTrue(response.get(1).currentPlan());
+        assertFalse(response.get(2).currentPlan());
+        assertTrue(response.get(0).purchasable());
+        assertTrue(response.get(1).purchasable());
+        assertTrue(response.get(2).purchasable());
+    }
+
+    @Test
+    void createCheckoutSessionUsesTrimmedCustomUrlsAndGatewayResponse() {
+        UUID userId = UUID.randomUUID();
+        PaymentPlanDefinition basicPlan = plan(SubscriptionPlanCode.BASIC, 500, 1499);
+        Subscription subscription = subscription(UUID.randomUUID(), userId, 50, 50);
+        when(paymentPlanCatalogPort.getPaidPlanOrThrow("BASIC")).thenReturn(basicPlan);
+        when(userIdentityPort.findUserIdentityById(userId)).thenReturn(Optional.of(new UserIdentity(userId, "user@example.com")));
+        when(paymentPersistencePort.findSubscriptionByUserId(userId)).thenReturn(Optional.of(subscription));
+        when(paymentGatewayPort.createCheckoutSession(
+                eq(userId),
+                eq("user@example.com"),
+                eq(basicPlan),
+                eq("https://app.example.com/success"),
+                eq("https://app.example.com/cancel")
+        )).thenReturn("https://checkout.example.com/session");
+
+        CreateCheckoutSessionResponse response = paymentService.createCheckoutSession(
+                userId,
+                new CreateCheckoutSessionRequest(
+                        "BASIC",
+                        " https://app.example.com/success ",
+                        " https://app.example.com/cancel "
+                )
+        );
+
+        assertEquals("https://checkout.example.com/session", response.url());
+    }
+
+    @Test
+    void createCheckoutSessionRejectsMissingRequestBeforeDependencyWork() {
+        UUID userId = UUID.randomUUID();
+
+        InvalidPaymentRequestException exception = assertThrows(
+                InvalidPaymentRequestException.class,
+                () -> paymentService.createCheckoutSession(userId, null)
+        );
+
+        assertEquals("checkout_request_required", exception.error().code());
+        verifyNoInteractions(paymentPlanCatalogPort, userIdentityPort, paymentPersistencePort, paymentGatewayPort);
+    }
+
+    @Test
+    void handleWebhookSkipsDuplicateRecordedEvent() {
+        PaymentWebhookNotification notification = new PaymentWebhookNotification(
+                "evt-1",
+                "subscription.updated",
+                "customer-1",
+                "subscription-1",
+                UUID.randomUUID(),
+                "BASIC",
+                "active",
+                false,
+                NOW,
+                Instant.parse("2026-02-01T00:00:00Z"),
+                false
+        );
+        when(paymentGatewayPort.parseVerifiedWebhook("{\"id\":\"evt-1\"}", "sig", "req", "evt-1"))
+                .thenReturn(notification);
+        when(paymentPersistencePort.tryRecordProcessedWebhookEvent("evt-1", "subscription.updated", NOW))
+                .thenReturn(false);
+
+        paymentService.handleWebhook("{\"id\":\"evt-1\"}", "sig", "req", "evt-1");
+
+        verify(paymentPersistencePort, never()).findSubscriptionByGatewaySubscriptionId(any());
+        verify(paymentPersistencePort, never()).saveSubscription(any());
+        verify(paymentPersistencePort, never()).saveTokenTransaction(any());
+    }
+
     private Subscription subscription(UUID subscriptionId, UUID userId, int remainingTokens, int monthlyTokenLimit) {
+        return subscription(
+                subscriptionId,
+                userId,
+                remainingTokens,
+                monthlyTokenLimit,
+                SubscriptionPlanCode.FREE,
+                PaymentProvider.FREE
+        );
+    }
+
+    private Subscription subscription(
+            UUID subscriptionId,
+            UUID userId,
+            int remainingTokens,
+            int monthlyTokenLimit,
+            SubscriptionPlanCode planCode,
+            PaymentProvider provider
+    ) {
         return Subscription.restore(
                 subscriptionId,
                 userId,
-                SubscriptionPlanCode.FREE,
+                planCode,
                 SubscriptionStatus.ACTIVE,
-                PaymentProvider.FREE,
+                provider,
                 null,
-                null,
+                provider == PaymentProvider.MERCADO_PAGO ? "gateway-subscription-id" : null,
                 NOW,
                 Instant.parse("2026-02-01T00:00:00Z"),
                 false,
@@ -145,6 +271,17 @@ class PaymentServiceTest {
                 remainingTokens,
                 NOW,
                 NOW
+        );
+    }
+
+    private PaymentPlanDefinition plan(SubscriptionPlanCode code, int tokenLimit, int monthlyPriceCents) {
+        return new PaymentPlanDefinition(
+                code,
+                code.name(),
+                code.name() + " plan",
+                tokenLimit,
+                monthlyPriceCents,
+                "pen"
         );
     }
 

@@ -6,6 +6,8 @@ import com.legalfam.backend.common.error.ApiErrorFactory;
 import com.legalfam.backend.common.error.CommonApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Comparator;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,7 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
+@Order(Ordered.LOWEST_PRECEDENCE)
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);

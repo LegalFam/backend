@@ -83,6 +83,53 @@ class N8nWebhookClientTest {
         assertEquals(1, response.metadata().agentTokenCost());
     }
 
+    @Test
+    void mapResponseInfersGoodCitationSupportWhenValidCitationsExist() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "citations": [
+                    {
+                      "file_name": "Codigo Civil",
+                      "snippet": "Articulo relevante",
+                      "file_url": "https://example.com/codigo"
+                    },
+                    {
+                      "file_name": "Sin URL",
+                      "snippet": "Debe omitirse"
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals("GOOD", response.metadata().citationSupportStatus());
+        assertEquals(1, response.citations().size());
+        assertEquals("Codigo Civil", response.citations().getFirst().sourceTitle());
+        assertEquals("https://example.com/codigo", response.citations().getFirst().sourceUrl());
+    }
+
+    @Test
+    void mapResponseIgnoresInvalidCitationSupportStatus() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "citations": [],
+                  "citationSupportStatus": "UNKNOWN"
+                }
+                """);
+
+        assertEquals(null, response.metadata().citationSupportStatus());
+    }
+
+    @Test
+    void parseResponseBodyTreatsPlainTextAsAssistantMessage() throws Exception {
+        ChatAssistantGatewayResponse response = map("respuesta en texto plano");
+
+        assertEquals("respuesta en texto plano", response.message());
+        assertEquals("NONE", response.metadata().citationSupportStatus());
+        assertEquals(1, response.metadata().agentTokenCost());
+    }
+
     private ChatAssistantGatewayResponse map(String responseBody) throws Exception {
         JsonNode root = (JsonNode) parseResponseBody.invoke(client, responseBody);
         return (ChatAssistantGatewayResponse) mapResponse.invoke(client, root);

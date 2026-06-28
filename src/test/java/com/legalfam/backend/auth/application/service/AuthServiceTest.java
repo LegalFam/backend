@@ -180,6 +180,40 @@ class AuthServiceTest {
     }
 
     @Test
+    void refreshThrowsWhenTokenDoesNotExist() {
+        String rawToken = "missing-token";
+        when(IRefreshTokenPersistencePort.findByToken(hashRefreshToken(rawToken))).thenReturn(Optional.empty());
+
+        assertThrows(
+                InvalidRefreshTokenException.class,
+                () -> authService.refresh(rawToken)
+        );
+
+        verify(IRefreshTokenPersistencePort, never()).save(any(RefreshToken.class));
+        verify(IUserPort, never()).findById(any(UUID.class));
+    }
+
+    @Test
+    void refreshRevokesOldTokenButFailsWhenUserNoLongerExists() {
+        UUID userId = UUID.randomUUID();
+        String oldRefreshRaw = "orphan-refresh";
+        String oldRefreshHashed = hashRefreshToken(oldRefreshRaw);
+        RefreshToken existing = RefreshToken.issue(oldRefreshHashed, userId, Instant.now().plusSeconds(60));
+        when(IRefreshTokenPersistencePort.findByToken(oldRefreshHashed)).thenReturn(Optional.of(existing));
+        when(IRefreshTokenPersistencePort.save(any(RefreshToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(IUserPort.findById(userId)).thenReturn(Optional.empty());
+
+        assertThrows(
+                InvalidRefreshTokenException.class,
+                () -> authService.refresh(oldRefreshRaw)
+        );
+
+        verify(IRefreshTokenPersistencePort).save(refreshTokenCaptor.capture());
+        assertTrue(refreshTokenCaptor.getValue().isRevoked());
+        verify(IAccessTokenPort, never()).generateAccessToken(any(UUID.class), any(String.class));
+    }
+
+    @Test
     void refreshRevokesOldTokenAndIssuesNewOne() {
         User user = User.restore(UUID.randomUUID(), "user@example.com", "stored-hash", "Juan", "900000000");
         String oldRefreshRaw = "old-refresh";

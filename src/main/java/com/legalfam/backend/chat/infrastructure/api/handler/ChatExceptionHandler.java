@@ -11,6 +11,8 @@ import com.legalfam.backend.common.error.ApiErrorDescriptor;
 import com.legalfam.backend.common.error.ApiErrorFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Comparator;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice(basePackages = "com.legalfam.backend.chat")
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class ChatExceptionHandler {
 
     @ExceptionHandler(ChatUpstreamException.class)

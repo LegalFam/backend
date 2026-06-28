@@ -24,6 +24,7 @@ public class ChatOutboxCleanupJob {
         this.IChatPersistencePort = IChatPersistencePort;
     }
 
+    // Cada hora
     @Scheduled(cron = "${app.chat.outbox.cleanup.cron:0 0 * * * *}")
     @Transactional
     public void cleanup() {
