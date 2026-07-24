@@ -3,7 +3,7 @@ package com.legalfam.backend.common.cursor;
 public record CursorQuery(Integer cursor, int size) {
 
     public static final int DEFAULT_SIZE = 20;
-    public static final int MAX_SIZE = 100;
+    public static final int MAX_SIZE = 500;
 
     public static CursorQuery of(Integer cursor, int size) {
         if (size < 1 || size > MAX_SIZE) {

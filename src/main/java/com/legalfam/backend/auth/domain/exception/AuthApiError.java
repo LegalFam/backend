@@ -17,7 +17,10 @@ public enum AuthApiError implements ApiErrorDescriptor {
     INVALID_CREDENTIALS("authentication_error", "invalid_credentials", 401, "Invalid credentials"),
     INVALID_REFRESH_TOKEN("authentication_error", "invalid_refresh_token", 401, "Invalid refresh token"),
     SIGNUP_REQUEST_REQUIRED("validation_error", "signup_request_required", 400, "Signup request body is required"),
-    LOGIN_REQUEST_REQUIRED("validation_error", "login_request_required", 400, "Login request body is required");
+    LOGIN_REQUEST_REQUIRED("validation_error", "login_request_required", 400, "Login request body is required"),
+    PROFILE_REQUEST_REQUIRED("validation_error", "profile_request_required", 400, "Profile request body is required"),
+    PASSWORD_REQUEST_REQUIRED("validation_error", "password_request_required", 400, "Password request body is required"),
+    CURRENT_PASSWORD_INVALID("validation_error", "current_password_invalid", 400, "Current password is invalid");
 
     private final String type;
     private final String code;

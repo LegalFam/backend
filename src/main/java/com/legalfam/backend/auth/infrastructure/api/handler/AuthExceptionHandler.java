@@ -74,7 +74,7 @@ public class AuthExceptionHandler {
                 default -> AuthApiError.EMAIL_REQUIRED;
             };
         }
-        if ("password".equals(field)) {
+        if ("password".equals(field) || "currentPassword".equals(field) || "newPassword".equals(field)) {
             return "Size".equals(constraint)
                     ? AuthApiError.PASSWORD_LENGTH_INVALID
                     : AuthApiError.PASSWORD_REQUIRED;

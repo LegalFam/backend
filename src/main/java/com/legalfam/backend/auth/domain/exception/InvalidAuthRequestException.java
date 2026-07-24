@@ -22,6 +22,18 @@ public class InvalidAuthRequestException extends RuntimeException {
         return new InvalidAuthRequestException(AuthApiError.REFRESH_TOKEN_REQUIRED);
     }
 
+    public static InvalidAuthRequestException profileRequestRequired() {
+        return new InvalidAuthRequestException(AuthApiError.PROFILE_REQUEST_REQUIRED);
+    }
+
+    public static InvalidAuthRequestException passwordRequestRequired() {
+        return new InvalidAuthRequestException(AuthApiError.PASSWORD_REQUEST_REQUIRED);
+    }
+
+    public static InvalidAuthRequestException currentPasswordInvalid() {
+        return new InvalidAuthRequestException(AuthApiError.CURRENT_PASSWORD_INVALID);
+    }
+
     public ApiErrorDescriptor error() {
         return error;
     }

@@ -81,6 +81,31 @@ public class Subscription {
         return provider == PaymentProvider.FREE && (currentPeriodEnd == null || !now.isBefore(currentPeriodEnd));
     }
 
+    /**
+     * Flags the subscription so it stops renewing while the already paid period is honored.
+     * The plan, the token balance and the period are intentionally left untouched.
+     */
+    public void scheduleCancellationAtPeriodEnd(Instant now) {
+        this.cancelAtPeriodEnd = true;
+        this.updatedAt = now;
+    }
+
+    public boolean isCancellationScheduled() {
+        return cancelAtPeriodEnd && provider == PaymentProvider.MERCADO_PAGO;
+    }
+
+    /** True once a scheduled cancellation has reached the end of the paid period. */
+    public boolean isCancellationDueAt(Instant now) {
+        return isCancellationScheduled() && (currentPeriodEnd == null || !now.isBefore(currentPeriodEnd));
+    }
+
+    /** True while a gateway-backed period is still running and therefore still owed to the user. */
+    public boolean hasPaidPeriodRemainingAt(Instant now) {
+        return provider == PaymentProvider.MERCADO_PAGO
+                && currentPeriodEnd != null
+                && now.isBefore(currentPeriodEnd);
+    }
+
     public void assertCheckoutAllowedFor(SubscriptionPlanCode targetPlanCode) {
         if (planCode == targetPlanCode
                 && provider == PaymentProvider.MERCADO_PAGO

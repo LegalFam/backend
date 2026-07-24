@@ -89,7 +89,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     @Transactional
     public PaymentSubscriptionResponse getSubscription(UUID userId) {
         Subscription subscription = getOrCreateSubscription(userId);
-        refreshFreeSubscriptionIfNeeded(subscription);
+        settlePeriodIfNeeded(subscription);
         return toSubscriptionResponse(subscription);
     }
 
@@ -102,7 +102,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         PaymentPlanDefinition plan = IPaymentPlanCatalogPort.getPaidPlanOrThrow(request.planCode());
         UserIdentity user = getRequiredUser(userId);
         Subscription subscription = getOrCreateSubscription(userId);
-        refreshFreeSubscriptionIfNeeded(subscription);
+        settlePeriodIfNeeded(subscription);
         ensureCheckoutAllowed(subscription, plan);
 
         String checkoutUrl = IPaymentGatewayPort.createCheckoutSession(
@@ -119,14 +119,21 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     @Transactional
     public void cancelSubscription(UUID userId) {
         Subscription subscription = getOrCreateSubscription(userId);
-        refreshFreeSubscriptionIfNeeded(subscription);
+        settlePeriodIfNeeded(subscription);
 
         if (!subscription.hasGatewaySubscription()) {
             throw InvalidPaymentRequestException.of(PaymentApiError.NO_GATEWAY_SUBSCRIPTION_TO_CANCEL);
         }
+        if (subscription.isCancellationScheduled()) {
+            throw InvalidPaymentRequestException.of(PaymentApiError.SUBSCRIPTION_ALREADY_CANCELED);
+        }
 
         IPaymentGatewayPort.cancelSubscription(subscription.getGatewaySubscriptionId());
-        downgradeToFreePlan(subscription, "Allocated tokens after Mercado Pago subscription cancellation");
+
+        // The gateway stops renewing, but the period the user already paid for is honored:
+        // plan, token balance and period end stay as they are until settlePeriodIfNeeded downgrades them.
+        subscription.scheduleCancellationAtPeriodEnd(now());
+        IPaymentPersistencePort.saveSubscription(subscription);
     }
 
     @Override
@@ -197,7 +204,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         )) {
             return;
         }
-        refreshFreeSubscriptionIfNeeded(subscription);
+        settlePeriodIfNeeded(subscription);
         int consumedTokens = 0;
         if (subscription.getStatus() == SubscriptionStatus.ACTIVE) {
             consumedTokens = subscription.consumeAvailableChatTokens(requestedTotalCost, now());
@@ -230,7 +237,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     private Subscription getOrCreateSubscription(UUID userId) {
         return IPaymentPersistencePort.findSubscriptionByUserId(userId)
                 .map(existing -> {
-                    refreshFreeSubscriptionIfNeeded(existing);
+                    settlePeriodIfNeeded(existing);
                     return existing;
                 })
                 .orElseGet(() -> {
@@ -242,7 +249,7 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
     private Subscription getOrCreateSubscriptionForUpdate(UUID userId) {
         return IPaymentPersistencePort.findSubscriptionByUserIdForUpdate(userId)
                 .map(existing -> {
-                    refreshFreeSubscriptionIfNeeded(existing);
+                    settlePeriodIfNeeded(existing);
                     return existing;
                 })
                 .orElseGet(() -> {
@@ -265,6 +272,19 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
         saveTokenTransaction(subscription, null, TokenTransactionType.PERIOD_ALLOCATION,
                 freePlan.monthlyTokenLimit(), "Allocated monthly tokens for free plan");
         return subscription;
+    }
+
+    /**
+     * Applies whatever the calendar owes the subscription before it is read or charged:
+     * a scheduled cancellation whose paid period already ended, or a new free-plan period.
+     * There is no scheduler in this service, so every entry point settles lazily.
+     */
+    private void settlePeriodIfNeeded(Subscription subscription) {
+        if (subscription.isCancellationDueAt(now())) {
+            downgradeToFreePlan(subscription, "Allocated tokens after scheduled subscription cancellation");
+            return;
+        }
+        refreshFreeSubscriptionIfNeeded(subscription);
     }
 
     private void refreshFreeSubscriptionIfNeeded(Subscription subscription) {
@@ -354,6 +374,16 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
 
     private void handleSubscriptionDeleted(PaymentWebhookNotification notification) {
         Subscription subscription = resolveGatewayBackedSubscription(notification);
+
+        // Mercado Pago fires this right after our own cancelSubscription call. Downgrading here
+        // would wipe the balance the user already paid for, so only schedule the downgrade and
+        // let settlePeriodIfNeeded apply it once the period is actually over.
+        if (subscription.hasPaidPeriodRemainingAt(now())) {
+            subscription.scheduleCancellationAtPeriodEnd(now());
+            IPaymentPersistencePort.saveSubscription(subscription);
+            return;
+        }
+
         downgradeToFreePlan(subscription, "Allocated tokens after Mercado Pago subscription cancellation");
     }
 

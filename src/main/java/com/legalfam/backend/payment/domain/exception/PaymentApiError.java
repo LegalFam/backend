@@ -17,6 +17,7 @@ public enum PaymentApiError implements ApiErrorDescriptor {
     CHECKOUT_PLAN_ALREADY_ACTIVE("payment_error", "checkout_plan_already_active", 403, "User is already subscribed to the selected plan"),
     CHECKOUT_ACTIVE_GATEWAY_SUBSCRIPTION("payment_error", "checkout_active_gateway_subscription", 403, "Cancel the current gateway subscription before changing plans"),
     NO_GATEWAY_SUBSCRIPTION_TO_CANCEL("payment_error", "no_gateway_subscription_to_cancel", 400, "No gateway subscription is available to cancel"),
+    SUBSCRIPTION_ALREADY_CANCELED("payment_error", "subscription_already_canceled", 400, "Subscription is already scheduled for cancellation"),
     SUBSCRIPTION_NOT_FOUND("payment_error", "subscription_not_found", 404, "Subscription not found"),
     SUBSCRIPTION_INACTIVE("payment_error", "subscription_inactive", 403, "Subscription is not active"),
     INSUFFICIENT_TOKENS("payment_error", "insufficient_tokens", 403, "Insufficient tokens"),

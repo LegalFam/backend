@@ -86,6 +86,9 @@ Use header:
 Authorization: Bearer <accessToken>
 ```
 
+- `GET /api/v1/users/me`
+- `PATCH /api/v1/users/me`
+- `PATCH /api/v1/users/me/password`
 - `GET /api/v1/payments/subscription`
 - `POST /api/v1/payments/checkout-sessions`
 - `POST /api/v1/payments/subscription/cancel`
@@ -99,6 +102,59 @@ Authorization: Bearer <accessToken>
 - `POST /api/v1/chat/send`
 - `PATCH /api/v1/chat/messages/{messageId}/rating`
 - `PATCH /api/v1/chat/messages/{messageId}/receipt`
+
+## Users
+
+Profile endpoints live under `/api/v1/users` (not `/api/v1/auth`) because `/api/v1/auth/**` is public in `SecurityConfig`. They require a bearer token.
+
+### `GET /api/v1/users/me`
+Return the authenticated user profile.
+
+Success response `200`:
+```json
+{
+  "id": "uuid",
+  "email": "maria@ejemplo.com",
+  "name": "Maria Garcia",
+  "phone": "987654321"
+}
+```
+
+### `PATCH /api/v1/users/me`
+Update the authenticated user profile. Only `name` is editable; email changes require email verification, which is not implemented yet.
+
+Request body:
+```json
+{
+  "name": "Maria Garcia"
+}
+```
+
+Success response `200`: same shape as `GET /api/v1/users/me`.
+
+Common errors:
+- `400` `name_required` when `name` is missing or blank
+- `400` `name_too_long` when `name` exceeds 120 characters
+
+### `PATCH /api/v1/users/me/password`
+Change the authenticated user password. The current password must be provided and match.
+
+Request body:
+```json
+{
+  "currentPassword": "actual123",
+  "newPassword": "nueva1234"
+}
+```
+
+Success response `204`: no body.
+
+Common errors:
+- `400` `password_required` when either field is missing or blank
+- `400` `password_length_invalid` when `newPassword` is shorter than 8 or longer than 128 characters
+- `400` `current_password_invalid` when `currentPassword` does not match
+
+`current_password_invalid` is a `400` and not a `401` on purpose: the session is valid, only the supplied body field is wrong. A `401` here would make clients treat it as an expired session and trigger a token refresh.
 
 ## Payments
 
@@ -309,7 +365,7 @@ Common errors:
 List chat sessions for current user.
 
 Query parameters:
-- `size`: optional, default `20`, allowed range `1..100`.
+- `size`: optional, default `20`, allowed range `1..500`.
 - `cursor`: optional. Omit it for the first batch. Use `nextCursor` from the previous response for the next batch.
 
 Success response `200`:
@@ -333,7 +389,7 @@ Success response `200`:
 List messages in one session (ordered oldest to newest).
 
 Query parameters:
-- `size`: optional, default `20`, allowed range `1..100`.
+- `size`: optional, default `20`, allowed range `1..500`.
 - `cursor`: optional. Omit it for the first batch. Use `nextCursor` from the previous response for the next batch.
 
 Success response `200`:
@@ -470,6 +526,9 @@ Auth:
 | `invalid_refresh_token` | 401 | `authentication_error` | Invalid refresh token |
 | `signup_request_required` | 400 | `validation_error` | Signup request body is required |
 | `login_request_required` | 400 | `validation_error` | Login request body is required |
+| `profile_request_required` | 400 | `validation_error` | Profile request body is required |
+| `password_request_required` | 400 | `validation_error` | Password request body is required |
+| `current_password_invalid` | 400 | `validation_error` | Current password is invalid |
 
 Chat:
 

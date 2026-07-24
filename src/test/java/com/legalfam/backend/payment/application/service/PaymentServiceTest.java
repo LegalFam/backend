@@ -130,7 +130,6 @@ class PaymentServiceTest {
     @Test
     void consumeChatTokensForAssistantResultIsIdempotentWhenConsumptionAlreadyExists() {
         UUID userId = UUID.randomUUID();
-        UUID subscriptionId = UUID.randomUUID();
         UUID chatMessageId = UUID.randomUUID();
         when(paymentPersistencePort.existsTokenTransactionByChatMessageIdAndType(
                 chatMessageId,
@@ -235,6 +234,134 @@ class PaymentServiceTest {
         verify(paymentPersistencePort, never()).findSubscriptionByGatewaySubscriptionId(any());
         verify(paymentPersistencePort, never()).saveSubscription(any());
         verify(paymentPersistencePort, never()).saveTokenTransaction(any());
+    }
+
+    @Test
+    void cancelSubscriptionKeepsPlanAndTokensUntilPaidPeriodEnds() {
+        UUID userId = UUID.randomUUID();
+        Subscription paid = subscription(
+                UUID.randomUUID(), userId, 437, 500,
+                SubscriptionPlanCode.BASIC, PaymentProvider.MERCADO_PAGO
+        );
+        when(paymentPersistencePort.findSubscriptionByUserId(userId)).thenReturn(Optional.of(paid));
+        when(paymentPersistencePort.saveSubscription(any(Subscription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        paymentService.cancelSubscription(userId);
+
+        verify(paymentGatewayPort).cancelSubscription("gateway-subscription-id");
+
+        ArgumentCaptor<Subscription> saved = ArgumentCaptor.forClass(Subscription.class);
+        verify(paymentPersistencePort).saveSubscription(saved.capture());
+        Subscription result = saved.getValue();
+        assertEquals(SubscriptionPlanCode.BASIC, result.getPlanCode());
+        assertEquals(437, result.getRemainingTokens());
+        assertEquals(500, result.getMonthlyTokenLimit());
+        assertEquals(Instant.parse("2026-02-01T00:00:00Z"), result.getCurrentPeriodEnd());
+        assertTrue(result.isCancelAtPeriodEnd());
+
+        // No downgrade happened, so no free-plan reallocation should be recorded.
+        verify(paymentPersistencePort, never()).saveTokenTransaction(any());
+    }
+
+    @Test
+    void cancelSubscriptionRejectsWhenCancellationIsAlreadyScheduled() {
+        UUID userId = UUID.randomUUID();
+        Subscription pending = pendingCancellation(userId, 437, Instant.parse("2026-02-01T00:00:00Z"));
+        when(paymentPersistencePort.findSubscriptionByUserId(userId)).thenReturn(Optional.of(pending));
+
+        assertThrows(InvalidPaymentRequestException.class, () -> paymentService.cancelSubscription(userId));
+
+        verifyNoInteractions(paymentGatewayPort);
+        verify(paymentPersistencePort, never()).saveSubscription(any());
+    }
+
+    @Test
+    void getSubscriptionKeepsPaidTokensWhileCancellationIsPending() {
+        UUID userId = UUID.randomUUID();
+        Subscription pending = pendingCancellation(userId, 437, Instant.parse("2026-02-01T00:00:00Z"));
+        when(paymentPersistencePort.findSubscriptionByUserId(userId)).thenReturn(Optional.of(pending));
+
+        var response = paymentService.getSubscription(userId);
+
+        assertEquals("BASIC", response.planCode());
+        assertEquals(437, response.remainingTokens());
+        assertTrue(response.cancelAtPeriodEnd());
+        verify(paymentPersistencePort, never()).saveSubscription(any());
+    }
+
+    @Test
+    void getSubscriptionDowngradesToFreeOncePaidPeriodEnded() {
+        UUID userId = UUID.randomUUID();
+        Subscription expired = pendingCancellation(userId, 437, NOW.minusSeconds(1));
+        when(paymentPersistencePort.findSubscriptionByUserId(userId)).thenReturn(Optional.of(expired));
+        when(paymentPlanCatalogPort.getFreePlan()).thenReturn(plan(SubscriptionPlanCode.FREE, 50, 0));
+        when(paymentPersistencePort.saveSubscription(any(Subscription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = paymentService.getSubscription(userId);
+
+        assertEquals("FREE", response.planCode());
+        assertEquals("FREE", response.provider());
+        assertEquals(50, response.remainingTokens());
+        assertFalse(response.cancelAtPeriodEnd());
+    }
+
+    @Test
+    void subscriptionDeletedWebhookDoesNotWipeTokensWhilePaidPeriodRemains() {
+        UUID userId = UUID.randomUUID();
+        Subscription paid = subscription(
+                UUID.randomUUID(), userId, 437, 500,
+                SubscriptionPlanCode.BASIC, PaymentProvider.MERCADO_PAGO
+        );
+        PaymentWebhookNotification canceled = new PaymentWebhookNotification(
+                "evt-cancel",
+                "subscription.updated",
+                "customer-1",
+                "gateway-subscription-id",
+                userId,
+                "BASIC",
+                "cancelled",
+                true,
+                NOW,
+                Instant.parse("2026-02-01T00:00:00Z"),
+                false
+        );
+        when(paymentGatewayPort.parseVerifiedWebhook("{}", "sig", "req", "evt-cancel"))
+                .thenReturn(canceled);
+        when(paymentPersistencePort.tryRecordProcessedWebhookEvent("evt-cancel", "subscription.updated", NOW))
+                .thenReturn(true);
+        when(paymentPersistencePort.findSubscriptionByGatewaySubscriptionId("gateway-subscription-id"))
+                .thenReturn(Optional.of(paid));
+        when(paymentPersistencePort.saveSubscription(any(Subscription.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        paymentService.handleWebhook("{}", "sig", "req", "evt-cancel");
+
+        ArgumentCaptor<Subscription> saved = ArgumentCaptor.forClass(Subscription.class);
+        verify(paymentPersistencePort).saveSubscription(saved.capture());
+        assertEquals(SubscriptionPlanCode.BASIC, saved.getValue().getPlanCode());
+        assertEquals(437, saved.getValue().getRemainingTokens());
+        assertTrue(saved.getValue().isCancelAtPeriodEnd());
+    }
+
+    private Subscription pendingCancellation(UUID userId, int remainingTokens, Instant periodEnd) {
+        return Subscription.restore(
+                UUID.randomUUID(),
+                userId,
+                SubscriptionPlanCode.BASIC,
+                SubscriptionStatus.ACTIVE,
+                PaymentProvider.MERCADO_PAGO,
+                null,
+                "gateway-subscription-id",
+                NOW.minusSeconds(60),
+                periodEnd,
+                true,
+                500,
+                remainingTokens,
+                NOW,
+                NOW
+        );
     }
 
     private Subscription subscription(UUID subscriptionId, UUID userId, int remainingTokens, int monthlyTokenLimit) {

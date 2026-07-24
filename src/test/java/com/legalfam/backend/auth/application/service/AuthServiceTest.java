@@ -19,6 +19,7 @@ import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.auth.application.port.out.IRefreshTokenPersistencePort;
 import com.legalfam.backend.common.identity.event.UserRegisteredEvent;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
+import com.legalfam.backend.auth.domain.exception.InvalidAuthRequestException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
@@ -240,6 +241,72 @@ class AuthServiceTest {
 
         assertEquals("new-access", response.accessToken());
         assertNotEquals(newToken.getToken(), response.refreshToken());
+    }
+
+    @Test
+    void getProfileReturnsStoredUser() {
+        UUID userId = UUID.randomUUID();
+        User user = User.restore(userId, "user@example.com", "hashed", "Juan Perez", "900000000");
+        when(IUserPort.findById(userId)).thenReturn(Optional.of(user));
+
+        var profile = authService.getProfile(userId);
+
+        assertEquals(userId, profile.id());
+        assertEquals("user@example.com", profile.email());
+        assertEquals("Juan Perez", profile.name());
+        assertEquals("900000000", profile.phone());
+    }
+
+    @Test
+    void getProfileThrowsWhenUserIsMissing() {
+        UUID userId = UUID.randomUUID();
+        when(IUserPort.findById(userId)).thenReturn(Optional.empty());
+
+        assertThrows(InvalidCredentialsException.class, () -> authService.getProfile(userId));
+    }
+
+    @Test
+    void updateProfileRenamesUserAndKeepsEmail() {
+        UUID userId = UUID.randomUUID();
+        User user = User.restore(userId, "user@example.com", "hashed", "Juan Perez", "900000000");
+        when(IUserPort.findById(userId)).thenReturn(Optional.of(user));
+        when(IUserPort.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var profile = authService.updateProfile(userId, "Juana Perez");
+
+        verify(IUserPort).save(userCaptor.capture());
+        assertEquals("Juana Perez", userCaptor.getValue().getName());
+        assertEquals("user@example.com", userCaptor.getValue().getEmail());
+        assertEquals("Juana Perez", profile.name());
+    }
+
+    @Test
+    void updatePasswordEncodesNewPasswordWhenCurrentMatches() {
+        UUID userId = UUID.randomUUID();
+        User user = User.restore(userId, "user@example.com", "old-hash", "Juan Perez", "900000000");
+        when(IUserPort.findById(userId)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("actual123", "old-hash")).thenReturn(true);
+        when(passwordEncoder.encode("nueva1234")).thenReturn("new-hash");
+
+        authService.updatePassword(userId, "actual123", "nueva1234");
+
+        verify(IUserPort).save(userCaptor.capture());
+        assertEquals("new-hash", userCaptor.getValue().getPassword());
+    }
+
+    @Test
+    void updatePasswordThrowsWhenCurrentPasswordDoesNotMatch() {
+        UUID userId = UUID.randomUUID();
+        User user = User.restore(userId, "user@example.com", "old-hash", "Juan Perez", "900000000");
+        when(IUserPort.findById(userId)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("incorrecta", "old-hash")).thenReturn(false);
+
+        assertThrows(
+                InvalidAuthRequestException.class,
+                () -> authService.updatePassword(userId, "incorrecta", "nueva1234")
+        );
+
+        verify(IUserPort, never()).save(any(User.class));
     }
 
     private static String hashRefreshToken(String rawToken) {

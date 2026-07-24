@@ -25,6 +25,14 @@ public class User {
         return user;
     }
 
+    public void rename(String name) {
+        this.name = name;
+    }
+
+    public void changePassword(String passwordHash) {
+        this.password = passwordHash;
+    }
+
     public UUID getId() {
         return id;
     }

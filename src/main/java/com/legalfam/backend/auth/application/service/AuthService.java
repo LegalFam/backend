@@ -7,6 +7,7 @@ import com.legalfam.backend.auth.application.port.out.IRefreshTokenPersistencePo
 import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.common.identity.event.UserRegisteredEvent;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
+import com.legalfam.backend.auth.domain.exception.InvalidAuthRequestException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
@@ -19,6 +20,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -98,6 +100,41 @@ public class AuthService implements IAuthUseCase {
         return issueTokens(user);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getProfile(UUID userId) {
+        return toUserResponse(requireUser(userId));
+    }
+
+    @Override
+    @Transactional
+    public UserResponse updateProfile(UUID userId, String name) {
+        User user = requireUser(userId);
+        user.rename(name);
+        return toUserResponse(IUserPort.save(user));
+    }
+
+    @Override
+    @Transactional
+    public void updatePassword(UUID userId, String currentRawPassword, String newRawPassword) {
+        User user = requireUser(userId);
+
+        if (!passwordEncoder.matches(currentRawPassword, user.getPassword())) {
+            throw InvalidAuthRequestException.currentPasswordInvalid();
+        }
+
+        user.changePassword(passwordEncoder.encode(newRawPassword));
+        IUserPort.save(user);
+    }
+
+    private User requireUser(UUID userId) {
+        return IUserPort.findById(userId).orElseThrow(InvalidCredentialsException::invalidCredentials);
+    }
+
+    private UserResponse toUserResponse(User user) {
+        return new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone());
+    }
+
     private TokenResponse issueTokens(User user) {
         String accessToken = IAccessTokenPort.generateAccessToken(user.getId(), user.getEmail());
         String refreshToken = createRefreshToken(user);
@@ -106,7 +143,7 @@ public class AuthService implements IAuthUseCase {
                 refreshToken,
                 "Bearer",
                 IAccessTokenPort.getAccessTokenExpirationSeconds(),
-                new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone())
+                toUserResponse(user)
         );
     }
 
