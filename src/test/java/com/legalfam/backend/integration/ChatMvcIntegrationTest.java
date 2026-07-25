@@ -18,6 +18,7 @@ import com.legalfam.backend.auth.infrastructure.security.JwtAuthenticationFilter
 import com.legalfam.backend.auth.infrastructure.security.SecurityConfig;
 import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.application.port.in.IChatUseCase;
+import com.legalfam.backend.chat.domain.exception.InsufficientChatTokensException;
 import com.legalfam.backend.chat.infrastructure.adapter.out.SseChatAssistantDeliveryAdapter;
 import com.legalfam.backend.chat.infrastructure.api.ChatController;
 import com.legalfam.backend.chat.infrastructure.api.handler.ChatExceptionHandler;
@@ -125,6 +126,28 @@ class ChatMvcIntegrationTest {
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/send")));
 
         verifyNoInteractions(chatUseCase);
+    }
+
+    @Test
+    void chatSendReturnsForbiddenInsufficientTokensThroughRealMvcAdvice() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        when(tokenValidationPort.isTokenValid("valid-token")).thenReturn(true);
+        when(tokenValidationPort.extractUserId("valid-token")).thenReturn(userId);
+        when(chatUseCase.send(eq(userId), eq("hola"), eq(sessionId)))
+                .thenThrow(InsufficientChatTokensException.noTokens());
+
+        mockMvc.perform(post("/api/v1/chat/send")
+                        .header("Authorization", "Bearer valid-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"hola\",\"sessionId\":\"" + sessionId + "\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type", is("payment_error")))
+                .andExpect(jsonPath("$.code", is("insufficient_tokens")))
+                .andExpect(jsonPath("$.status", is(403)))
+                .andExpect(jsonPath("$.path", is("/api/v1/chat/send")));
+
+        verify(chatUseCase).send(userId, "hola", sessionId);
     }
 
     @Test

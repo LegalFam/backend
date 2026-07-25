@@ -132,6 +132,8 @@ public class ChatController {
                     content = @Content(schema = @Schema(implementation = ChatSendAcceptedResponse.class))),
             @ApiResponse(responseCode = "400", description = "Invalid request",
                     content = @Content(schema = @Schema(implementation = ApiError.class))),
+            @ApiResponse(responseCode = "403", description = "Not enough tokens to send the message",
+                    content = @Content(schema = @Schema(implementation = ApiError.class))),
             @ApiResponse(responseCode = "409", description = "Assistant receipt confirmation is still pending",
                     content = @Content(schema = @Schema(implementation = ApiError.class)))
     })

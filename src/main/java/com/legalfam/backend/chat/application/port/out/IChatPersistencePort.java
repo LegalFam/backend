@@ -22,6 +22,12 @@ public interface IChatPersistencePort {
 
     CursorResult<ChatSession> findSessionsByUserIdOrderByUpdatedAtDesc(UUID userId, CursorQuery cursorQuery);
 
+    CursorResult<ChatSession> findSessionsByUserIdUpdatedAfterOrderByUpdatedAtDesc(
+            UUID userId,
+            Instant threshold,
+            CursorQuery cursorQuery
+    );
+
     ChatMessage saveMessage(ChatMessage chatMessage);
 
     Optional<ChatMessage> findMessageById(UUID messageId);

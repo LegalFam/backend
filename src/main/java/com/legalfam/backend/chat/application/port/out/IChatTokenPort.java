@@ -4,4 +4,6 @@ import java.util.UUID;
 
 public interface IChatTokenPort {
     void consumeChatTokensForAssistantResult(UUID userId, UUID chatMessageId, int tokenCost);
+
+    boolean hasChatTokensAvailable(UUID userId);
 }

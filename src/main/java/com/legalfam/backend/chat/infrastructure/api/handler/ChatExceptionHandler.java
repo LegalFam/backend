@@ -4,6 +4,7 @@ import com.legalfam.backend.chat.domain.exception.ChatAccessDeniedException;
 import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
+import com.legalfam.backend.chat.domain.exception.InsufficientChatTokensException;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.domain.exception.PendingAssistantMessageException;
 import com.legalfam.backend.common.error.ApiError;
@@ -58,6 +59,14 @@ public class ChatExceptionHandler {
     @ExceptionHandler(PendingAssistantMessageException.class)
     public ResponseEntity<ApiError> handlePendingAssistantMessage(
             PendingAssistantMessageException ex,
+            HttpServletRequest request
+    ) {
+        return buildResponse(ex.error(), request);
+    }
+
+    @ExceptionHandler(InsufficientChatTokensException.class)
+    public ResponseEntity<ApiError> handleInsufficientChatTokens(
+            InsufficientChatTokensException ex,
             HttpServletRequest request
     ) {
         return buildResponse(ex.error(), request);

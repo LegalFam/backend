@@ -88,6 +88,20 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
     }
 
     @Override
+    public CursorResult<ChatSession> findSessionsByUserIdUpdatedAfterOrderByUpdatedAtDesc(
+            UUID userId,
+            Instant threshold,
+            CursorQuery cursorQuery
+    ) {
+        Slice<ChatSessionEntity> page = IChatSessionRepository.findByUserIdAndUpdatedAtAfterOrderByUpdatedAtDesc(
+                userId,
+                threshold,
+                OffsetPageRequest.of(cursorQuery.offset(), cursorQuery.size())
+        );
+        return toCursorResult(page, cursorQuery, ChatEntityMapper::toDomain);
+    }
+
+    @Override
     public ChatMessage saveMessage(ChatMessage chatMessage) {
         return ChatEntityMapper.toDomain(IChatMessageRepository.save(ChatEntityMapper.toEntity(chatMessage)));
     }

@@ -16,6 +16,7 @@ public enum ChatApiError implements ApiErrorDescriptor {
     ASSISTANT_DELIVERY_EVENT_NOT_FOUND("resource_error", "assistant_delivery_event_not_found", 404, "Assistant delivery event not found"),
     MESSAGE_PROCESSING_PENDING("chat_state_error", "message_processing_pending", 409, "Message processing is already pending"),
     ASSISTANT_RECEIPT_PENDING("chat_state_error", "assistant_receipt_pending", 409, "Assistant receipt confirmation is still pending for this session"),
+    INSUFFICIENT_TOKENS("payment_error", "insufficient_tokens", 403, "You do not have enough tokens to send a message"),
     PERSONAL_DATA_NOT_ALLOWED("validation_error", "personal_data_not_allowed", 400, "Personal data is not allowed in chat messages"),
     METADATA_ONLY_ASSISTANT("validation_error", "metadata_only_assistant", 400, "Metadata can only be applied to assistant messages"),
     ONLY_ASSISTANT_MESSAGES_CAN_BE_RATED("validation_error", "only_assistant_messages_can_be_rated", 400, "Only assistant messages can be rated"),

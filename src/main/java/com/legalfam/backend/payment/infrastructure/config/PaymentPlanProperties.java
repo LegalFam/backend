@@ -3,6 +3,7 @@ package com.legalfam.backend.payment.infrastructure.config;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
@@ -19,7 +20,11 @@ public record PaymentPlanProperties(
             String description,
             @NotNull @PositiveOrZero Integer tokens,
             @NotNull @PositiveOrZero Integer monthlyPriceCents,
-            String currency
+            String currency,
+            /** Mensajes previos que se envían al asistente como contexto. */
+            @NotNull @Positive Integer contextMessages,
+            /** Antigüedad máxima del historial visible. Nulo significa sin límite. */
+            @Positive Integer historyWindowDays
     ) {
     }
 }

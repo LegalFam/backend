@@ -74,13 +74,23 @@ public class PaymentPlanCatalogAdapter implements IPaymentPlanCatalogPort {
         if (monthlyPriceCents < 0) {
             throw new IllegalStateException("Payment plan price must be non-negative for " + code.name());
         }
+        Integer contextMessages = properties.contextMessages();
+        if (contextMessages == null || contextMessages <= 0) {
+            throw new IllegalStateException("Payment plan context message limit must be positive for " + code.name());
+        }
+        Integer historyWindowDays = properties.historyWindowDays();
+        if (historyWindowDays != null && historyWindowDays <= 0) {
+            throw new IllegalStateException("Payment plan history window must be positive for " + code.name());
+        }
         return new PaymentPlanDefinition(
                 code,
                 displayName.trim(),
                 defaultString(properties.description()),
                 monthlyTokenLimit,
                 monthlyPriceCents,
-                defaultCurrency(properties.currency())
+                defaultCurrency(properties.currency()),
+                contextMessages,
+                historyWindowDays
         );
     }
 

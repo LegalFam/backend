@@ -8,7 +8,9 @@ public record PaymentPlanDefinition(
         String description,
         int monthlyTokenLimit,
         int monthlyPriceCents,
-        String currency
+        String currency,
+        int contextMessageLimit,
+        Integer historyWindowDays
 ) {
     public boolean isFree() {
         return code == SubscriptionPlanCode.FREE;

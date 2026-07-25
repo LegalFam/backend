@@ -4,10 +4,12 @@ import com.legalfam.backend.common.identity.UserIdentity;
 import com.legalfam.backend.common.identity.application.port.out.IUserIdentityPort;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionRequest;
 import com.legalfam.backend.payment.application.dto.CreateCheckoutSessionResponse;
+import com.legalfam.backend.payment.application.dto.PaymentEntitlements;
 import com.legalfam.backend.payment.application.dto.PaymentPlanDefinition;
 import com.legalfam.backend.payment.application.dto.PaymentPlanResponse;
 import com.legalfam.backend.payment.application.dto.PaymentSubscriptionResponse;
 import com.legalfam.backend.payment.application.dto.PaymentWebhookNotification;
+import com.legalfam.backend.payment.application.port.in.IPaymentEntitlementsUseCase;
 import com.legalfam.backend.payment.application.port.in.IPaymentProvisioningUseCase;
 import com.legalfam.backend.payment.application.port.in.IPaymentTokenUseCase;
 import com.legalfam.backend.payment.application.port.in.IPaymentUseCase;
@@ -29,12 +31,14 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseCase, IPaymentTokenUseCase {
+public class PaymentService
+        implements IPaymentUseCase, IPaymentProvisioningUseCase, IPaymentTokenUseCase, IPaymentEntitlementsUseCase {
 
     private static final String BILLING_INTERVAL = "month";
 
@@ -194,6 +198,41 @@ public class PaymentService implements IPaymentUseCase, IPaymentProvisioningUseC
             return;
         }
         consumeResolvedChatTokens(userId, chatMessageId, requestedTotalCost);
+    }
+
+    @Override
+    @Transactional
+    public boolean hasChatTokensAvailable(UUID userId) {
+        if (userId == null) {
+            return false;
+        }
+        Subscription subscription = getOrCreateSubscription(userId);
+        return subscription.getStatus() == SubscriptionStatus.ACTIVE
+                && subscription.getRemainingTokens() > 0;
+    }
+
+    /**
+     * Resuelve los límites de producto del plan vigente. Una suscripción que no está
+     * ACTIVE (pago pendiente, vencida) cae a los límites del plan gratuito en lugar de
+     * conservar los del plan que dejó de pagarse.
+     */
+    @Override
+    @Transactional
+    public PaymentEntitlements resolveEntitlements(UUID userId) {
+        PaymentPlanDefinition plan = IPaymentPlanCatalogPort.getFreePlan();
+        if (userId != null) {
+            Subscription subscription = getOrCreateSubscription(userId);
+            if (subscription.getStatus() == SubscriptionStatus.ACTIVE) {
+                plan = findPlanByCode(subscription.getPlanCode()).orElse(plan);
+            }
+        }
+        return new PaymentEntitlements(plan.contextMessageLimit(), plan.historyWindowDays());
+    }
+
+    private Optional<PaymentPlanDefinition> findPlanByCode(SubscriptionPlanCode code) {
+        return IPaymentPlanCatalogPort.listPlans().stream()
+                .filter(plan -> plan.code() == code)
+                .findFirst();
     }
 
     private void consumeResolvedChatTokens(UUID userId, UUID chatMessageId, int requestedTotalCost) {

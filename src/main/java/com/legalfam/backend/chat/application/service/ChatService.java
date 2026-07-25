@@ -5,8 +5,11 @@ import com.legalfam.backend.chat.application.service.mapper.ChatMessageResponseM
 import com.legalfam.backend.chat.application.policy.ChatAccessPolicy;
 import com.legalfam.backend.chat.application.policy.ChatPrivacyPolicy;
 import com.legalfam.backend.chat.application.port.in.IChatUseCase;
+import com.legalfam.backend.chat.application.port.out.IChatEntitlementsPort;
 import com.legalfam.backend.chat.application.port.out.IChatEventPublisherPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
+import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
+import com.legalfam.backend.chat.application.dto.ChatEntitlements;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
 import com.legalfam.backend.chat.application.dto.ChatProcessingStatusResponse;
@@ -16,6 +19,7 @@ import com.legalfam.backend.chat.application.dto.ChatSessionResponse;
 import com.legalfam.backend.chat.application.dto.ChatUpdateSessionRequest;
 import com.legalfam.backend.chat.domain.exception.ChatNotFoundException;
 import com.legalfam.backend.chat.domain.exception.ChatApiError;
+import com.legalfam.backend.chat.domain.exception.InsufficientChatTokensException;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
@@ -27,6 +31,7 @@ import com.legalfam.backend.chat.domain.policy.ChatSendPolicy;
 import com.legalfam.backend.common.cursor.CursorQuery;
 import com.legalfam.backend.common.cursor.CursorResult;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -39,11 +44,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ChatService implements IChatUseCase {
 
-    private static final int ASSISTANT_CONTEXT_MESSAGE_LIMIT = 12;
     private static final int ASSISTANT_CONTEXT_CONTENT_LIMIT = 2000;
 
     private final IChatPersistencePort IChatPersistencePort;
     private final IChatEventPublisherPort IChatEventPublisherPort;
+    private final IChatTokenPort IChatTokenPort;
+    private final IChatEntitlementsPort IChatEntitlementsPort;
     private final ChatAccessPolicy chatAccessPolicy;
     private final ChatPrivacyPolicy chatPrivacyPolicy;
     private final ChatMessageResponseMapper chatMessageResponseMapper;
@@ -51,12 +57,16 @@ public class ChatService implements IChatUseCase {
     public ChatService(
             IChatPersistencePort IChatPersistencePort,
             IChatEventPublisherPort IChatEventPublisherPort,
+            IChatTokenPort IChatTokenPort,
+            IChatEntitlementsPort IChatEntitlementsPort,
             ChatAccessPolicy chatAccessPolicy,
             ChatPrivacyPolicy chatPrivacyPolicy,
             ChatMessageResponseMapper chatMessageResponseMapper
     ) {
         this.IChatPersistencePort = IChatPersistencePort;
         this.IChatEventPublisherPort = IChatEventPublisherPort;
+        this.IChatTokenPort = IChatTokenPort;
+        this.IChatEntitlementsPort = IChatEntitlementsPort;
         this.chatAccessPolicy = chatAccessPolicy;
         this.chatPrivacyPolicy = chatPrivacyPolicy;
         this.chatMessageResponseMapper = chatMessageResponseMapper;
@@ -75,10 +85,17 @@ public class ChatService implements IChatUseCase {
                 IChatPersistencePort.findActiveMessageProcessingByUserId(userId).isPresent(),
                 IChatPersistencePort.existsUnreadAssistantMessageBySessionId(chatSession.getId())
         );
+        if (!IChatTokenPort.hasChatTokensAvailable(userId)) {
+            throw InsufficientChatTokensException.noTokens();
+        }
         Instant now = Instant.now();
 
+        ChatEntitlements entitlements = IChatEntitlementsPort.resolveEntitlements(userId);
         ChatMessage userMessage = ChatMessage.userMessage(chatSession.getId(), messageInput, now);
-        List<ChatPreviousMessage> previousMessages = recentPreviousMessages(chatSession.getId());
+        List<ChatPreviousMessage> previousMessages = recentPreviousMessages(
+                chatSession.getId(),
+                entitlements.contextMessageLimit()
+        );
 
         userMessage = IChatPersistencePort.saveMessage(userMessage);
 
@@ -140,11 +157,23 @@ public class ChatService implements IChatUseCase {
         IChatPersistencePort.deleteSessionById(session.getId());
     }
 
+    /**
+     * Los planes con ventana de historial solo listan las conversaciones dentro de ella.
+     * Es un límite de acceso, no de retención: nada se elimina, así que al pasar a un plan
+     * sin ventana el historial completo vuelve a aparecer.
+     */
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public CursorResult<ChatSessionResponse> listSessions(UUID userId, CursorQuery cursorQuery) {
-        return IChatPersistencePort.findSessionsByUserIdOrderByUpdatedAtDesc(userId, cursorQuery)
-                .map(this::toSessionResponse);
+        Integer historyWindowDays = IChatEntitlementsPort.resolveEntitlements(userId).historyWindowDays();
+        CursorResult<ChatSession> sessions = historyWindowDays == null
+                ? IChatPersistencePort.findSessionsByUserIdOrderByUpdatedAtDesc(userId, cursorQuery)
+                : IChatPersistencePort.findSessionsByUserIdUpdatedAfterOrderByUpdatedAtDesc(
+                        userId,
+                        Instant.now().minus(historyWindowDays, ChronoUnit.DAYS),
+                        cursorQuery
+                );
+        return sessions.map(this::toSessionResponse);
     }
 
     @Override
@@ -223,8 +252,8 @@ public class ChatService implements IChatUseCase {
         );
     }
 
-    private List<ChatPreviousMessage> recentPreviousMessages(UUID sessionId) {
-        return IChatPersistencePort.findRecentMessagesForAssistantContext(sessionId, ASSISTANT_CONTEXT_MESSAGE_LIMIT)
+    private List<ChatPreviousMessage> recentPreviousMessages(UUID sessionId, int contextMessageLimit) {
+        return IChatPersistencePort.findRecentMessagesForAssistantContext(sessionId, contextMessageLimit)
                 .stream()
                 .map(message -> new ChatPreviousMessage(
                         message.getRole().name(),

@@ -364,6 +364,30 @@ class PaymentServiceTest {
         );
     }
 
+    @Test
+    void hasChatTokensAvailableReturnsTrueWhenActiveSubscriptionHasTokens() {
+        UUID userId = UUID.randomUUID();
+        Subscription subscription = subscription(UUID.randomUUID(), userId, 3, 50);
+        when(paymentPersistencePort.findSubscriptionByUserId(userId)).thenReturn(Optional.of(subscription));
+
+        assertTrue(paymentService.hasChatTokensAvailable(userId));
+    }
+
+    @Test
+    void hasChatTokensAvailableReturnsFalseWhenNoTokensRemain() {
+        UUID userId = UUID.randomUUID();
+        Subscription subscription = subscription(UUID.randomUUID(), userId, 0, 50);
+        when(paymentPersistencePort.findSubscriptionByUserId(userId)).thenReturn(Optional.of(subscription));
+
+        assertFalse(paymentService.hasChatTokensAvailable(userId));
+    }
+
+    @Test
+    void hasChatTokensAvailableReturnsFalseForNullUser() {
+        assertFalse(paymentService.hasChatTokensAvailable(null));
+        verifyNoInteractions(paymentPersistencePort);
+    }
+
     private Subscription subscription(UUID subscriptionId, UUID userId, int remainingTokens, int monthlyTokenLimit) {
         return subscription(
                 subscriptionId,
@@ -408,7 +432,9 @@ class PaymentServiceTest {
                 code.name() + " plan",
                 tokenLimit,
                 monthlyPriceCents,
-                "pen"
+                "pen",
+                code == SubscriptionPlanCode.FREE ? 10 : 15,
+                code == SubscriptionPlanCode.FREE ? 30 : null
         );
     }
 

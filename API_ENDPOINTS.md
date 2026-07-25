@@ -241,12 +241,25 @@ Common errors:
 - `403` user already has an active paid subscription
 
 ### `POST /api/v1/payments/subscription/cancel`
-Cancel the current Mercado Pago subscription.
+Cancel the current Mercado Pago subscription at the end of the paid period.
+
+The subscription stops renewing at the gateway, but the period the user already paid for is honored:
+plan, `monthlyTokenLimit`, `remainingTokens` and `currentPeriodEnd` are left untouched and
+`cancelAtPeriodEnd` becomes `true`. The downgrade to `FREE` is applied lazily the first time the
+subscription is read or charged after `currentPeriodEnd` has passed, so `GET /api/v1/payments/subscription`
+is what surfaces the final state.
 
 Success response `204` with empty body.
 
 Common errors:
-- `400` no active Mercado Pago subscription to cancel
+- `400` `no_gateway_subscription_to_cancel` when there is no Mercado Pago subscription to cancel
+- `400` `subscription_already_canceled` when a cancellation is already scheduled
+
+Notes:
+- The `subscription.cancelled` webhook that Mercado Pago fires after this call does **not** downgrade
+  the user either, for the same reason; it only schedules the cancellation when a paid period is still running.
+- While a cancellation is pending, `POST /api/v1/payments/checkout-sessions` still rejects with
+  `checkout_active_gateway_subscription`: the paid plan is active until the period ends.
 
 ### `POST /api/v1/payments/webhook/mercado-pago`
 Public webhook endpoint for Mercado Pago notifications.
@@ -563,6 +576,7 @@ Payment:
 | `checkout_plan_already_active` | 403 | `payment_error` | User is already subscribed to the selected plan |
 | `checkout_active_gateway_subscription` | 403 | `payment_error` | Cancel the current gateway subscription before changing plans |
 | `no_gateway_subscription_to_cancel` | 400 | `payment_error` | No gateway subscription is available to cancel |
+| `subscription_already_canceled` | 400 | `payment_error` | Subscription is already scheduled for cancellation |
 | `subscription_not_found` | 404 | `payment_error` | Subscription not found |
 | `subscription_inactive` | 403 | `payment_error` | Subscription is not active |
 | `insufficient_tokens` | 403 | `payment_error` | Insufficient tokens |
@@ -688,7 +702,7 @@ For `GET /api/v1/payments/subscription`:
 - Use `GET /api/v1/payments/plans` to build pricing UI and disable plan buttons where `purchasable=false`.
 - After `POST /api/v1/payments/checkout-sessions`, redirect immediately to returned `url`.
 - When frontend returns from Mercado Pago success page, call `GET /api/v1/payments/subscription` and `GET /api/v1/payments/plans` to refresh plan badges and token quotas.
-- After `POST /api/v1/payments/subscription/cancel`, refresh subscription state and update UI to free-plan expectations only after backend confirms.
+- After `POST /api/v1/payments/subscription/cancel`, refresh subscription state. Do not switch the UI to free-plan expectations: the response keeps the paid plan with `cancelAtPeriodEnd=true` until `currentPeriodEnd`. Show the remaining tokens and the end date instead.
 - Do not assume webhook processing is instantaneous; the frontend must re-fetch subscription state instead of assuming checkout completed immediately.
 
 ### 9. Minimal robust frontend flow for chat
