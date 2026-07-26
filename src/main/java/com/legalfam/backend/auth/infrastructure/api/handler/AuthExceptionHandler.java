@@ -2,6 +2,7 @@ package com.legalfam.backend.auth.infrastructure.api.handler;
 
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
 import com.legalfam.backend.auth.domain.exception.AuthApiError;
+import com.legalfam.backend.auth.domain.exception.EmailNotVerifiedException;
 import com.legalfam.backend.auth.domain.exception.InvalidAuthRequestException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
@@ -30,6 +31,11 @@ public class AuthExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ApiError> handleInvalidCredentials(HttpServletRequest request) {
         return buildResponse(AuthApiError.INVALID_CREDENTIALS, request);
+    }
+
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<ApiError> handleEmailNotVerified(HttpServletRequest request) {
+        return buildResponse(AuthApiError.EMAIL_NOT_VERIFIED, request);
     }
 
     @ExceptionHandler(InvalidRefreshTokenException.class)
@@ -87,6 +93,9 @@ public class AuthExceptionHandler {
         }
         if ("refreshToken".equals(field)) {
             return AuthApiError.REFRESH_TOKEN_REQUIRED;
+        }
+        if ("token".equals(field)) {
+            return AuthApiError.TOKEN_REQUIRED;
         }
         return AuthApiError.SIGNUP_REQUEST_REQUIRED;
     }

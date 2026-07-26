@@ -6,7 +6,7 @@ API Prefix: `/api/v1`
 ## Auth
 
 ### `POST /api/v1/auth/signup`
-Create a user and return tokens.
+Create an **unverified** user and email a verification link. **No tokens are issued**: the user cannot log in until the link is opened.
 
 Request body:
 ```json
@@ -21,22 +21,19 @@ Request body:
 Success response `201`:
 ```json
 {
-  "accessToken": "jwt-token",
-  "refreshToken": "refresh-token",
-  "tokenType": "Bearer",
-  "expiresIn": 900,
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "name": "Juan Perez",
-    "phone": "900000000"
-  }
+  "id": "uuid",
+  "email": "user@example.com",
+  "name": "Juan Perez",
+  "phone": "900000000",
+  "emailVerified": false
 }
 ```
 
 Common errors:
 - `400` invalid request (`email/password/name/phone` required, invalid email format)
 - `409` email already exists
+
+Frontend: show a "check your inbox" state with a resend button. Do **not** store a session.
 
 ### `POST /api/v1/auth/login`
 Login and return tokens.
@@ -49,11 +46,27 @@ Request body:
 }
 ```
 
-Success response `200`: same token response as signup.
+Success response `200`:
+```json
+{
+  "accessToken": "jwt-token",
+  "refreshToken": "refresh-token",
+  "tokenType": "Bearer",
+  "expiresIn": 900,
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "name": "Juan Perez",
+    "phone": "900000000",
+    "emailVerified": true
+  }
+}
+```
 
 Common errors:
 - `400` invalid request
 - `401` invalid credentials
+- `403` `email_not_verified` — the credentials are correct but the address is unconfirmed. Offer the resend action.
 
 ### `POST /api/v1/auth/refresh`
 Rotate refresh token and return a new token pair.
@@ -65,17 +78,88 @@ Request body:
 }
 ```
 
-Success response `200`: same token response as signup/login.
+Success response `200`: same token response as login.
 
 Common errors:
 - `400` refresh token missing
 - `401` invalid/expired/revoked refresh token
+
+### `POST /api/v1/auth/verify-email`
+Confirm an address with the token from the verification email. Single-use; valid for 24 hours.
+
+Request body:
+```json
+{
+  "token": "token-from-the-email-link"
+}
+```
+
+Success response `204` (no body).
+
+Common errors:
+- `400` `token_required`
+- `400` `verification_token_invalid` (unknown, expired or already used)
+
+Frontend: the email links to `/verificar-correo?token=...`; that page POSTs the token here. Fire the request **once** per mount (React StrictMode double-invokes effects in dev and would burn the single-use token).
+
+### `POST /api/v1/auth/resend-verification`
+Re-send the verification email.
+
+Request body:
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+Success response `204` — **always**, whether the address is unknown, already verified, or within the 60 s cooldown. This is intentional: the endpoint must not reveal who is registered.
+
+Common errors:
+- `400` only when the email is missing or malformed
+
+### `POST /api/v1/auth/forgot-password`
+Email a password reset link. Valid for 1 hour, single-use.
+
+Request body:
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+Success response `204` — **always**, same anti-enumeration rule as `resend-verification`. Show a neutral message ("if the address is registered, we sent a link").
+
+Common errors:
+- `400` only when the email is missing or malformed
+
+### `POST /api/v1/auth/reset-password`
+Set a new password with the token from the reset email.
+
+Request body:
+```json
+{
+  "token": "token-from-the-email-link",
+  "newPassword": "NuevaPassword123!"
+}
+```
+
+Success response `204` (no body). Side effects: the address is marked verified, every outstanding token is consumed, and **all refresh tokens of that user are revoked**. Access tokens already issued stay valid until they expire (15 min).
+
+Common errors:
+- `400` `token_required` / `reset_token_invalid`
+- `400` `password_length_invalid` (must be 8–128 characters)
+
+Frontend: the email links to `/restablecer-contrasena?token=...`. On success, route to login; do not auto-authenticate.
 
 ## Public Endpoints
 
 - `POST /api/v1/auth/signup`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/verify-email`
+- `POST /api/v1/auth/resend-verification`
+- `POST /api/v1/auth/forgot-password`
+- `POST /api/v1/auth/reset-password`
 - `GET /api/v1/payments/plans`
 - `POST /api/v1/payments/webhook/mercado-pago`
 
@@ -116,12 +200,13 @@ Success response `200`:
   "id": "uuid",
   "email": "maria@ejemplo.com",
   "name": "Maria Garcia",
-  "phone": "987654321"
+  "phone": "987654321",
+  "emailVerified": true
 }
 ```
 
 ### `PATCH /api/v1/users/me`
-Update the authenticated user profile. Only `name` is editable; email changes require email verification, which is not implemented yet.
+Update the authenticated user profile. Only `name` is editable; changing the email would require re-verifying the new address, which is not implemented yet.
 
 Request body:
 ```json
@@ -542,6 +627,15 @@ Auth:
 | `profile_request_required` | 400 | `validation_error` | Profile request body is required |
 | `password_request_required` | 400 | `validation_error` | Password request body is required |
 | `current_password_invalid` | 400 | `validation_error` | Current password is invalid |
+| `email_not_verified` | 403 | `authorization_error` | Email is not verified |
+| `email_already_verified` | 409 | `conflict_error` | Email is already verified |
+| `token_required` | 400 | `validation_error` | Token is required |
+| `verification_token_invalid` | 400 | `validation_error` | Verification token is invalid or expired |
+| `reset_token_invalid` | 400 | `validation_error` | Reset token is invalid or expired |
+| `verify_email_request_required` | 400 | `validation_error` | Verify email request body is required |
+| `resend_verification_request_required` | 400 | `validation_error` | Resend verification request body is required |
+| `forgot_password_request_required` | 400 | `validation_error` | Forgot password request body is required |
+| `reset_password_request_required` | 400 | `validation_error` | Reset password request body is required |
 
 Chat:
 
@@ -602,8 +696,9 @@ Async chat failures:
 
 ## Frontend Integration Notes
 
-- Store `accessToken` + `refreshToken` securely on login/signup.
+- Store `accessToken` + `refreshToken` securely on **login/refresh only**. Signup does not return tokens.
 - Retry failed protected calls after `POST /auth/refresh` on `401`.
+- Handle `403 email_not_verified` on login by showing the resend-verification action, not by logging the user out.
 - Recommended flow for new chats:
 1. `POST /api/v1/chat/sessions`
 2. `GET /api/v1/chat/subscribe/{sessionId}`
@@ -621,6 +716,17 @@ Async chat failures:
 - On `401`, try exactly one `POST /api/v1/auth/refresh` and replay the original request once.
 - If refresh also fails with `401`, clear session state and redirect to login.
 - Prevent parallel refresh storms: if many requests fail with `401` at the same time, run one refresh request and queue the others until it finishes.
+- Never run the refresh interceptor for `/auth/*` calls, and never treat `403` as a refresh trigger.
+
+### 1b. Email verification and password reset
+
+- Signup returns the user with `emailVerified: false`. Show a "check your inbox" screen; do not navigate into the app.
+- Serve two public routes matching the backend's `app.frontend.*-path`: `/verificar-correo` and `/restablecer-contrasena`. Both read `?token=` and POST it.
+- The emailed link must point at the SPA, not at the API: mail scanners prefetch links and would consume the single-use token before the user clicks.
+- Guard the verify request so it fires once per mount (React StrictMode double-invokes effects in development).
+- Treat every `204` from `/forgot-password` and `/resend-verification` as success and show the same neutral copy. A different message for unknown addresses would leak who is registered.
+- Throttle the resend button client-side (60 s) to match the backend cooldown.
+- After a successful reset, all sessions are revoked: clear any stored tokens and send the user to login.
 
 ### 2. Chat send: correct UX and duplicate prevention
 

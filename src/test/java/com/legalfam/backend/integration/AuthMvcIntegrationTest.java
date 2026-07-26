@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.legalfam.backend.auth.application.dto.TokenResponse;
+import com.legalfam.backend.auth.application.dto.UserResponse;
+import com.legalfam.backend.auth.application.port.in.IAuthMailDispatchUseCase;
 import com.legalfam.backend.auth.application.port.in.IAuthUseCase;
 import com.legalfam.backend.auth.application.port.out.ITokenValidationPort;
 import com.legalfam.backend.auth.infrastructure.api.AuthController;
@@ -18,6 +20,7 @@ import com.legalfam.backend.auth.infrastructure.config.CorsProperties;
 import com.legalfam.backend.auth.infrastructure.security.JwtAuthenticationFilter;
 import com.legalfam.backend.auth.infrastructure.security.SecurityConfig;
 import com.legalfam.backend.common.error.handler.GlobalExceptionHandler;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -44,12 +47,16 @@ class AuthMvcIntegrationTest {
     private IAuthUseCase authUseCase;
 
     @MockitoBean
+    private IAuthMailDispatchUseCase authMailDispatchUseCase;
+
+    @MockitoBean
     private ITokenValidationPort tokenValidationPort;
 
     @Test
     void signupIsPublicAndUsesValidationAndControllerAdvice() throws Exception {
+        UUID userId = UUID.randomUUID();
         when(authUseCase.signup("user@example.com", "secret123", "Juan", "900000000"))
-                .thenReturn(new TokenResponse("access-1", "refresh-1", "Bearer", 900));
+                .thenReturn(new UserResponse(userId, "user@example.com", "Juan", "900000000", false));
 
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -62,12 +69,40 @@ class AuthMvcIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.accessToken", is("access-1")))
-                .andExpect(jsonPath("$.refreshToken", is("refresh-1")))
-                .andExpect(jsonPath("$.tokenType", is("Bearer")))
-                .andExpect(jsonPath("$.expiresIn", is(900)));
+                .andExpect(jsonPath("$.id", is(userId.toString())))
+                .andExpect(jsonPath("$.email", is("user@example.com")))
+                .andExpect(jsonPath("$.emailVerified", is(false)))
+                .andExpect(jsonPath("$.accessToken").doesNotExist());
 
         verify(authUseCase).signup("user@example.com", "secret123", "Juan", "900000000");
+    }
+
+    @Test
+    void verificationAndPasswordResetEndpointsArePublic() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\" verify-1 \"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"user@example.com\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"user@example.com\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\" reset-1 \",\"newPassword\":\"nueva1234\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(authUseCase).confirmEmailVerification("verify-1");
+        verify(authUseCase).resetPassword("reset-1", "nueva1234");
+        verify(authMailDispatchUseCase).resendEmailVerification("user@example.com");
+        verify(authMailDispatchUseCase).requestPasswordReset("user@example.com");
     }
 
     @Test

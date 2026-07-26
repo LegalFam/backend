@@ -14,7 +14,9 @@ public final class UserEntityMapper {
                 entity.getEmail(),
                 entity.getPassword(),
                 entity.getName(),
-                entity.getPhone()
+                entity.getPhone(),
+                entity.isEmailVerified(),
+                entity.getEmailVerifiedAt()
         );
     }
 
@@ -25,6 +27,8 @@ public final class UserEntityMapper {
         entity.setPassword(domain.getPassword());
         entity.setName(domain.getName());
         entity.setPhone(domain.getPhone());
+        entity.setEmailVerified(domain.isEmailVerified());
+        entity.setEmailVerifiedAt(domain.getEmailVerifiedAt());
         return entity;
     }
 }

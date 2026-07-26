@@ -61,7 +61,7 @@ class UserProfileControllerTest {
         authenticateAs(userId.toString());
 
         when(authService.getProfile(eq(userId)))
-                .thenReturn(new UserResponse(userId, "maria@ejemplo.com", "Maria Garcia", "987654321"));
+                .thenReturn(new UserResponse(userId, "maria@ejemplo.com", "Maria Garcia", "987654321", true));
 
         mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isOk())
@@ -88,7 +88,7 @@ class UserProfileControllerTest {
         authenticateAs(userId.toString());
 
         when(authService.updateProfile(eq(userId), eq("Maria Garcia")))
-                .thenReturn(new UserResponse(userId, "maria@ejemplo.com", "Maria Garcia", "987654321"));
+                .thenReturn(new UserResponse(userId, "maria@ejemplo.com", "Maria Garcia", "987654321", true));
 
         mockMvc.perform(patch("/api/v1/users/me")
                         .contentType(MediaType.APPLICATION_JSON)

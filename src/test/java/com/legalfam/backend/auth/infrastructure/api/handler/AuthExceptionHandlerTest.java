@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
+import com.legalfam.backend.auth.domain.exception.EmailNotVerifiedException;
+import com.legalfam.backend.auth.domain.exception.InvalidAuthRequestException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.infrastructure.api.handler.AuthExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +53,36 @@ class AuthExceptionHandlerTest {
                 .andExpect(jsonPath("$.timestamp", notNullValue()));
     }
 
+    @Test
+    void mapsEmailNotVerifiedToForbidden() throws Exception {
+        mockMvc.perform(get("/auth-errors/email-not-verified"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.type", is("authorization_error")))
+                .andExpect(jsonPath("$.code", is("email_not_verified")))
+                .andExpect(jsonPath("$.message", is("Email is not verified")))
+                .andExpect(jsonPath("$.status", is(403)))
+                .andExpect(jsonPath("$.path", is("/auth-errors/email-not-verified")))
+                .andExpect(jsonPath("$.timestamp", notNullValue()));
+    }
+
+    @Test
+    void mapsInvalidVerificationTokenToBadRequest() throws Exception {
+        mockMvc.perform(get("/auth-errors/verification-token"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type", is("validation_error")))
+                .andExpect(jsonPath("$.code", is("verification_token_invalid")))
+                .andExpect(jsonPath("$.status", is(400)));
+    }
+
+    @Test
+    void mapsInvalidResetTokenToBadRequest() throws Exception {
+        mockMvc.perform(get("/auth-errors/reset-token"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type", is("validation_error")))
+                .andExpect(jsonPath("$.code", is("reset_token_invalid")))
+                .andExpect(jsonPath("$.status", is(400)));
+    }
+
     @RestController
     private static class ThrowingAuthController {
         @GetMapping("/auth-errors/conflict")
@@ -61,6 +93,21 @@ class AuthExceptionHandlerTest {
         @GetMapping("/auth-errors/invalid-credentials")
         String invalidCredentials() {
             throw InvalidCredentialsException.invalidCredentials();
+        }
+
+        @GetMapping("/auth-errors/email-not-verified")
+        String emailNotVerified() {
+            throw EmailNotVerifiedException.forLogin();
+        }
+
+        @GetMapping("/auth-errors/verification-token")
+        String verificationToken() {
+            throw InvalidAuthRequestException.verificationTokenInvalid();
+        }
+
+        @GetMapping("/auth-errors/reset-token")
+        String resetToken() {
+            throw InvalidAuthRequestException.resetTokenInvalid();
         }
     }
 }

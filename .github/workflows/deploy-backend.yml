@@ -51,6 +51,15 @@ jobs:
           RABBITMQ_USER: ${{ vars.RABBITMQ_USER }}
           RABBITMQ_VHOST: ${{ vars.RABBITMQ_VHOST }}
           CHAT_RABBIT_ENABLED: ${{ vars.CHAT_RABBIT_ENABLED }}
+          MAIL_HOST: ${{ vars.MAIL_HOST }}
+          MAIL_PORT: ${{ vars.MAIL_PORT }}
+          MAIL_USERNAME: ${{ vars.MAIL_USERNAME }}
+          MAIL_SMTP_AUTH: ${{ vars.MAIL_SMTP_AUTH }}
+          MAIL_SMTP_STARTTLS: ${{ vars.MAIL_SMTP_STARTTLS }}
+          AUTH_MAIL_ENABLED: ${{ vars.AUTH_MAIL_ENABLED }}
+          AUTH_MAIL_FROM: ${{ vars.AUTH_MAIL_FROM }}
+          AUTH_MAIL_FROM_NAME: ${{ vars.AUTH_MAIL_FROM_NAME }}
+          FRONTEND_BASE_URL: ${{ vars.FRONTEND_BASE_URL }}
         run: |
           set -euo pipefail
 
@@ -77,6 +86,15 @@ jobs:
             RABBITMQ_USER
             RABBITMQ_VHOST
             CHAT_RABBIT_ENABLED
+            MAIL_HOST
+            MAIL_PORT
+            MAIL_USERNAME
+            MAIL_SMTP_AUTH
+            MAIL_SMTP_STARTTLS
+            AUTH_MAIL_ENABLED
+            AUTH_MAIL_FROM
+            AUTH_MAIL_FROM_NAME
+            FRONTEND_BASE_URL
           )
 
           for var_name in "${required_vars[@]}"; do
@@ -124,8 +142,18 @@ jobs:
             --set-env-vars RABBITMQ_USER="${{ vars.RABBITMQ_USER }}" \
             --set-env-vars RABBITMQ_VHOST="${{ vars.RABBITMQ_VHOST }}" \
             --set-env-vars CHAT_RABBIT_ENABLED="${{ vars.CHAT_RABBIT_ENABLED }}" \
+            --set-env-vars MAIL_HOST="${{ vars.MAIL_HOST }}" \
+            --set-env-vars MAIL_PORT="${{ vars.MAIL_PORT }}" \
+            --set-env-vars MAIL_USERNAME="${{ vars.MAIL_USERNAME }}" \
+            --set-env-vars MAIL_SMTP_AUTH="${{ vars.MAIL_SMTP_AUTH }}" \
+            --set-env-vars MAIL_SMTP_STARTTLS="${{ vars.MAIL_SMTP_STARTTLS }}" \
+            --set-env-vars AUTH_MAIL_ENABLED="${{ vars.AUTH_MAIL_ENABLED }}" \
+            --set-env-vars AUTH_MAIL_FROM="${{ vars.AUTH_MAIL_FROM }}" \
+            --set-env-vars AUTH_MAIL_FROM_NAME="${{ vars.AUTH_MAIL_FROM_NAME }}" \
+            --set-env-vars FRONTEND_BASE_URL="${{ vars.FRONTEND_BASE_URL }}" \
             --set-secrets DB_PASSWORD="backend-db-password:latest" \
             --set-secrets JWT_SECRET="backend-jwt-secret:latest" \
             --set-secrets N8N_AUTH_TOKEN="backend-n8n-auth-token:latest" \
             --set-secrets MERCADO_PAGO_ACCESS_TOKEN="backend-mercado-pago-access-token:latest" \
-            --set-secrets RABBITMQ_PASSWORD="backend-rabbitmq-password:latest"
+            --set-secrets RABBITMQ_PASSWORD="backend-rabbitmq-password:latest" \
+            --set-secrets MAIL_PASSWORD="backend-mail-password:latest"

@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
-    phone VARCHAR(255) NOT NULL
+    phone VARCHAR(255) NOT NULL,
+    email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    email_verified_at TIMESTAMP WITH TIME ZONE NULL
 );
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -21,6 +23,22 @@ CREATE INDEX idx_refresh_tokens_user_id
 
 CREATE INDEX idx_refresh_tokens_expires_at
     ON refresh_tokens(expires_at);
+
+CREATE TABLE IF NOT EXISTS auth_one_time_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    token_hash VARCHAR(512) NOT NULL UNIQUE,
+    purpose VARCHAR(32) NOT NULL CHECK (purpose IN ('EMAIL_VERIFICATION', 'PASSWORD_RESET')),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    consumed_at TIMESTAMP WITH TIME ZONE NULL
+);
+
+CREATE INDEX idx_auth_one_time_tokens_user_purpose
+    ON auth_one_time_tokens(user_id, purpose, created_at DESC);
+
+CREATE INDEX idx_auth_one_time_tokens_expires_at
+    ON auth_one_time_tokens(expires_at);
 
 CREATE TABLE IF NOT EXISTS chat_session (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

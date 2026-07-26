@@ -1,0 +1,9 @@
+{{appName}}
+
+Hola {{name}}, gracias por crear tu cuenta.
+
+Confirma tu correo electronico para poder iniciar sesion:
+{{actionUrl}}
+
+El enlace vence en {{expiresInMinutes}} minutos.
+Si no creaste esta cuenta, ignora este correo.

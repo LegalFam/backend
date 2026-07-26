@@ -1,5 +1,6 @@
 package com.legalfam.backend.auth.domain.model;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public class User {
@@ -9,6 +10,8 @@ public class User {
     private String password;
     private String name;
     private String phone;
+    private boolean emailVerified;
+    private Instant emailVerifiedAt;
 
     public static User create(String email, String passwordHash, String name, String phone) {
         User user = new User();
@@ -16,12 +19,23 @@ public class User {
         user.password = passwordHash;
         user.name = name;
         user.phone = phone;
+        user.emailVerified = false;
         return user;
     }
 
-    public static User restore(UUID id, String email, String passwordHash, String name, String phone) {
+    public static User restore(
+            UUID id,
+            String email,
+            String passwordHash,
+            String name,
+            String phone,
+            boolean emailVerified,
+            Instant emailVerifiedAt
+    ) {
         User user = create(email, passwordHash, name, phone);
         user.id = id;
+        user.emailVerified = emailVerified;
+        user.emailVerifiedAt = emailVerifiedAt;
         return user;
     }
 
@@ -31,6 +45,13 @@ public class User {
 
     public void changePassword(String passwordHash) {
         this.password = passwordHash;
+    }
+
+    public void verifyEmail(Instant now) {
+        if (!emailVerified) {
+            this.emailVerified = true;
+            this.emailVerifiedAt = now;
+        }
     }
 
     public UUID getId() {
@@ -47,5 +68,11 @@ public class User {
     }
     public String getPhone() {
         return phone;
+    }
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
     }
 }

@@ -20,7 +20,21 @@ public enum AuthApiError implements ApiErrorDescriptor {
     LOGIN_REQUEST_REQUIRED("validation_error", "login_request_required", 400, "Login request body is required"),
     PROFILE_REQUEST_REQUIRED("validation_error", "profile_request_required", 400, "Profile request body is required"),
     PASSWORD_REQUEST_REQUIRED("validation_error", "password_request_required", 400, "Password request body is required"),
-    CURRENT_PASSWORD_INVALID("validation_error", "current_password_invalid", 400, "Current password is invalid");
+    CURRENT_PASSWORD_INVALID("validation_error", "current_password_invalid", 400, "Current password is invalid"),
+    EMAIL_NOT_VERIFIED("authorization_error", "email_not_verified", 403, "Email is not verified"),
+    EMAIL_ALREADY_VERIFIED("conflict_error", "email_already_verified", 409, "Email is already verified"),
+    TOKEN_REQUIRED("validation_error", "token_required", 400, "Token is required"),
+    VERIFICATION_TOKEN_INVALID("validation_error", "verification_token_invalid", 400,
+            "Verification token is invalid or expired"),
+    RESET_TOKEN_INVALID("validation_error", "reset_token_invalid", 400, "Reset token is invalid or expired"),
+    VERIFY_EMAIL_REQUEST_REQUIRED("validation_error", "verify_email_request_required", 400,
+            "Verify email request body is required"),
+    RESEND_VERIFICATION_REQUEST_REQUIRED("validation_error", "resend_verification_request_required", 400,
+            "Resend verification request body is required"),
+    FORGOT_PASSWORD_REQUEST_REQUIRED("validation_error", "forgot_password_request_required", 400,
+            "Forgot password request body is required"),
+    RESET_PASSWORD_REQUEST_REQUIRED("validation_error", "reset_password_request_required", 400,
+            "Reset password request body is required");
 
     private final String type;
     private final String code;

@@ -82,6 +82,17 @@ RABBITMQ_USER=guest
 RABBITMQ_PASSWORD=guest
 RABBITMQ_VHOST=/
 CHAT_RABBIT_ENABLED=true
+MAIL_HOST=smtp.your-provider.com
+MAIL_PORT=587
+MAIL_USERNAME=your-smtp-user
+MAIL_PASSWORD=your-smtp-password
+MAIL_SMTP_AUTH=true
+MAIL_SMTP_STARTTLS=true
+AUTH_MAIL_ENABLED=false
+AUTH_MAIL_FROM=no-reply@legalfam.pe
+AUTH_MAIL_FROM_NAME=LegalFam
+AUTH_MAIL_REPLY_TO=
+FRONTEND_BASE_URL=http://localhost:5173
 ```
 
 Notes:
@@ -97,6 +108,10 @@ Notes:
 - `POST /api/v1/chat/send` enqueues message processing asynchronously.
 - With `CHAT_RABBIT_ENABLED=true` (default), chat processing uses `Transactional Outbox + RabbitMQ`.
 - With `CHAT_RABBIT_ENABLED=false`, the backend still uses the same transactional outbox, but the relay dispatches locally after commit.
+- For the auth module, SMTP credentials come from env (`MAIL_*`), while non-secret settings (sender, link paths, token TTLs) are bound through typed properties from `src/main/resources/auth/auth.properties`.
+- `AUTH_MAIL_ENABLED=false` skips SMTP entirely and logs the verification / reset link at INFO instead. That is the default for local dev and the test profile, so neither the app nor `./mvnw test` needs a mail server.
+- `FRONTEND_BASE_URL` must be the deployed SPA origin **without** a trailing path, and the SPA must serve `/verificar-correo` and `/restablecer-contrasena` (see `app.frontend.*-path`).
+- Cloud Run blocks outbound port 25. Use 587 (STARTTLS) or 465 against a provider such as Brevo, SendGrid, Mailgun or SES.
 - Database schema is managed manually (not by Flyway).
 - Apply [`database/schema.sql`](database/schema.sql) before using the app outside the test profile.
 
@@ -134,11 +149,28 @@ Open:
 
 ## Authentication Flow
 
-- `POST /api/v1/auth/signup` creates a user and returns tokens.
-- `POST /api/v1/auth/login` validates credentials and returns tokens.
+- `POST /api/v1/auth/signup` creates an **unverified** user and emails a verification link. It returns the user, **not tokens**.
+- `POST /api/v1/auth/verify-email` consumes the emailed token and activates the account (`204`).
+- `POST /api/v1/auth/login` validates credentials and returns tokens. It fails with `403 email_not_verified` while the address is unconfirmed.
 - `POST /api/v1/auth/refresh` rotates refresh token and returns new tokens.
+- `POST /api/v1/auth/forgot-password` emails a reset link; `POST /api/v1/auth/reset-password` sets the new password, marks the email verified and revokes every refresh token of that user. Access tokens are stateless JWTs and cannot be revoked: they expire within `app.jwt.access-token-expiration-ms` (15 min).
+- `POST /api/v1/auth/resend-verification` re-sends the verification link.
 
-Token response format:
+`/forgot-password` and `/resend-verification` always answer `204`, whether the address is registered, already verified or throttled, so they cannot be used to enumerate accounts. A silent 60 s per-user cooldown limits resend abuse.
+
+Signup response format:
+
+```json
+{
+  "id": "6f1c...",
+  "email": "user@example.com",
+  "name": "Juan Perez",
+  "phone": "900000000",
+  "emailVerified": false
+}
+```
+
+Token response format (login / refresh):
 
 ```json
 {
@@ -156,6 +188,10 @@ Token response format:
 - `POST /api/v1/auth/signup`
 - `POST /api/v1/auth/login`
 - `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/verify-email`
+- `POST /api/v1/auth/resend-verification`
+- `POST /api/v1/auth/forgot-password`
+- `POST /api/v1/auth/reset-password`
 - `GET /api/v1/payments/plans`
 - `POST /api/v1/payments/webhook/mercado-pago`
 
@@ -196,6 +232,28 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 curl -X POST http://localhost:8080/api/v1/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{"refreshToken":"<your_refresh_token>"}'
+```
+
+### Verify email
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/verify-email \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<token_from_the_email_link>"}'
+```
+
+### Forgot / reset password
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com"}'
+```
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<token_from_the_email_link>","newPassword":"NuevaPassword123!"}'
 ```
 
 ### Send chat message (protected, async)
@@ -400,6 +458,9 @@ Examples of error codes:
 - `email_already_exists`
 - `invalid_credentials`
 - `invalid_refresh_token`
+- `email_not_verified`
+- `verification_token_invalid`
+- `reset_token_invalid`
 - `unauthorized`
 - `forbidden`
 - `upstream_unavailable`
@@ -418,7 +479,15 @@ Configured in `src/main/resources/application.properties`:
 - Access token: `900000` ms (15 minutes)
 - Refresh token: `604800000` ms (7 days)
 
+Configured in `src/main/resources/auth/auth.properties`:
+
+- Email verification token: `86400000` ms (24 hours)
+- Password reset token: `3600000` ms (1 hour)
+- Resend cooldown: `60000` ms (1 minute)
+
 Refresh token rotation is enabled: each successful refresh revokes the old refresh token and issues a new one.
+
+Verification and reset tokens are 32 random bytes from `SecureRandom`; only their SHA-256 digest is stored. They are single-use, and issuing a new one consumes any outstanding token of the same purpose, so only the newest link ever works.
 
 ## Subscription Plans
 

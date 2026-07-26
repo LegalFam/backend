@@ -5,6 +5,7 @@ import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.infrastructure.persistence.IRefreshTokenRepository;
 import com.legalfam.backend.auth.infrastructure.persistence.mapper.RefreshTokenEntityMapper;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -26,5 +27,10 @@ public class JpaRefreshTokenPersistenceAdapter implements IRefreshTokenPersisten
         return RefreshTokenEntityMapper.toDomain(
                 IRefreshTokenRepository.save(RefreshTokenEntityMapper.toEntity(refreshToken))
         );
+    }
+
+    @Override
+    public void revokeAllForUser(UUID userId) {
+        IRefreshTokenRepository.revokeAllByUserId(userId);
     }
 }

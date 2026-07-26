@@ -3,24 +3,28 @@ package com.legalfam.backend.auth.application.service;
 import com.legalfam.backend.auth.application.port.in.IAuthUseCase;
 import com.legalfam.backend.auth.application.port.out.IAccessTokenPort;
 import com.legalfam.backend.auth.application.port.out.IAuthEventPublisherPort;
+import com.legalfam.backend.auth.application.port.out.IOneTimeTokenPersistencePort;
 import com.legalfam.backend.auth.application.port.out.IRefreshTokenPersistencePort;
 import com.legalfam.backend.auth.application.port.out.IUserPort;
 import com.legalfam.backend.common.identity.event.UserRegisteredEvent;
 import com.legalfam.backend.auth.domain.exception.EmailAlreadyExistsException;
+import com.legalfam.backend.auth.domain.exception.EmailNotVerifiedException;
 import com.legalfam.backend.auth.domain.exception.InvalidAuthRequestException;
 import com.legalfam.backend.auth.domain.exception.InvalidCredentialsException;
 import com.legalfam.backend.auth.domain.exception.InvalidRefreshTokenException;
+import com.legalfam.backend.auth.application.dto.AuthMailDispatch;
 import com.legalfam.backend.auth.application.dto.TokenResponse;
 import com.legalfam.backend.auth.application.dto.UserResponse;
+import com.legalfam.backend.auth.domain.model.OneTimeToken;
+import com.legalfam.backend.auth.domain.model.OneTimeTokenPurpose;
 import com.legalfam.backend.auth.domain.model.RefreshToken;
 import com.legalfam.backend.auth.domain.model.User;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
+import com.legalfam.backend.auth.domain.token.SecureTokenGenerator;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,15 +34,19 @@ public class AuthService implements IAuthUseCase {
 
     private final IUserPort IUserPort;
     private final IRefreshTokenPersistencePort IRefreshTokenPersistencePort;
+    private final IOneTimeTokenPersistencePort IOneTimeTokenPersistencePort;
     private final PasswordEncoder passwordEncoder;
     private final IAccessTokenPort IAccessTokenPort;
     private final IAuthEventPublisherPort IAuthEventPublisherPort;
     private final long refreshTokenExpirationMs;
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final long emailVerificationExpirationMs;
+    private final long passwordResetExpirationMs;
+    private final long mailResendCooldownMs;
 
     public AuthService(
             IUserPort IUserPort,
             IRefreshTokenPersistencePort IRefreshTokenPersistencePort,
+            IOneTimeTokenPersistencePort IOneTimeTokenPersistencePort,
             PasswordEncoder passwordEncoder,
             IAccessTokenPort IAccessTokenPort,
             IAuthEventPublisherPort IAuthEventPublisherPort,
@@ -46,15 +54,19 @@ public class AuthService implements IAuthUseCase {
     ) {
         this.IUserPort = IUserPort;
         this.IRefreshTokenPersistencePort = IRefreshTokenPersistencePort;
+        this.IOneTimeTokenPersistencePort = IOneTimeTokenPersistencePort;
         this.passwordEncoder = passwordEncoder;
         this.IAccessTokenPort = IAccessTokenPort;
         this.IAuthEventPublisherPort = IAuthEventPublisherPort;
         this.refreshTokenExpirationMs = authTokenProperties.refreshTokenExpirationMs();
+        this.emailVerificationExpirationMs = authTokenProperties.emailVerificationExpirationMs();
+        this.passwordResetExpirationMs = authTokenProperties.passwordResetExpirationMs();
+        this.mailResendCooldownMs = authTokenProperties.mailResendCooldownMs();
     }
 
     @Override
     @Transactional
-    public TokenResponse signup(String email, String rawPassword, String name, String phone) {
+    public UserResponse signup(String email, String rawPassword, String name, String phone) {
         if (IUserPort.existsByEmail(email)) {
             throw EmailAlreadyExistsException.forEmail(email);
         }
@@ -63,7 +75,7 @@ public class AuthService implements IAuthUseCase {
 
         User savedUser = IUserPort.save(user);
         IAuthEventPublisherPort.publishUserRegistered(new UserRegisteredEvent(savedUser.getId()));
-        return issueTokens(savedUser);
+        return toUserResponse(savedUser);
     }
 
     @Override
@@ -77,13 +89,18 @@ public class AuthService implements IAuthUseCase {
             throw InvalidCredentialsException.invalidCredentials();
         }
 
+        // Checked after the password so verification state is never disclosed without valid credentials.
+        if (!user.isEmailVerified()) {
+            throw EmailNotVerifiedException.forLogin();
+        }
+
         return issueTokens(user);
     }
 
     @Override
     @Transactional
     public TokenResponse refresh(String refreshTokenValue) {
-        String tokenHash = hashRefreshToken(refreshTokenValue);
+        String tokenHash = SecureTokenGenerator.hash(refreshTokenValue);
         RefreshToken refreshToken = IRefreshTokenPersistencePort
                 .findByToken(tokenHash)
                 .orElseThrow(InvalidRefreshTokenException::invalidRefreshToken);
@@ -127,12 +144,140 @@ public class AuthService implements IAuthUseCase {
         IUserPort.save(user);
     }
 
+    @Override
+    @Transactional
+    public Optional<AuthMailDispatch> issueEmailVerificationToken(UUID userId) {
+        return IUserPort.findById(userId).flatMap(this::issueEmailVerificationToken);
+    }
+
+    @Override
+    @Transactional
+    public Optional<AuthMailDispatch> issueEmailVerificationToken(String email) {
+        return IUserPort.findByEmail(email).flatMap(this::issueEmailVerificationToken);
+    }
+
+    @Override
+    @Transactional
+    public Optional<AuthMailDispatch> issuePasswordResetToken(String email) {
+        // An unknown email is not an error: the endpoint must not reveal who is registered.
+        Optional<User> user = IUserPort.findByEmail(email);
+        if (user.isEmpty()) {
+            return Optional.empty();
+        }
+        return issueToken(user.get(), OneTimeTokenPurpose.PASSWORD_RESET, passwordResetExpirationMs);
+    }
+
+    @Override
+    @Transactional
+    public void confirmEmailVerification(String rawToken) {
+        Instant now = Instant.now();
+        OneTimeToken token = consumeToken(
+                rawToken,
+                OneTimeTokenPurpose.EMAIL_VERIFICATION,
+                now,
+                InvalidAuthRequestException::verificationTokenInvalid
+        );
+
+        User user = IUserPort.findById(token.getUserId())
+                .orElseThrow(InvalidAuthRequestException::verificationTokenInvalid);
+        user.verifyEmail(now);
+        IUserPort.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String rawToken, String newRawPassword) {
+        Instant now = Instant.now();
+        OneTimeToken token = consumeToken(
+                rawToken,
+                OneTimeTokenPurpose.PASSWORD_RESET,
+                now,
+                InvalidAuthRequestException::resetTokenInvalid
+        );
+
+        User user = IUserPort.findById(token.getUserId())
+                .orElseThrow(InvalidAuthRequestException::resetTokenInvalid);
+        user.changePassword(passwordEncoder.encode(newRawPassword));
+        // Opening the emailed link proves ownership of the address.
+        user.verifyEmail(now);
+        IUserPort.save(user);
+
+        IOneTimeTokenPersistencePort.consumeAllFor(user.getId(), OneTimeTokenPurpose.PASSWORD_RESET, now);
+        IOneTimeTokenPersistencePort.consumeAllFor(user.getId(), OneTimeTokenPurpose.EMAIL_VERIFICATION, now);
+        IRefreshTokenPersistencePort.revokeAllForUser(user.getId());
+    }
+
+    private Optional<AuthMailDispatch> issueEmailVerificationToken(User user) {
+        if (user.isEmailVerified()) {
+            return Optional.empty();
+        }
+        return issueToken(user, OneTimeTokenPurpose.EMAIL_VERIFICATION, emailVerificationExpirationMs);
+    }
+
+    private Optional<AuthMailDispatch> issueToken(User user, OneTimeTokenPurpose purpose, long expirationMs) {
+        Instant now = Instant.now();
+
+        if (isWithinResendCooldown(user.getId(), purpose, now)) {
+            return Optional.empty();
+        }
+
+        // Only the newest link may work.
+        IOneTimeTokenPersistencePort.consumeAllFor(user.getId(), purpose, now);
+
+        String rawToken = SecureTokenGenerator.generateRawToken(SecureTokenGenerator.ONE_TIME_TOKEN_BYTES);
+        IOneTimeTokenPersistencePort.save(OneTimeToken.issue(
+                SecureTokenGenerator.hash(rawToken),
+                purpose,
+                user.getId(),
+                now,
+                now.plusMillis(expirationMs)
+        ));
+
+        return Optional.of(new AuthMailDispatch(
+                user.getEmail(),
+                user.getName(),
+                rawToken,
+                Duration.ofMillis(expirationMs).toMinutes()
+        ));
+    }
+
+    private boolean isWithinResendCooldown(UUID userId, OneTimeTokenPurpose purpose, Instant now) {
+        return IOneTimeTokenPersistencePort.findLatestIssuedAt(userId, purpose)
+                .map(issuedAt -> issuedAt.plusMillis(mailResendCooldownMs).isAfter(now))
+                .orElse(false);
+    }
+
+    private OneTimeToken consumeToken(
+            String rawToken,
+            OneTimeTokenPurpose purpose,
+            Instant now,
+            Supplier<RuntimeException> invalid
+    ) {
+        OneTimeToken token = IOneTimeTokenPersistencePort
+                .findByHashAndPurpose(SecureTokenGenerator.hash(rawToken), purpose)
+                .orElseThrow(invalid);
+
+        if (!token.isUsableAt(now)) {
+            throw invalid.get();
+        }
+
+        token.consume(now);
+        IOneTimeTokenPersistencePort.save(token);
+        return token;
+    }
+
     private User requireUser(UUID userId) {
         return IUserPort.findById(userId).orElseThrow(InvalidCredentialsException::invalidCredentials);
     }
 
     private UserResponse toUserResponse(User user) {
-        return new UserResponse(user.getId(), user.getEmail(), user.getName(), user.getPhone());
+        return new UserResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getName(),
+                user.getPhone(),
+                user.isEmailVerified()
+        );
     }
 
     private TokenResponse issueTokens(User user) {
@@ -148,28 +293,15 @@ public class AuthService implements IAuthUseCase {
     }
 
     private String createRefreshToken(User user) {
-        byte[] randomBytes = new byte[64];
-        secureRandom.nextBytes(randomBytes);
-        String tokenValue = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-        String tokenHash = hashRefreshToken(tokenValue);
+        String tokenValue = SecureTokenGenerator.generateRawToken(SecureTokenGenerator.REFRESH_TOKEN_BYTES);
 
         RefreshToken refreshToken = RefreshToken.issue(
-                tokenHash,
+                SecureTokenGenerator.hash(tokenValue),
                 user.getId(),
                 Instant.now().plusMillis(refreshTokenExpirationMs)
         );
 
         IRefreshTokenPersistencePort.save(refreshToken);
         return tokenValue;
-    }
-
-    private String hashRefreshToken(String rawToken) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 algorithm is unavailable", ex);
-        }
     }
 }
