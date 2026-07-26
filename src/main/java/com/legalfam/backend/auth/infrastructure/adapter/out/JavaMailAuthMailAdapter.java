@@ -31,7 +31,7 @@ public class JavaMailAuthMailAdapter implements IAuthMailPort {
     private static final Logger log = LoggerFactory.getLogger(JavaMailAuthMailAdapter.class);
 
     private static final String VERIFY_SUBJECT = "Confirma tu correo";
-    private static final String RESET_SUBJECT = "Restablece tu contrasena";
+    private static final String RESET_SUBJECT = "Restablece tu contraseña";
 
     private final JavaMailSender mailSender;
     private final AuthMailProperties authMailProperties;

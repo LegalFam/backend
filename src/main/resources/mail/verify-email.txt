@@ -2,7 +2,7 @@
 
 Hola {{name}}, gracias por crear tu cuenta.
 
-Confirma tu correo electronico para poder iniciar sesion:
+Confirma tu correo electrónico para poder iniciar sesión:
 {{actionUrl}}
 
 El enlace vence en {{expiresInMinutes}} minutos.
