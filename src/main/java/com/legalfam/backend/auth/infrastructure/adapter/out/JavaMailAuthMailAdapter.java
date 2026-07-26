@@ -14,10 +14,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+/**
+ * Sends synchronously on purpose. Cloud Run only allocates CPU while a request is being processed,
+ * so an @Async send is frozen the moment the response is returned: the SMTP socket opens, the thread
+ * stalls, the server drops the connection, and the send dies with "Can't send command to SMTP host".
+ * Running inside the request costs a second or two of latency and makes delivery reliable.
+ * The send still cannot break signup: it runs after the transaction commits and failures are logged.
+ */
 @Component
 @ConditionalOnProperty(prefix = "app.auth.mail", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class JavaMailAuthMailAdapter implements IAuthMailPort {
@@ -42,7 +48,6 @@ public class JavaMailAuthMailAdapter implements IAuthMailPort {
     }
 
     @Override
-    @Async("authMailTaskExecutor")
     public void sendEmailVerification(
             String toEmail,
             String recipientName,
@@ -53,7 +58,6 @@ public class JavaMailAuthMailAdapter implements IAuthMailPort {
     }
 
     @Override
-    @Async("authMailTaskExecutor")
     public void sendPasswordReset(String toEmail, String recipientName, String resetUrl, long expiresInMinutes) {
         send(toEmail, recipientName, resetUrl, expiresInMinutes, RESET_SUBJECT, "reset-password");
     }
@@ -73,7 +77,8 @@ public class JavaMailAuthMailAdapter implements IAuthMailPort {
                 "appName", authMailProperties.fromName()
         );
 
-        // @Async void swallows exceptions, so failures are logged here. The token never reaches the log.
+        // Never propagate: the account already exists and the user can request a new link.
+        // The token never reaches the log.
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
