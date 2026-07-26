@@ -47,6 +47,8 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -573,6 +575,37 @@ class AuthServiceTest {
 
         verify(IUserPort, never()).save(any(User.class));
         verify(IRefreshTokenPersistencePort, never()).revokeAllForUser(any(UUID.class));
+    }
+
+    /*
+     * These three run from an AFTER_COMMIT listener, where the synchronization of the committed
+     * signup transaction is still bound to the thread. With the default REQUIRED propagation they
+     * join that dead transaction and every write fails with "No active transaction". No other test
+     * can catch a regression here because the whole suite mocks the persistence ports.
+     */
+    @Test
+    void tokenIssuingMethodsRunInTheirOwnTransaction() throws NoSuchMethodException {
+        assertEquals(
+                Propagation.REQUIRES_NEW,
+                propagationOf("issueEmailVerificationToken", UUID.class)
+        );
+        assertEquals(
+                Propagation.REQUIRES_NEW,
+                propagationOf("issueEmailVerificationToken", String.class)
+        );
+        assertEquals(
+                Propagation.REQUIRES_NEW,
+                propagationOf("issuePasswordResetToken", String.class)
+        );
+    }
+
+    private static Propagation propagationOf(String methodName, Class<?> parameterType)
+            throws NoSuchMethodException {
+        Transactional transactional = AuthService.class
+                .getMethod(methodName, parameterType)
+                .getAnnotation(Transactional.class);
+        assertNotNull(transactional, methodName + " must be transactional");
+        return transactional.propagation();
     }
 
     private static User verifiedUser(UUID id, String email, String passwordHash) {

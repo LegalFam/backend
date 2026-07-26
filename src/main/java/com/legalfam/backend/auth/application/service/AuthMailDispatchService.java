@@ -10,9 +10,11 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
- * Deliberately not transactional. It calls through the {@link IAuthUseCase} proxy so the
- * token row is committed before the mail port is invoked; otherwise the async send could
- * deliver a link the user clicks before the token is visible to other transactions.
+ * Deliberately not transactional. It calls through the {@link IAuthUseCase} proxy, whose token-issuing
+ * methods are REQUIRES_NEW, so the token row is committed before the mail port is invoked; otherwise
+ * the async send could deliver a link the user clicks before the token is visible to other
+ * transactions. The propagation matters: this is also reached from an AFTER_COMMIT listener, where a
+ * REQUIRED method would join the already-committed transaction and fail on the first write.
  */
 @Service
 public class AuthMailDispatchService implements IAuthMailDispatchUseCase {

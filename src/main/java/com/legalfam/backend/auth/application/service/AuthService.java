@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -144,20 +145,27 @@ public class AuthService implements IAuthUseCase {
         IUserPort.save(user);
     }
 
+    /*
+     * REQUIRES_NEW, not the default REQUIRED: these run from an AFTER_COMMIT listener, where the
+     * synchronization of the just-committed signup transaction is still bound to the thread.
+     * REQUIRED would join that dead transaction and every write would fail with
+     * "No active transaction". REQUIRES_NEW also guarantees the token row is committed before the
+     * dispatcher hands the raw token to the (async) mail port.
+     */
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<AuthMailDispatch> issueEmailVerificationToken(UUID userId) {
         return IUserPort.findById(userId).flatMap(this::issueEmailVerificationToken);
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<AuthMailDispatch> issueEmailVerificationToken(String email) {
         return IUserPort.findByEmail(email).flatMap(this::issueEmailVerificationToken);
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Optional<AuthMailDispatch> issuePasswordResetToken(String email) {
         // An unknown email is not an error: the endpoint must not reveal who is registered.
         Optional<User> user = IUserPort.findByEmail(email);
