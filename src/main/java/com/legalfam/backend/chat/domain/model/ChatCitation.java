@@ -9,6 +9,9 @@ public class ChatCitation {
     private String sourceTitle;
     private String sourceSnippet;
     private String sourceUrl;
+    private String sourceLocator;
+    private String sourceBreadcrumb;
+    private String sourceLocatorKind;
 
     private ChatCitation() {}
 
@@ -16,13 +19,19 @@ public class ChatCitation {
             UUID chatMessageId,
             String sourceTitle,
             String sourceSnippet,
-            String sourceUrl
+            String sourceUrl,
+            String sourceLocator,
+            String sourceBreadcrumb,
+            String sourceLocatorKind
     ) {
         ChatCitation citation = new ChatCitation();
         citation.chatMessageId = chatMessageId;
         citation.sourceTitle = sourceTitle;
         citation.sourceSnippet = sourceSnippet;
         citation.sourceUrl = sourceUrl;
+        citation.sourceLocator = sourceLocator;
+        citation.sourceBreadcrumb = sourceBreadcrumb;
+        citation.sourceLocatorKind = sourceLocatorKind;
         return citation;
     }
 
@@ -31,9 +40,20 @@ public class ChatCitation {
             UUID chatMessageId,
             String sourceTitle,
             String sourceSnippet,
-            String sourceUrl
+            String sourceUrl,
+            String sourceLocator,
+            String sourceBreadcrumb,
+            String sourceLocatorKind
     ) {
-        ChatCitation citation = create(chatMessageId, sourceTitle, sourceSnippet, sourceUrl);
+        ChatCitation citation = create(
+                chatMessageId,
+                sourceTitle,
+                sourceSnippet,
+                sourceUrl,
+                sourceLocator,
+                sourceBreadcrumb,
+                sourceLocatorKind
+        );
         citation.id = id;
         return citation;
     }
@@ -56,5 +76,17 @@ public class ChatCitation {
 
     public String getSourceUrl() {
         return sourceUrl;
+    }
+
+    public String getSourceLocator() {
+        return sourceLocator;
+    }
+
+    public String getSourceBreadcrumb() {
+        return sourceBreadcrumb;
+    }
+
+    public String getSourceLocatorKind() {
+        return sourceLocatorKind;
     }
 }

@@ -28,6 +28,15 @@ public class ChatCitationEntity {
     @Column(name = "source_url", nullable = false, columnDefinition = "TEXT")
     private String sourceUrl;
 
+    @Column(name = "source_locator", columnDefinition = "TEXT")
+    private String sourceLocator;
+
+    @Column(name = "source_breadcrumb", columnDefinition = "TEXT")
+    private String sourceBreadcrumb;
+
+    @Column(name = "source_locator_kind", length = 32)
+    private String sourceLocatorKind;
+
     public UUID getId() {
         return id;
     }
@@ -66,5 +75,29 @@ public class ChatCitationEntity {
 
     public void setSourceUrl(String sourceUrl) {
         this.sourceUrl = sourceUrl;
+    }
+
+    public String getSourceLocator() {
+        return sourceLocator;
+    }
+
+    public void setSourceLocator(String sourceLocator) {
+        this.sourceLocator = sourceLocator;
+    }
+
+    public String getSourceBreadcrumb() {
+        return sourceBreadcrumb;
+    }
+
+    public void setSourceBreadcrumb(String sourceBreadcrumb) {
+        this.sourceBreadcrumb = sourceBreadcrumb;
+    }
+
+    public String getSourceLocatorKind() {
+        return sourceLocatorKind;
+    }
+
+    public void setSourceLocatorKind(String sourceLocatorKind) {
+        this.sourceLocatorKind = sourceLocatorKind;
     }
 }

@@ -300,6 +300,9 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         String sourceTitle = readText(citationNode, "file_name");
         String sourceSnippet = readText(citationNode, "snippet");
         String sourceUrl = readText(citationNode, "file_url");
+        String sourceLocator = readText(citationNode, "locator");
+        String sourceBreadcrumb = readText(citationNode, "breadcrumb");
+        String sourceLocatorKind = readText(citationNode, "locator_source");
 
         if ((sourceTitle == null || sourceTitle.isBlank())
                 && (sourceSnippet == null || sourceSnippet.isBlank())
@@ -309,7 +312,14 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         if (sourceUrl == null || sourceUrl.isBlank()) {
             return null;
         }
-        return new ChatCitationResponse(sourceTitle, sourceSnippet, sourceUrl);
+        return new ChatCitationResponse(
+                sourceTitle,
+                sourceSnippet,
+                sourceUrl,
+                sourceLocator,
+                sourceBreadcrumb,
+                sourceLocatorKind
+        );
     }
 
     private ChatUpstreamException buildStatusException(int statusCode, String responseBody) {

@@ -113,7 +113,12 @@ CREATE TABLE IF NOT EXISTS citations (
     chat_message_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
     source_title TEXT NOT NULL,
     source_snippet TEXT NOT NULL,
-    source_url TEXT NOT NULL
+    source_url TEXT NOT NULL,
+    source_locator TEXT NULL,
+    source_breadcrumb TEXT NULL,
+    source_locator_kind VARCHAR(32) NULL,
+    CONSTRAINT citations_source_locator_kind_check CHECK (source_locator_kind IS NULL OR source_locator_kind IN
+        ('exact', 'prefix', 'fuzzy', 'markdown_heading', 'snippet_regex'))
 );
 
 CREATE INDEX idx_citations_chat_message_id

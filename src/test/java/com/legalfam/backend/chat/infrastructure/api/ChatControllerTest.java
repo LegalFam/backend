@@ -238,7 +238,7 @@ class ChatControllerTest {
                         "util",
                         Instant.parse("2026-01-01T00:00:01Z"),
                         Instant.parse("2026-01-01T00:00:00Z"),
-                        List.of(new ChatCitationResponse("Ley", "Texto", "https://example.com/ley")),
+                        List.of(new ChatCitationResponse("Ley", "Texto", "https://example.com/ley", "Art. 333", "Libro III > Art. 333", "exact")),
                         "LOW",
                         "Faltan datos generales.",
                         List.of("Reune constancias disponibles."),

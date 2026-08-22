@@ -58,7 +58,7 @@ class ChatQueuedMessageServiceTest {
                 "GOOD",
                 3
         );
-        List<ChatCitationResponse> citations = List.of(new ChatCitationResponse("source", "snippet", "https://example.test"));
+        List<ChatCitationResponse> citations = List.of(new ChatCitationResponse("source", "snippet", "https://example.test", null, null, null));
         ChatAssistantGatewayResponse response = new ChatAssistantGatewayResponse("respuesta", citations, metadata);
 
         when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);

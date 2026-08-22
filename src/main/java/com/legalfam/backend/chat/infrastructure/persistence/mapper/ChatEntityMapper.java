@@ -149,7 +149,10 @@ public final class ChatEntityMapper {
                 entity.getChatMessageId(),
                 entity.getSourceTitle(),
                 entity.getSourceSnippet(),
-                entity.getSourceUrl()
+                entity.getSourceUrl(),
+                entity.getSourceLocator(),
+                entity.getSourceBreadcrumb(),
+                entity.getSourceLocatorKind()
         );
     }
 
@@ -160,6 +163,9 @@ public final class ChatEntityMapper {
         entity.setSourceTitle(domain.getSourceTitle());
         entity.setSourceSnippet(domain.getSourceSnippet());
         entity.setSourceUrl(domain.getSourceUrl());
+        entity.setSourceLocator(domain.getSourceLocator());
+        entity.setSourceBreadcrumb(domain.getSourceBreadcrumb());
+        entity.setSourceLocatorKind(domain.getSourceLocatorKind());
         return entity;
     }
 
