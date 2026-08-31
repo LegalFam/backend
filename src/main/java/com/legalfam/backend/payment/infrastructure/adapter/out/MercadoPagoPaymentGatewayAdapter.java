@@ -24,6 +24,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
@@ -36,6 +38,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
 
+    private static final Logger log = LoggerFactory.getLogger(MercadoPagoPaymentGatewayAdapter.class);
     private static final int TIMEOUT_MS = 15000;
 
     private final ObjectMapper objectMapper;
@@ -222,6 +225,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
             }
             return readTree(response.getBody());
         } catch (HttpStatusCodeException ex) {
+            log.warn("Mercado Pago {} {} -> {} {}", method, path, ex.getStatusCode(), ex.getResponseBodyAsString());
             throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_UNAVAILABLE, ex);
         } catch (ResourceAccessException ex) {
             throw PaymentGatewayException.of(PaymentApiError.PAYMENT_GATEWAY_UNAVAILABLE, ex);
