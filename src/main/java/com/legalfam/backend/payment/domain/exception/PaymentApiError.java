@@ -29,6 +29,7 @@ public enum PaymentApiError implements ApiErrorDescriptor {
     WEBHOOK_SIGNATURE_INVALID("payment_error", "webhook_signature_invalid", 400, "Webhook signature is invalid"),
     WEBHOOK_SIGNATURE_REQUIRED("payment_error", "webhook_signature_required", 400, "Webhook signature is required"),
     WEBHOOK_SIGNATURE_UNVERIFIABLE("payment_error", "webhook_signature_unverifiable", 400, "Webhook signature cannot be verified"),
+    WEBHOOK_SECRET_NOT_CONFIGURED("payment_error", "webhook_secret_not_configured", 503, "Webhook signing secret is not configured"),
     PAYMENT_GATEWAY_UNAVAILABLE("payment_error", "payment_gateway_unavailable", 503, "Payment gateway is unavailable"),
     PAYMENT_GATEWAY_EMPTY_RESPONSE("payment_error", "payment_gateway_empty_response", 503, "Payment gateway returned an empty response"),
     PAYMENT_GATEWAY_MISCONFIGURED("payment_error", "payment_gateway_misconfigured", 503, "Payment gateway is misconfigured"),

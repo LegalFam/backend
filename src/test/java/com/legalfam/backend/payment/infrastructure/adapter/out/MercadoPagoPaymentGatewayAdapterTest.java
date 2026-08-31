@@ -30,4 +30,25 @@ class MercadoPagoPaymentGatewayAdapterTest {
                 "evt_123"
         ));
     }
+
+    @Test
+    void parseVerifiedWebhookRejectsPayloadWhenSecretIsNotConfigured() {
+        MercadoPagoPaymentGatewayAdapter adapter = new MercadoPagoPaymentGatewayAdapter(
+                mock(ObjectMapper.class),
+                new MercadoPagoProperties(
+                        "access-token",
+                        "https://api.mercadopago.com",
+                        "   ",
+                        "http://localhost:3000/billing/success",
+                        "http://localhost:3000/billing/cancel"
+                )
+        );
+
+        assertThrows(PaymentWebhookException.class, () -> adapter.parseVerifiedWebhook(
+                "{\"id\":\"evt_123\"}",
+                "ts=1,v1=deadbeef",
+                "request-123",
+                "evt_123"
+        ));
+    }
 }

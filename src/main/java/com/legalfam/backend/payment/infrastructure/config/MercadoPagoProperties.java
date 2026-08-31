@@ -30,4 +30,18 @@ public record MercadoPagoProperties(
     public String normalizedWebhookSecret() {
         return webhookSecret == null ? "" : webhookSecret.trim();
     }
+
+    public String normalizedCheckoutSuccessUrl() {
+        return normalizeCheckoutUrl(checkoutSuccessUrl);
+    }
+
+    public String normalizedCheckoutCancelUrl() {
+        return normalizeCheckoutUrl(checkoutCancelUrl);
+    }
+
+    // La base del frontend puede venir con "/" final (FRONTEND_BASE_URL), lo que
+    // produce "//" al concatenar el path del checkout.
+    private static String normalizeCheckoutUrl(String url) {
+        return url == null ? null : url.trim().replaceAll("(?<!:)//+", "/");
+    }
 }

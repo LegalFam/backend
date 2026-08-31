@@ -10,8 +10,8 @@ public class PaymentConfig {
     @Bean
     public PaymentCheckoutProperties paymentCheckoutProperties(MercadoPagoProperties mercadoPagoProperties) {
         return new PaymentCheckoutProperties(
-                mercadoPagoProperties.checkoutSuccessUrl(),
-                mercadoPagoProperties.checkoutCancelUrl()
+                mercadoPagoProperties.normalizedCheckoutSuccessUrl(),
+                mercadoPagoProperties.normalizedCheckoutCancelUrl()
         );
     }
 }

@@ -155,5 +155,6 @@ jobs:
             --set-secrets JWT_SECRET="backend-jwt-secret:latest" \
             --set-secrets N8N_AUTH_TOKEN="backend-n8n-auth-token:latest" \
             --set-secrets MERCADO_PAGO_ACCESS_TOKEN="backend-mercado-pago-access-token:latest" \
+            --set-secrets MERCADO_PAGO_WEBHOOK_SECRET="backend-mercado-pago-webhook-secret:latest" \
             --set-secrets RABBITMQ_PASSWORD="backend-rabbitmq-password:latest" \
             --set-secrets MAIL_PASSWORD="backend-mail-password:latest"

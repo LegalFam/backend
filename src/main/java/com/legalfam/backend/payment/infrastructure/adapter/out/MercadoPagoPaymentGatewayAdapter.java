@@ -337,7 +337,7 @@ public class MercadoPagoPaymentGatewayAdapter implements IPaymentGatewayPort {
 
     private void verifyWebhookSignature(String signatureHeader, String requestId, String dataId) {
         if (webhookSecret.isBlank()) {
-            return;
+            throw PaymentWebhookException.of(PaymentApiError.WEBHOOK_SECRET_NOT_CONFIGURED);
         }
         SignatureParts signatureParts = parseSignature(signatureHeader);
         if (requestId == null || requestId.isBlank()) {
