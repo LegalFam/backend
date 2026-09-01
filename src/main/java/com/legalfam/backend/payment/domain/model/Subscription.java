@@ -187,7 +187,8 @@ public class Subscription {
     public boolean hasActiveGatewaySubscription() {
         return hasGatewaySubscription()
                 && status != SubscriptionStatus.CANCELED
-                && status != SubscriptionStatus.EXPIRED;
+                && status != SubscriptionStatus.EXPIRED
+                && !cancelAtPeriodEnd;
     }
 
     public boolean hasGatewaySubscription() {

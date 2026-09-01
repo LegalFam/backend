@@ -1,5 +1,6 @@
 package com.legalfam.backend.payment.domain.model;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -167,5 +168,28 @@ class SubscriptionTest {
                 InvalidPaymentRequestException.class,
                 () -> subscription.assertCheckoutAllowedFor(SubscriptionPlanCode.PREMIUM)
         );
+    }
+
+    @Test
+    void assertCheckoutAllowedAllowsChangingPlanWhenCancellationIsAlreadyScheduled() {
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        Subscription subscription = Subscription.restore(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                SubscriptionPlanCode.BASIC,
+                SubscriptionStatus.ACTIVE,
+                PaymentProvider.MERCADO_PAGO,
+                "customer",
+                "subscription",
+                now,
+                Instant.parse("2026-02-01T00:00:00Z"),
+                true,
+                500,
+                500,
+                now,
+                now
+        );
+
+        assertDoesNotThrow(() -> subscription.assertCheckoutAllowedFor(SubscriptionPlanCode.PREMIUM));
     }
 }
