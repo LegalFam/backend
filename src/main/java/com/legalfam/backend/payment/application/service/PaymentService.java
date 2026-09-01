@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentService
         implements IPaymentUseCase, IPaymentProvisioningUseCase, IPaymentTokenUseCase, IPaymentEntitlementsUseCase {
 
+    private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
     private static final String BILLING_INTERVAL = "month";
 
     private final IPaymentPersistencePort IPaymentPersistencePort;
@@ -153,6 +156,10 @@ public class PaymentService
                 requestId,
                 dataId
         );
+        log.info(
+                "Webhook verified: eventId={} eventType={} subscriptionId={} status={}",
+                notification.eventId(), notification.eventType(), notification.subscriptionId(), notification.status()
+        );
         if (notification.eventId() != null
                 && !notification.eventId().isBlank()
                 && !IPaymentPersistencePort.tryRecordProcessedWebhookEvent(
@@ -160,6 +167,7 @@ public class PaymentService
                         notification.eventType(),
                         now()
                 )) {
+            log.info("Webhook eventId={} already processed, skipping", notification.eventId());
             return;
         }
 
@@ -169,6 +177,7 @@ public class PaymentService
             } else {
                 syncSubscription(notification, notification.resetPeriod());
             }
+            log.info("Webhook eventId={} applied to subscriptionId={}", notification.eventId(), notification.subscriptionId());
         }
 
     }
