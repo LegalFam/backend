@@ -298,10 +298,13 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         }
 
         String sourceTitle = readText(citationNode, "file_name");
-        String sourceSnippet = readText(citationNode, "snippet");
+        // El resumen que redacta el agente XAI, que es lo que lee el usuario.
+        String sourceSnippet = readText(citationNode, "summary_snippet");
         // El pasaje literal que el agente XAI declaro haber usado. Es opcional: una cita
         // sin el sigue siendo valida, solo pierde el contraste con el resumen.
         String sourceOriginalSnippet = readText(citationNode, "original_snippet");
+        // La URL es opcional: no todo documento del corpus tiene fuente publica, y una
+        // cita sin enlace sigue siendo util. Descartarla dejaba la respuesta sin fuentes.
         String sourceUrl = readText(citationNode, "file_url");
         String sourceLocator = readText(citationNode, "locator");
         String sourceBreadcrumb = readText(citationNode, "breadcrumb");
@@ -310,9 +313,6 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         if ((sourceTitle == null || sourceTitle.isBlank())
                 && (sourceSnippet == null || sourceSnippet.isBlank())
                 && (sourceUrl == null || sourceUrl.isBlank())) {
-            return null;
-        }
-        if (sourceUrl == null || sourceUrl.isBlank()) {
             return null;
         }
         return new ChatCitationResponse(

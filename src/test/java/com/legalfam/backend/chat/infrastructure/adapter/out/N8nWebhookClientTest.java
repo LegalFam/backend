@@ -92,13 +92,12 @@ class N8nWebhookClientTest {
                   "citations": [
                     {
                       "file_name": "Codigo Civil",
-                      "snippet": "Articulo relevante",
+                      "summary_snippet": "Articulo relevante",
                       "original_snippet": "El demandante goza de Auxilio Judicial",
                       "file_url": "https://example.com/codigo"
                     },
                     {
-                      "file_name": "Sin URL",
-                      "snippet": "Debe omitirse"
+                      "locator": "Art. 562"
                     }
                   ]
                 }
@@ -116,6 +115,28 @@ class N8nWebhookClientTest {
     }
 
     @Test
+    void mapResponseKeepsCitationsWithoutSourceUrl() throws Exception {
+        // No todo documento del corpus tiene fuente publica. Descartar la cita por eso
+        // dejaba la respuesta entera sin fuentes, que es peor que una cita sin enlace.
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "citations": [
+                    {
+                      "summary_snippet": "Exoneracion de tasas judiciales",
+                      "original_snippet": "El demandante se encuentra exonerado",
+                      "locator": "Art. 562"
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals(1, response.citations().size());
+        assertNull(response.citations().getFirst().sourceUrl());
+        assertEquals("Art. 562", response.citations().getFirst().sourceLocator());
+    }
+
+    @Test
     void mapResponseKeepsCitationsWithoutOriginalSnippet() throws Exception {
         // Una cita sin pasaje literal sigue siendo valida: pierde el contraste con el
         // resumen, no la fuente.
@@ -125,7 +146,7 @@ class N8nWebhookClientTest {
                   "citations": [
                     {
                       "file_name": "Codigo Civil",
-                      "snippet": "Articulo relevante",
+                      "summary_snippet": "Articulo relevante",
                       "file_url": "https://example.com/codigo"
                     }
                   ]
