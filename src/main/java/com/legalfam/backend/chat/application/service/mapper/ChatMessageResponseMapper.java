@@ -47,6 +47,7 @@ public class ChatMessageResponseMapper {
                 .map(citation -> new ChatCitationResponse(
                         citation.getSourceTitle(),
                         citation.getSourceSnippet(),
+                        citation.getSourceOriginalSnippet(),
                         citation.getSourceUrl(),
                         citation.getSourceLocator(),
                         citation.getSourceBreadcrumb(),

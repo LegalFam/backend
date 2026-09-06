@@ -8,6 +8,7 @@ public class ChatCitation {
     private UUID chatMessageId;
     private String sourceTitle;
     private String sourceSnippet;
+    private String sourceOriginalSnippet;
     private String sourceUrl;
     private String sourceLocator;
     private String sourceBreadcrumb;
@@ -19,6 +20,7 @@ public class ChatCitation {
             UUID chatMessageId,
             String sourceTitle,
             String sourceSnippet,
+            String sourceOriginalSnippet,
             String sourceUrl,
             String sourceLocator,
             String sourceBreadcrumb,
@@ -28,6 +30,7 @@ public class ChatCitation {
         citation.chatMessageId = chatMessageId;
         citation.sourceTitle = sourceTitle;
         citation.sourceSnippet = sourceSnippet;
+        citation.sourceOriginalSnippet = sourceOriginalSnippet;
         citation.sourceUrl = sourceUrl;
         citation.sourceLocator = sourceLocator;
         citation.sourceBreadcrumb = sourceBreadcrumb;
@@ -40,6 +43,7 @@ public class ChatCitation {
             UUID chatMessageId,
             String sourceTitle,
             String sourceSnippet,
+            String sourceOriginalSnippet,
             String sourceUrl,
             String sourceLocator,
             String sourceBreadcrumb,
@@ -49,6 +53,7 @@ public class ChatCitation {
                 chatMessageId,
                 sourceTitle,
                 sourceSnippet,
+                sourceOriginalSnippet,
                 sourceUrl,
                 sourceLocator,
                 sourceBreadcrumb,
@@ -72,6 +77,10 @@ public class ChatCitation {
 
     public String getSourceSnippet() {
         return sourceSnippet;
+    }
+
+    public String getSourceOriginalSnippet() {
+        return sourceOriginalSnippet;
     }
 
     public String getSourceUrl() {

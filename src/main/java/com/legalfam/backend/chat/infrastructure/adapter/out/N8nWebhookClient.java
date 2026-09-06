@@ -299,6 +299,9 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
 
         String sourceTitle = readText(citationNode, "file_name");
         String sourceSnippet = readText(citationNode, "snippet");
+        // El pasaje literal que el agente XAI declaro haber usado. Es opcional: una cita
+        // sin el sigue siendo valida, solo pierde el contraste con el resumen.
+        String sourceOriginalSnippet = readText(citationNode, "original_snippet");
         String sourceUrl = readText(citationNode, "file_url");
         String sourceLocator = readText(citationNode, "locator");
         String sourceBreadcrumb = readText(citationNode, "breadcrumb");
@@ -315,6 +318,7 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         return new ChatCitationResponse(
                 sourceTitle,
                 sourceSnippet,
+                sourceOriginalSnippet,
                 sourceUrl,
                 sourceLocator,
                 sourceBreadcrumb,

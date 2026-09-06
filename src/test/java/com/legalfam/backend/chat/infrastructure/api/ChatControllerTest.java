@@ -238,7 +238,7 @@ class ChatControllerTest {
                         "util",
                         Instant.parse("2026-01-01T00:00:01Z"),
                         Instant.parse("2026-01-01T00:00:00Z"),
-                        List.of(new ChatCitationResponse("Ley", "Texto", "https://example.com/ley", "Art. 333", "Libro III > Art. 333", "exact")),
+                        List.of(new ChatCitationResponse("Ley", "Texto", "Pasaje literal de la ley", "https://example.com/ley", "Art. 333", "Libro III > Art. 333", "exact")),
                         "LOW",
                         "Faltan datos generales.",
                         List.of("Reune constancias disponibles."),
@@ -256,7 +256,9 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.content[0].rating", is(5)))
                 .andExpect(jsonPath("$.content[0].receiptStatus", is("PUBLISHED")))
                 .andExpect(jsonPath("$.content[0].citationSupportStatus", is("WEAK")))
-                .andExpect(jsonPath("$.content[0].citations[0].sourceUrl", is("https://example.com/ley")));
+                .andExpect(jsonPath("$.content[0].citations[0].sourceUrl", is("https://example.com/ley")))
+                .andExpect(jsonPath("$.content[0].citations[0].sourceSnippet", is("Texto")))
+                .andExpect(jsonPath("$.content[0].citations[0].sourceOriginalSnippet", is("Pasaje literal de la ley")));
     }
 
     @Test

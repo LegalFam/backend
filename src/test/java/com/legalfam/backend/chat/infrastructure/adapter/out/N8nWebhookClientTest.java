@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat.infrastructure.adapter.out;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
 import com.legalfam.backend.chat.infrastructure.config.N8nProperties;
@@ -92,6 +93,7 @@ class N8nWebhookClientTest {
                     {
                       "file_name": "Codigo Civil",
                       "snippet": "Articulo relevante",
+                      "original_snippet": "El demandante goza de Auxilio Judicial",
                       "file_url": "https://example.com/codigo"
                     },
                     {
@@ -106,6 +108,32 @@ class N8nWebhookClientTest {
         assertEquals(1, response.citations().size());
         assertEquals("Codigo Civil", response.citations().getFirst().sourceTitle());
         assertEquals("https://example.com/codigo", response.citations().getFirst().sourceUrl());
+        assertEquals("Articulo relevante", response.citations().getFirst().sourceSnippet());
+        assertEquals(
+                "El demandante goza de Auxilio Judicial",
+                response.citations().getFirst().sourceOriginalSnippet()
+        );
+    }
+
+    @Test
+    void mapResponseKeepsCitationsWithoutOriginalSnippet() throws Exception {
+        // Una cita sin pasaje literal sigue siendo valida: pierde el contraste con el
+        // resumen, no la fuente.
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "citations": [
+                    {
+                      "file_name": "Codigo Civil",
+                      "snippet": "Articulo relevante",
+                      "file_url": "https://example.com/codigo"
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals(1, response.citations().size());
+        assertNull(response.citations().getFirst().sourceOriginalSnippet());
     }
 
     @Test

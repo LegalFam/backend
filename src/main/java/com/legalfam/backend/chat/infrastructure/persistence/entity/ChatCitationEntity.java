@@ -25,6 +25,9 @@ public class ChatCitationEntity {
     @Column(name = "source_snippet", nullable = false, columnDefinition = "TEXT")
     private String sourceSnippet;
 
+    @Column(name = "source_original_snippet", columnDefinition = "TEXT")
+    private String sourceOriginalSnippet;
+
     @Column(name = "source_url", nullable = false, columnDefinition = "TEXT")
     private String sourceUrl;
 
@@ -67,6 +70,14 @@ public class ChatCitationEntity {
 
     public void setSourceSnippet(String sourceSnippet) {
         this.sourceSnippet = sourceSnippet;
+    }
+
+    public String getSourceOriginalSnippet() {
+        return sourceOriginalSnippet;
+    }
+
+    public void setSourceOriginalSnippet(String sourceOriginalSnippet) {
+        this.sourceOriginalSnippet = sourceOriginalSnippet;
     }
 
     public String getSourceUrl() {

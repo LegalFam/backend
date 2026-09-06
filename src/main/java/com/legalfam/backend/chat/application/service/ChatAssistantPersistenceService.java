@@ -165,6 +165,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                     assistantMessage.getId(),
                     defaultString(citation.sourceTitle()),
                     defaultString(citation.sourceSnippet()),
+                    citation.sourceOriginalSnippet(),
                     citation.sourceUrl(),
                     citation.sourceLocator(),
                     citation.sourceBreadcrumb(),

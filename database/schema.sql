@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS citations (
     chat_message_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
     source_title TEXT NOT NULL,
     source_snippet TEXT NOT NULL,
+    source_original_snippet TEXT NULL,
     source_url TEXT NOT NULL,
     source_locator TEXT NULL,
     source_breadcrumb TEXT NULL,
