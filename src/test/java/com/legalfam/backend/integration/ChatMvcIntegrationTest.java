@@ -134,7 +134,7 @@ class ChatMvcIntegrationTest {
         UUID sessionId = UUID.randomUUID();
         when(tokenValidationPort.isTokenValid("valid-token")).thenReturn(true);
         when(tokenValidationPort.extractUserId("valid-token")).thenReturn(userId);
-        when(chatUseCase.send(eq(userId), eq("hola"), eq(sessionId)))
+        when(chatUseCase.send(eq(userId), eq("hola"), eq(sessionId), eq((String) null)))
                 .thenThrow(InsufficientChatTokensException.noTokens());
 
         mockMvc.perform(post("/api/v1/chat/send")
@@ -147,7 +147,7 @@ class ChatMvcIntegrationTest {
                 .andExpect(jsonPath("$.status", is(403)))
                 .andExpect(jsonPath("$.path", is("/api/v1/chat/send")));
 
-        verify(chatUseCase).send(userId, "hola", sessionId);
+        verify(chatUseCase).send(userId, "hola", sessionId, null);
     }
 
     @Test

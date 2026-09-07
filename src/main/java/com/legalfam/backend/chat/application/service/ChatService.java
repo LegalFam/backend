@@ -22,6 +22,7 @@ import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.InsufficientChatTokensException;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
+import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
@@ -74,10 +75,11 @@ public class ChatService implements IChatUseCase {
 
     @Override
     @Transactional
-    public ChatSendAcceptedResponse send(UUID userId, String messageInput, UUID sessionId) {
+    public ChatSendAcceptedResponse send(UUID userId, String messageInput, UUID sessionId, String language) {
         if (sessionId == null) {
             throw InvalidChatRequestException.of(ChatApiError.SESSION_ID_REQUIRED);
         }
+        ChatLanguage chatLanguage = ChatLanguage.fromCode(language);
         chatPrivacyPolicy.assertAllowed(messageInput);
         chatAccessPolicy.assertUserExists(userId);
         ChatSession chatSession = chatAccessPolicy.requireSessionOwner(userId, sessionId);
@@ -91,7 +93,10 @@ public class ChatService implements IChatUseCase {
         Instant now = Instant.now();
 
         ChatEntitlements entitlements = IChatEntitlementsPort.resolveEntitlements(userId);
-        ChatMessage userMessage = ChatMessage.userMessage(chatSession.getId(), messageInput, now);
+        ChatMessage userMessage = ChatMessage.userMessage(chatSession.getId(), messageInput, chatLanguage, now);
+        // `recentPreviousMessages` lee `content`, que siempre es espanol: el historial que
+        // viaja al flujo nunca queda en idiomas mezclados, ni siquiera si el usuario cambia
+        // de lengua a mitad de la conversacion.
         List<ChatPreviousMessage> previousMessages = recentPreviousMessages(
                 chatSession.getId(),
                 entitlements.contextMessageLimit()
@@ -106,7 +111,8 @@ public class ChatService implements IChatUseCase {
                 chatSession.getId(),
                 userMessage.getId(),
                 messageInput,
-                previousMessages
+                previousMessages,
+                chatLanguage.code()
         ));
 
         return new ChatSendAcceptedResponse(chatSession.getId(), userMessage.getId(), "PROCESSING");

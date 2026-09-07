@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat.infrastructure.persistence.mapper;
 
 import com.legalfam.backend.chat.domain.model.ChatCitation;
+import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
@@ -47,6 +48,8 @@ public final class ChatEntityMapper {
                 entity.getChatSessionId(),
                 entity.getRole(),
                 entity.getContent(),
+                ChatLanguage.fromCode(entity.getLanguage()),
+                entity.getContentLocalized(),
                 entity.getErrorCode(),
                 entity.getRating(),
                 entity.getFeedbackComment(),
@@ -54,6 +57,7 @@ public final class ChatEntityMapper {
                 entity.getConfidenceStatus(),
                 entity.getConfidenceReason(),
                 readStringList(entity.getNextSteps()),
+                readStringList(entity.getNextStepsLocalized()),
                 entity.getSpecialistSupportRecommended(),
                 entity.getCitationSupportStatus(),
                 entity.getCreatedAt()
@@ -66,6 +70,8 @@ public final class ChatEntityMapper {
         entity.setChatSessionId(domain.getChatSessionId());
         entity.setRole(domain.getRole());
         entity.setContent(domain.getContent());
+        entity.setLanguage(domain.getLanguage().code());
+        entity.setContentLocalized(domain.getContentLocalized());
         entity.setErrorCode(domain.getErrorCode());
         entity.setRating(domain.getRating());
         entity.setFeedbackComment(domain.getFeedbackComment());
@@ -73,6 +79,7 @@ public final class ChatEntityMapper {
         entity.setConfidenceStatus(domain.getConfidenceStatus());
         entity.setConfidenceReason(domain.getConfidenceReason());
         entity.setNextSteps(writeStringList(domain.getNextSteps()));
+        entity.setNextStepsLocalized(writeStringList(domain.getNextStepsLocalized()));
         entity.setSpecialistSupportRecommended(domain.getSpecialistSupportRecommended());
         entity.setCitationSupportStatus(domain.getCitationSupportStatus());
         entity.setCreatedAt(domain.getCreatedAt());
@@ -149,6 +156,7 @@ public final class ChatEntityMapper {
                 entity.getChatMessageId(),
                 entity.getSourceTitle(),
                 entity.getSourceSnippet(),
+                entity.getSourceSnippetLocalized(),
                 entity.getSourceOriginalSnippet(),
                 entity.getSourceUrl(),
                 entity.getSourceLocator(),
@@ -163,6 +171,7 @@ public final class ChatEntityMapper {
         entity.setChatMessageId(domain.getChatMessageId());
         entity.setSourceTitle(domain.getSourceTitle());
         entity.setSourceSnippet(domain.getSourceSnippet());
+        entity.setSourceSnippetLocalized(domain.getSourceSnippetLocalized());
         entity.setSourceOriginalSnippet(domain.getSourceOriginalSnippet());
         entity.setSourceUrl(domain.getSourceUrl());
         entity.setSourceLocator(domain.getSourceLocator());

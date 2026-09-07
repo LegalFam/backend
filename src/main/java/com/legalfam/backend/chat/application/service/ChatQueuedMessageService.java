@@ -10,6 +10,7 @@ import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
+import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import com.legalfam.backend.common.error.ApiErrorDescriptor;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -40,6 +41,7 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
         UUID chatSessionId = event.chatSessionId();
         UUID userMessageId = event.userMessageId();
         String userMessageInput = event.userMessageInput();
+        ChatLanguage language = event.resolvedLanguage();
 
         if (!IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)) {
             log.debug("Ignoring duplicate or terminal chat event userMessageId={}", userMessageId);
@@ -48,7 +50,12 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
 
         ChatAssistantGatewayResponse response;
         try {
-            response = IChatAssistantGatewayPort.sendMessage(userMessageInput, chatSessionId, event.previousMessages());
+            response = IChatAssistantGatewayPort.sendMessage(
+                    userMessageInput,
+                    chatSessionId,
+                    event.previousMessages(),
+                    language
+            );
         } catch (ChatUpstreamException ex) {
             log.warn("Assistant gateway call failed for chatSessionId={}: {}", chatSessionId, ex.getMessage());
             persistAndDispatchFailure(
@@ -80,9 +87,8 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
         ChatAssistantMessageDispatch dispatch = IChatAssistantPersistenceUseCase.persistAssistantMessage(
                 chatSessionId,
                 userMessageId,
-                response.message(),
-                response.citations(),
-                response.metadata()
+                response,
+                language
         );
         if (dispatch == null) {
             return;

@@ -55,7 +55,13 @@ CREATE TABLE IF NOT EXISTS chat_message (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chat_session_id UUID NOT NULL REFERENCES chat_session(id) ON DELETE CASCADE,
     role VARCHAR(32) NOT NULL CHECK (role IN ('USER', 'ASSISTANT', 'SYSTEM')),
+    -- Siempre el espanol canonico, sea cual sea el idioma del usuario: de aca sale el
+    -- historial que viaja al flujo n8n.
     content TEXT NOT NULL,
+    language VARCHAR(8) NOT NULL DEFAULT 'es' CHECK (language IN ('es', 'qu', 'ay')),
+    -- El texto en la lengua del usuario. NULL cuando language = 'es'.
+    content_localized TEXT NULL,
+    next_steps_localized TEXT NULL,
     error_code VARCHAR(255) NULL,
     rating INTEGER NULL CHECK (rating IS NULL OR rating BETWEEN 1 AND 5),
     feedback_comment TEXT NULL,
@@ -113,6 +119,8 @@ CREATE TABLE IF NOT EXISTS citations (
     chat_message_id UUID NOT NULL REFERENCES chat_message(id) ON DELETE CASCADE,
     source_title TEXT NOT NULL,
     source_snippet TEXT NOT NULL,
+    -- El resumen traducido. El pasaje literal (source_original_snippet) nunca se traduce.
+    source_snippet_localized TEXT NULL,
     source_original_snippet TEXT NULL,
     source_url TEXT NOT NULL,
     source_locator TEXT NULL,

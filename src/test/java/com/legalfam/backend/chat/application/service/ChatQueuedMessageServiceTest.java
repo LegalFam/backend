@@ -16,6 +16,7 @@ import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import com.legalfam.backend.chat.domain.exception.ChatApiError;
+import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -49,30 +50,31 @@ class ChatQueuedMessageServiceTest {
                 "antes",
                 Instant.parse("2026-01-01T00:00:00Z")
         ));
-        ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(sessionId, userMessageId, "hola", previousMessages);
+        ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(sessionId, userMessageId, "hola", previousMessages, "es");
         ChatAssistantMetadata metadata = new ChatAssistantMetadata(
                 "HIGH",
                 "clear question",
                 List.of("review documents"),
+                List.of(),
                 false,
                 "GOOD",
                 3
         );
-        List<ChatCitationResponse> citations = List.of(new ChatCitationResponse("source", "snippet", "pasaje literal", "https://example.test", null, null, null));
-        ChatAssistantGatewayResponse response = new ChatAssistantGatewayResponse("respuesta", citations, metadata);
+        List<ChatCitationResponse> citations = List.of(new ChatCitationResponse("source", "snippet", null, "pasaje literal", "https://example.test", null, null, null));
+        ChatAssistantGatewayResponse response = new ChatAssistantGatewayResponse("respuesta", null, null, citations, metadata);
 
         when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);
-        when(IChatAssistantGatewayPort.sendMessage("hola", sessionId, previousMessages)).thenReturn(response);
+        when(IChatAssistantGatewayPort.sendMessage("hola", sessionId, previousMessages, ChatLanguage.ES))
+                .thenReturn(response);
 
         chatQueuedMessageService.process(event);
 
-        verify(IChatAssistantGatewayPort).sendMessage("hola", sessionId, previousMessages);
+        verify(IChatAssistantGatewayPort).sendMessage("hola", sessionId, previousMessages, ChatLanguage.ES);
         verify(IChatAssistantPersistenceUseCase).persistAssistantMessage(
                 sessionId,
                 userMessageId,
-                "respuesta",
-                citations,
-                metadata
+                response,
+                ChatLanguage.ES
         );
         verify(IChatAssistantDeliveryPort, never()).dispatchAssistantError(
                 org.mockito.ArgumentMatchers.any(),
@@ -87,7 +89,7 @@ class ChatQueuedMessageServiceTest {
         UUID userMessageId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         UUID failureMessageId = UUID.randomUUID();
-        ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(sessionId, userMessageId, "hola", List.of());
+        ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(sessionId, userMessageId, "hola", List.of(), "es");
         ChatAssistantErrorEvent errorEvent = new ChatAssistantErrorEvent(
                 sessionId,
                 failureMessageId,
@@ -98,7 +100,7 @@ class ChatQueuedMessageServiceTest {
         ChatAssistantErrorDispatch dispatch = new ChatAssistantErrorDispatch(userId, sessionId, errorEvent);
 
         when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);
-        when(IChatAssistantGatewayPort.sendMessage("hola", sessionId, List.of()))
+        when(IChatAssistantGatewayPort.sendMessage("hola", sessionId, List.of(), ChatLanguage.ES))
                 .thenThrow(ChatUpstreamException.of(ChatApiError.UPSTREAM_TIMEOUT));
         when(IChatAssistantPersistenceUseCase.persistAssistantFailure(
                 sessionId,

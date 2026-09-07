@@ -1,6 +1,7 @@
 package com.legalfam.backend.chat.application.service;
 
 import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
+import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
@@ -12,6 +13,7 @@ import com.legalfam.backend.chat.application.port.in.IChatAssistantPersistenceUs
 import com.legalfam.backend.chat.application.port.out.IChatOutboxPort;
 import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
+import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageRole;
@@ -77,9 +79,8 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
     public ChatAssistantMessageDispatch persistAssistantMessage(
             UUID chatSessionId,
             UUID userMessageId,
-            String assistantMessageText,
-            List<ChatCitationResponse> citations,
-            ChatAssistantMetadata metadata
+            ChatAssistantGatewayResponse response,
+            ChatLanguage language
     ) {
         ChatSession chatSession = IChatPersistencePort.findSessionById(chatSessionId).orElse(null);
         if (chatSession == null) {
@@ -87,14 +88,25 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
             return null;
         }
 
+        ChatLanguage safeLanguage = language == null ? ChatLanguage.ES : language;
+        String assistantMessageText = response.message();
+        List<ChatCitationResponse> citations = response.citations();
+        ChatAssistantMetadata metadata = response.metadata();
+
         Instant now = Instant.now();
-        ChatMessage assistantMessage = ChatMessage.assistantMessage(chatSession.getId(), assistantMessageText, now);
+        ChatMessage assistantMessage = ChatMessage.assistantMessage(
+                chatSession.getId(),
+                assistantMessageText,
+                response.messageLocalized(),
+                safeLanguage,
+                now
+        );
         applyMetadata(assistantMessage, metadata);
         assistantMessage = IChatPersistencePort.saveMessage(assistantMessage);
 
         persistCitations(assistantMessage, citations);
         consumeTokensForAssistantResult(chatSession.getUserId(), userMessageId, metadata);
-        markUserMessageCompleted(userMessageId, now);
+        markUserMessageCompleted(userMessageId, now, response.userMessageTranslated());
         chatSession.recordActivity(now);
         IChatPersistencePort.saveSession(chatSession);
 
@@ -102,11 +114,14 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                 chatSession.getId(),
                 assistantMessage.getId(),
                 assistantMessageText,
+                assistantMessage.getLanguage().code(),
+                assistantMessage.getContentLocalized(),
                 assistantMessage.getCreatedAt(),
                 citations,
                 assistantMessage.getConfidenceStatus(),
                 assistantMessage.getConfidenceReason(),
                 assistantMessage.getNextSteps(),
+                assistantMessage.getNextStepsLocalized(),
                 assistantMessage.getSpecialistSupportRecommended(),
                 assistantMessage.getCitationSupportStatus(),
                 "PENDING",
@@ -165,6 +180,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                     assistantMessage.getId(),
                     defaultString(citation.sourceTitle()),
                     defaultString(citation.sourceSnippet()),
+                    citation.sourceSnippetLocalized(),
                     citation.sourceOriginalSnippet(),
                     defaultString(citation.sourceUrl()),
                     citation.sourceLocator(),
@@ -186,6 +202,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                 safeMetadata.confidenceStatus(),
                 safeMetadata.confidenceReason(),
                 safeMetadata.nextSteps(),
+                safeMetadata.nextStepsLocalized(),
                 safeMetadata.specialistSupportRecommended(),
                 safeMetadata.citationSupportStatus()
         );
@@ -197,10 +214,19 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         IChatTokenPort.consumeChatTokensForAssistantResult(userId, userMessageId, agentTokenCost);
     }
 
-    private void markUserMessageCompleted(UUID userMessageId, Instant now) {
+    private void markUserMessageCompleted(UUID userMessageId, Instant now, String userMessageTranslated) {
         ChatMessage userMessage = IChatPersistencePort.findMessageById(userMessageId).orElse(null);
         if (userMessage == null || userMessage.getRole() != ChatMessageRole.USER) {
             return;
+        }
+        // El mensaje se guardo antes de que existiera su traduccion. Ahora que el flujo la
+        // devolvio, `content` pasa a ser el espanol y el original queda en
+        // `content_localized`, para que el proximo turno mande historial en un solo idioma.
+        // Si la traduccion no llego, el metodo no hace nada y el turno sigue mostrandose en
+        // la lengua original: peor historial, pero nunca un mensaje perdido.
+        if (!userMessage.getLanguage().isSpanish()) {
+            userMessage.applyTranslatedContent(userMessageTranslated);
+            IChatPersistencePort.saveMessage(userMessage);
         }
         ChatMessageProcessing processing = IChatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
                 .orElseGet(() -> initializeProcessingRecord(userMessageId, now));

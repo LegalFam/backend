@@ -28,6 +28,15 @@ public class ChatMessageEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "language", nullable = false, length = 8)
+    private String language;
+
+    @Column(name = "content_localized", columnDefinition = "TEXT")
+    private String contentLocalized;
+
+    @Column(name = "next_steps_localized", columnDefinition = "TEXT")
+    private String nextStepsLocalized;
+
     @Column(name = "error_code")
     private String errorCode;
 
@@ -88,6 +97,30 @@ public class ChatMessageEntity {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    public String getContentLocalized() {
+        return contentLocalized;
+    }
+
+    public void setContentLocalized(String contentLocalized) {
+        this.contentLocalized = contentLocalized;
+    }
+
+    public String getNextStepsLocalized() {
+        return nextStepsLocalized;
+    }
+
+    public void setNextStepsLocalized(String nextStepsLocalized) {
+        this.nextStepsLocalized = nextStepsLocalized;
     }
 
     public String getErrorCode() {

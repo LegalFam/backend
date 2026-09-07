@@ -25,6 +25,7 @@ import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
 import com.legalfam.backend.chat.domain.exception.InsufficientChatTokensException;
 import com.legalfam.backend.chat.domain.exception.InvalidChatRequestException;
+import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
@@ -92,7 +93,7 @@ class ChatServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(IChatPersistencePort.saveSession(any(ChatSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        ChatSendAcceptedResponse response = chatService.send(userId, "hola", sessionId);
+        ChatSendAcceptedResponse response = chatService.send(userId, "hola", sessionId, null);
 
         ArgumentCaptor<ChatMessage> messageCaptor = ArgumentCaptor.forClass(ChatMessage.class);
         verify(IChatPersistencePort).saveMessage(messageCaptor.capture());
@@ -134,7 +135,7 @@ class ChatServiceTest {
 
         InsufficientChatTokensException exception = assertThrows(
                 InsufficientChatTokensException.class,
-                () -> chatService.send(userId, "hola", sessionId)
+                () -> chatService.send(userId, "hola", sessionId, null)
         );
 
         assertEquals("insufficient_tokens", exception.error().code());
@@ -149,7 +150,7 @@ class ChatServiceTest {
 
         InvalidChatRequestException exception = assertThrows(
                 InvalidChatRequestException.class,
-                () -> chatService.send(userId, "hola", null)
+                () -> chatService.send(userId, "hola", null, null)
         );
 
         assertEquals("session_id_required", exception.error().code());
@@ -184,13 +185,83 @@ class ChatServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(IChatPersistencePort.saveSession(any(ChatSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        chatService.send(userId, "hola", sessionId);
+        chatService.send(userId, "hola", sessionId, null);
 
         ArgumentCaptor<ChatMessageQueuedEvent> eventCaptor = ArgumentCaptor.forClass(ChatMessageQueuedEvent.class);
         verify(IChatEventPublisherPort).publishMessageQueued(eventCaptor.capture());
         String clippedContent = eventCaptor.getValue().previousMessages().getFirst().content();
         assertEquals(2_003, clippedContent.length());
         assertEquals("...", clippedContent.substring(2_000));
+    }
+
+    @Test
+    void sendPropagatesLanguageAndKeepsHistoryInSpanish() {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        ChatSession session = ChatSession.restore(sessionId, userId, null, Instant.now(), Instant.now());
+
+        when(chatAccessPolicy.requireSessionOwner(userId, sessionId)).thenReturn(session);
+        when(IChatPersistencePort.findActiveMessageProcessingByUserId(userId)).thenReturn(Optional.empty());
+        when(IChatPersistencePort.existsUnreadAssistantMessageBySessionId(sessionId)).thenReturn(false);
+        when(IChatTokenPort.hasChatTokensAvailable(userId)).thenReturn(true);
+        when(IChatEntitlementsPort.resolveEntitlements(userId)).thenReturn(new ChatEntitlements(15, null));
+        // Un turno anterior de una conversacion en quechua: `content` quedo en espanol tras
+        // la traduccion, y es ese el que debe viajar hacia el flujo.
+        when(IChatPersistencePort.findRecentMessagesForAssistantContext(sessionId, 15)).thenReturn(List.of(
+                ChatMessage.restore(
+                        UUID.randomUUID(),
+                        sessionId,
+                        ChatMessageRole.USER,
+                        "quiero pension de alimentos",
+                        ChatLanguage.QU,
+                        "mikuy qullqita munani",
+                        null, null, null, null, null, null,
+                        List.of(), List.of(), null, null,
+                        Instant.parse("2026-01-01T00:00:00Z")
+                )
+        ));
+        when(IChatPersistencePort.saveMessage(any(ChatMessage.class))).thenAnswer(i -> i.getArgument(0));
+        when(IChatPersistencePort.saveMessageProcessing(any(ChatMessageProcessing.class)))
+                .thenAnswer(i -> i.getArgument(0));
+        when(IChatPersistencePort.saveSession(any(ChatSession.class))).thenAnswer(i -> i.getArgument(0));
+
+        chatService.send(userId, "mikuy qullqita munani", sessionId, "qu");
+
+        ArgumentCaptor<ChatMessageQueuedEvent> eventCaptor = ArgumentCaptor.forClass(ChatMessageQueuedEvent.class);
+        verify(IChatEventPublisherPort).publishMessageQueued(eventCaptor.capture());
+        assertEquals("qu", eventCaptor.getValue().language());
+        assertEquals(
+                "quiero pension de alimentos",
+                eventCaptor.getValue().previousMessages().getFirst().content()
+        );
+
+        ArgumentCaptor<ChatMessage> messageCaptor = ArgumentCaptor.forClass(ChatMessage.class);
+        verify(IChatPersistencePort).saveMessage(messageCaptor.capture());
+        assertEquals(ChatLanguage.QU, messageCaptor.getValue().getLanguage());
+    }
+
+    @Test
+    void sendFallsBackToSpanishWhenLanguageIsAbsent() {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        ChatSession session = ChatSession.restore(sessionId, userId, null, Instant.now(), Instant.now());
+
+        when(chatAccessPolicy.requireSessionOwner(userId, sessionId)).thenReturn(session);
+        when(IChatPersistencePort.findActiveMessageProcessingByUserId(userId)).thenReturn(Optional.empty());
+        when(IChatPersistencePort.existsUnreadAssistantMessageBySessionId(sessionId)).thenReturn(false);
+        when(IChatTokenPort.hasChatTokensAvailable(userId)).thenReturn(true);
+        when(IChatEntitlementsPort.resolveEntitlements(userId)).thenReturn(new ChatEntitlements(15, null));
+        when(IChatPersistencePort.findRecentMessagesForAssistantContext(sessionId, 15)).thenReturn(List.of());
+        when(IChatPersistencePort.saveMessage(any(ChatMessage.class))).thenAnswer(i -> i.getArgument(0));
+        when(IChatPersistencePort.saveMessageProcessing(any(ChatMessageProcessing.class)))
+                .thenAnswer(i -> i.getArgument(0));
+        when(IChatPersistencePort.saveSession(any(ChatSession.class))).thenAnswer(i -> i.getArgument(0));
+
+        chatService.send(userId, "hola", sessionId, null);
+
+        ArgumentCaptor<ChatMessageQueuedEvent> eventCaptor = ArgumentCaptor.forClass(ChatMessageQueuedEvent.class);
+        verify(IChatEventPublisherPort).publishMessageQueued(eventCaptor.capture());
+        assertEquals("es", eventCaptor.getValue().language());
     }
 
     @Test
@@ -210,7 +281,7 @@ class ChatServiceTest {
                 .thenAnswer(i -> i.getArgument(0));
         when(IChatPersistencePort.saveSession(any(ChatSession.class))).thenAnswer(i -> i.getArgument(0));
 
-        chatService.send(userId, "hola", sessionId);
+        chatService.send(userId, "hola", sessionId, null);
 
         verify(IChatPersistencePort).findRecentMessagesForAssistantContext(sessionId, 25);
         verify(IChatPersistencePort, never()).findRecentMessagesForAssistantContext(eq(sessionId), intThat(l -> l != 25));

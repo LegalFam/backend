@@ -6,11 +6,12 @@ public record ChatAssistantMetadata(
         String confidenceStatus,
         String confidenceReason,
         List<String> nextSteps,
+        List<String> nextStepsLocalized,
         Boolean specialistSupportRecommended,
         String citationSupportStatus,
         Integer agentTokenCost
 ) {
     public static ChatAssistantMetadata empty() {
-        return new ChatAssistantMetadata(null, null, List.of(), null, null, null);
+        return new ChatAssistantMetadata(null, null, List.of(), List.of(), null, null, null);
     }
 }

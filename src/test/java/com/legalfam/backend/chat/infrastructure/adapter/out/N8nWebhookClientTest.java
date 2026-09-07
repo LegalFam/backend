@@ -4,8 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
+import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import com.legalfam.backend.chat.infrastructure.config.N8nProperties;
 import java.lang.reflect.Method;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -25,7 +27,7 @@ class N8nWebhookClientTest {
         );
         parseResponseBody = N8nWebhookClient.class.getDeclaredMethod("parseResponseBody", String.class);
         parseResponseBody.setAccessible(true);
-        mapResponse = N8nWebhookClient.class.getDeclaredMethod("mapResponse", JsonNode.class);
+        mapResponse = N8nWebhookClient.class.getDeclaredMethod("mapResponse", JsonNode.class, ChatLanguage.class);
         mapResponse.setAccessible(true);
     }
 
@@ -179,8 +181,79 @@ class N8nWebhookClientTest {
         assertEquals(1, response.metadata().agentTokenCost());
     }
 
+    @Test
+    void mapResponseReadsLocalizedFieldsWhenLanguageIsNotSpanish() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta en espanol",
+                  "message_localized": "kutichiy runasimipi",
+                  "user_message_es": "consulta traducida",
+                  "nextSteps": ["Reune constancias."],
+                  "nextSteps_localized": ["Qillqakunata huñuy."],
+                  "citations": [
+                    {
+                      "file_name": "Codigo Civil",
+                      "summary_snippet": "resumen en espanol",
+                      "summary_snippet_localized": "pisi willakuy",
+                      "original_snippet": "Articulo 472.- Se considera alimentos...",
+                      "file_url": "https://example.test/cc"
+                    }
+                  ],
+                  "agentTokenCost": 3
+                }
+                """, ChatLanguage.QU);
+
+        assertEquals("respuesta en espanol", response.message());
+        assertEquals("kutichiy runasimipi", response.messageLocalized());
+        assertEquals("consulta traducida", response.userMessageTranslated());
+        assertEquals(List.of("Qillqakunata huñuy."), response.metadata().nextStepsLocalized());
+        assertEquals("pisi willakuy", response.citations().get(0).sourceSnippetLocalized());
+        // El pasaje literal de la norma llega sin traducir, que es la unica forma de poder
+        // contrastar la cita contra la fuente.
+        assertEquals(
+                "Articulo 472.- Se considera alimentos...",
+                response.citations().get(0).sourceOriginalSnippet()
+        );
+    }
+
+    @Test
+    void mapResponseIgnoresLocalizedFieldsWhenLanguageIsSpanish() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta en espanol",
+                  "message_localized": "no deberia usarse",
+                  "user_message_es": "tampoco",
+                  "nextSteps_localized": ["ni esto"],
+                  "citations": []
+                }
+                """);
+
+        assertNull(response.messageLocalized());
+        assertNull(response.userMessageTranslated());
+        assertEquals(List.of(), response.metadata().nextStepsLocalized());
+    }
+
+    @Test
+    void mapResponseSurvivesMissingTranslationOnNonSpanishConversation() throws Exception {
+        // Si la traduccion falla aguas arriba, el turno sigue siendo utilizable: se entrega
+        // el espanol y el frontend lo muestra tal cual.
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta en espanol",
+                  "citations": []
+                }
+                """, ChatLanguage.AY);
+
+        assertEquals("respuesta en espanol", response.message());
+        assertNull(response.messageLocalized());
+    }
+
     private ChatAssistantGatewayResponse map(String responseBody) throws Exception {
+        return map(responseBody, ChatLanguage.ES);
+    }
+
+    private ChatAssistantGatewayResponse map(String responseBody, ChatLanguage language) throws Exception {
         JsonNode root = (JsonNode) parseResponseBody.invoke(client, responseBody);
-        return (ChatAssistantGatewayResponse) mapResponse.invoke(client, root);
+        return (ChatAssistantGatewayResponse) mapResponse.invoke(client, root, language);
     }
 }

@@ -151,7 +151,8 @@ public class ChatController {
         ChatSendAcceptedResponse response = IChatUseCase.send(
                 userId,
                 request.message().trim(),
-                request.sessionId()
+                request.sessionId(),
+                request.language()
         );
         return ResponseEntity.accepted().body(response);
     }

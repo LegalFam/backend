@@ -7,6 +7,7 @@ import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
+import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import com.legalfam.backend.chat.infrastructure.config.N8nProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,8 +60,10 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
     public ChatAssistantGatewayResponse sendMessage(
             String message,
             UUID sessionId,
-            List<ChatPreviousMessage> previousMessages
+            List<ChatPreviousMessage> previousMessages,
+            ChatLanguage language
     ) {
+        ChatLanguage safeLanguage = language == null ? ChatLanguage.ES : language;
         log.info("Preparing n8n webhook call: configuredUrl={}, timeoutMs={}",
                 webhookUrl == null || webhookUrl.isBlank() ? "<empty>" : webhookUrl,
                 timeoutMs);
@@ -71,13 +74,13 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         }
 
         validateWebhookUrl(webhookUrl);
-        String payloadJson = buildPayload(message, sessionId, previousMessages);
+        String payloadJson = buildPayload(message, sessionId, previousMessages, safeLanguage);
         HttpEntity<String> requestEntity = buildRequestEntity(payloadJson);
         ResponseEntity<String> response;
 
         try {
-            log.info("Calling n8n webhook: url={}, messageLength={}, sessionId={}",
-                    webhookUrl, message.length(), sessionId);
+            log.info("Calling n8n webhook: url={}, messageLength={}, sessionId={}, language={}",
+                    webhookUrl, message.length(), sessionId, safeLanguage.code());
             response = restTemplate.exchange(webhookUrl.trim(), HttpMethod.POST, requestEntity, String.class);
         } catch (HttpStatusCodeException ex) {
             ex.getResponseBodyAsString();
@@ -109,7 +112,7 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
             throw buildStatusException(statusCode, response.getBody());
         }
 
-        return mapResponse(parseResponseBody(response.getBody()));
+        return mapResponse(parseResponseBody(response.getBody()), safeLanguage);
     }
 
     private void validateWebhookUrl(String url) {
@@ -132,10 +135,18 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         return new HttpEntity<>(payloadJson, headers);
     }
 
-    private String buildPayload(String message, UUID sessionId, List<ChatPreviousMessage> previousMessages) {
+    private String buildPayload(
+            String message,
+            UUID sessionId,
+            List<ChatPreviousMessage> previousMessages,
+            ChatLanguage language
+    ) {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("message", message);
         payload.put("session_id", sessionId.toString());
+        // El historial siempre viaja en espanol; `language` solo le dice al flujo en que
+        // lengua debe entregar la respuesta y en cual viene el mensaje actual.
+        payload.put("language", language.code());
         ArrayNode history = payload.putArray("previous_messages");
         for (ChatPreviousMessage previousMessage : previousMessages == null ? List.<ChatPreviousMessage>of() : previousMessages) {
             ObjectNode item = history.addObject();
@@ -167,22 +178,28 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         }
     }
 
-    private ChatAssistantGatewayResponse mapResponse(JsonNode root) {
+    private ChatAssistantGatewayResponse mapResponse(JsonNode root, ChatLanguage language) {
+        // En espanol el flujo no traduce nada, asi que los campos localizados no vienen. Si
+        // en una conversacion en otra lengua faltan, la respuesta sigue siendo valida: se
+        // muestra el espanol, que es la version autoritativa de todos modos.
+        boolean localized = !language.isSpanish();
         return new ChatAssistantGatewayResponse(
                 readText(root, "message"),
-                extractCitations(root.get("citations")),
-                extractMetadata(root)
+                localized ? readText(root, "message_localized") : null,
+                localized ? readText(root, "user_message_es") : null,
+                extractCitations(root.get("citations"), localized),
+                extractMetadata(root, localized)
         );
     }
 
-    private List<ChatCitationResponse> extractCitations(JsonNode citationsNode) {
+    private List<ChatCitationResponse> extractCitations(JsonNode citationsNode, boolean localized) {
         if (citationsNode == null || citationsNode.isNull()) {
             return List.of();
         }
         if (citationsNode.isArray()) {
             List<ChatCitationResponse> citations = new ArrayList<>();
             for (JsonNode citationNode : citationsNode) {
-                ChatCitationResponse citation = mapCitation(citationNode);
+                ChatCitationResponse citation = mapCitation(citationNode, localized);
                 if (citation != null) {
                     citations.add(citation);
                 }
@@ -190,7 +207,7 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
             return citations;
         }
         if (citationsNode.isObject()) {
-            ChatCitationResponse singleCitation = mapCitation(citationsNode);
+            ChatCitationResponse singleCitation = mapCitation(citationsNode, localized);
             if (singleCitation != null) {
                 return List.of(singleCitation);
             }
@@ -198,14 +215,15 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         return List.of();
     }
 
-    private ChatAssistantMetadata extractMetadata(JsonNode root) {
+    private ChatAssistantMetadata extractMetadata(JsonNode root, boolean localized) {
         String citationSupportStatus = root != null && root.get("citationSupportStatus") != null
                 ? readCitationSupportStatus(root)
-                : inferCitationSupportStatus(root == null ? null : root.get("citations"));
+                : inferCitationSupportStatus(root == null ? null : root.get("citations"), localized);
         return new ChatAssistantMetadata(
                 readText(root, "confidenceStatus"),
                 readText(root, "confidenceReason"),
                 readStringArray(root.get("nextSteps")),
+                localized ? readStringArray(root.get("nextSteps_localized")) : List.of(),
                 readBoolean(root, "specialistSupportRecommended"),
                 citationSupportStatus,
                 readAgentTokenCost(root)
@@ -232,8 +250,8 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         };
     }
 
-    private String inferCitationSupportStatus(JsonNode citationsNode) {
-        return extractCitations(citationsNode).isEmpty() ? "NONE" : "GOOD";
+    private String inferCitationSupportStatus(JsonNode citationsNode, boolean localized) {
+        return extractCitations(citationsNode, localized).isEmpty() ? "NONE" : "GOOD";
     }
 
     private List<String> readStringArray(JsonNode node) {
@@ -292,14 +310,17 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         return null;
     }
 
-    private ChatCitationResponse mapCitation(JsonNode citationNode) {
+    private ChatCitationResponse mapCitation(JsonNode citationNode, boolean localized) {
         if (citationNode == null || citationNode.isNull()) {
             return null;
         }
 
         String sourceTitle = readText(citationNode, "file_name");
-        // El resumen que redacta el agente XAI, que es lo que lee el usuario.
+        // El resumen que redacta el agente XAI, en espanol.
         String sourceSnippet = readText(citationNode, "summary_snippet");
+        // El mismo resumen traducido. Solo se traduce este: el pasaje literal de abajo es
+        // texto de la norma y perderia su valor de contraste si se tradujera.
+        String sourceSnippetLocalized = localized ? readText(citationNode, "summary_snippet_localized") : null;
         // El pasaje literal que el agente XAI declaro haber usado. Es opcional: una cita
         // sin el sigue siendo valida, solo pierde el contraste con el resumen.
         String sourceOriginalSnippet = readText(citationNode, "original_snippet");
@@ -318,6 +339,7 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         return new ChatCitationResponse(
                 sourceTitle,
                 sourceSnippet,
+                sourceSnippetLocalized,
                 sourceOriginalSnippet,
                 sourceUrl,
                 sourceLocator,

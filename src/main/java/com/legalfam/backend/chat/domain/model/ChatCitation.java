@@ -8,6 +8,9 @@ public class ChatCitation {
     private UUID chatMessageId;
     private String sourceTitle;
     private String sourceSnippet;
+    // El resumen traducido a la lengua del usuario. El pasaje literal nunca se traduce: es
+    // lo que permite contrastar la cita contra la norma.
+    private String sourceSnippetLocalized;
     private String sourceOriginalSnippet;
     private String sourceUrl;
     private String sourceLocator;
@@ -20,6 +23,7 @@ public class ChatCitation {
             UUID chatMessageId,
             String sourceTitle,
             String sourceSnippet,
+            String sourceSnippetLocalized,
             String sourceOriginalSnippet,
             String sourceUrl,
             String sourceLocator,
@@ -30,6 +34,7 @@ public class ChatCitation {
         citation.chatMessageId = chatMessageId;
         citation.sourceTitle = sourceTitle;
         citation.sourceSnippet = sourceSnippet;
+        citation.sourceSnippetLocalized = sourceSnippetLocalized;
         citation.sourceOriginalSnippet = sourceOriginalSnippet;
         citation.sourceUrl = sourceUrl;
         citation.sourceLocator = sourceLocator;
@@ -43,6 +48,7 @@ public class ChatCitation {
             UUID chatMessageId,
             String sourceTitle,
             String sourceSnippet,
+            String sourceSnippetLocalized,
             String sourceOriginalSnippet,
             String sourceUrl,
             String sourceLocator,
@@ -53,6 +59,7 @@ public class ChatCitation {
                 chatMessageId,
                 sourceTitle,
                 sourceSnippet,
+                sourceSnippetLocalized,
                 sourceOriginalSnippet,
                 sourceUrl,
                 sourceLocator,
@@ -77,6 +84,10 @@ public class ChatCitation {
 
     public String getSourceSnippet() {
         return sourceSnippet;
+    }
+
+    public String getSourceSnippetLocalized() {
+        return sourceSnippetLocalized;
     }
 
     public String getSourceOriginalSnippet() {

@@ -113,7 +113,7 @@ class ChatControllerTest {
         UUID userMessageId = UUID.randomUUID();
         authenticateAs(userId.toString());
 
-        when(chatService.send(eq(userId), eq("hola"), eq(sessionId)))
+        when(chatService.send(eq(userId), eq("hola"), eq(sessionId), eq((String) null)))
                 .thenReturn(new ChatSendAcceptedResponse(
                         sessionId,
                         userMessageId,
@@ -233,15 +233,18 @@ class ChatControllerTest {
                         messageId,
                         "ASSISTANT",
                         "Hola",
+                        "es",
+                        null,
                         null,
                         5,
                         "util",
                         Instant.parse("2026-01-01T00:00:01Z"),
                         Instant.parse("2026-01-01T00:00:00Z"),
-                        List.of(new ChatCitationResponse("Ley", "Texto", "Pasaje literal de la ley", "https://example.com/ley", "Art. 333", "Libro III > Art. 333", "exact")),
+                        List.of(new ChatCitationResponse("Ley", "Texto", null, "Pasaje literal de la ley", "https://example.com/ley", "Art. 333", "Libro III > Art. 333", "exact")),
                         "LOW",
                         "Faltan datos generales.",
                         List.of("Reune constancias disponibles."),
+                        List.of(),
                         true,
                         "WEAK",
                         "PUBLISHED",

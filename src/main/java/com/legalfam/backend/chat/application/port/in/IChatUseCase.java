@@ -11,7 +11,7 @@ import com.legalfam.backend.common.cursor.CursorResult;
 import java.util.UUID;
 
 public interface IChatUseCase {
-    ChatSendAcceptedResponse send(UUID userId, String messageInput, UUID sessionId);
+    ChatSendAcceptedResponse send(UUID userId, String messageInput, UUID sessionId, String language);
 
     ChatProcessingStatusResponse getProcessingStatus(UUID userId);
 

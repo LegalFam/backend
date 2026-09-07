@@ -4,10 +4,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.port.out.IChatOutboxPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
+import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessing;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
@@ -48,6 +50,7 @@ class ChatAssistantPersistenceServiceTest {
                 "MEDIUM",
                 null,
                 List.of(),
+                List.of(),
                 false,
                 "GOOD",
                 3
@@ -65,9 +68,8 @@ class ChatAssistantPersistenceServiceTest {
         chatAssistantPersistenceService.persistAssistantMessage(
                 sessionId,
                 userMessageId,
-                "respuesta",
-                List.of(),
-                metadata
+                new ChatAssistantGatewayResponse("respuesta", null, null, List.of(), metadata),
+                ChatLanguage.ES
         );
 
         verify(chatTokenPort).consumeChatTokensForAssistantResult(userId, userMessageId, 3);
