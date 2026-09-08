@@ -31,6 +31,9 @@ public class ChatMessageEntity {
     @Column(name = "language", nullable = false, length = 8)
     private String language;
 
+    @Column(name = "language_requested", length = 8)
+    private String languageRequested;
+
     @Column(name = "content_localized", columnDefinition = "TEXT")
     private String contentLocalized;
 
@@ -105,6 +108,14 @@ public class ChatMessageEntity {
 
     public void setLanguage(String language) {
         this.language = language;
+    }
+
+    public String getLanguageRequested() {
+        return languageRequested;
+    }
+
+    public void setLanguageRequested(String languageRequested) {
+        this.languageRequested = languageRequested;
     }
 
     public String getContentLocalized() {

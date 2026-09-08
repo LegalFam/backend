@@ -49,6 +49,11 @@ public final class ChatEntityMapper {
                 entity.getRole(),
                 entity.getContent(),
                 ChatLanguage.fromCode(entity.getLanguage()),
+                // Null significa que no hubo desajuste, asi que aqui no se puede usar
+                // `fromCode`, que caeria a espanol e inventaria un desajuste inexistente.
+                entity.getLanguageRequested() == null
+                        ? null
+                        : ChatLanguage.fromCode(entity.getLanguageRequested()),
                 entity.getContentLocalized(),
                 entity.getErrorCode(),
                 entity.getRating(),
@@ -71,6 +76,9 @@ public final class ChatEntityMapper {
         entity.setRole(domain.getRole());
         entity.setContent(domain.getContent());
         entity.setLanguage(domain.getLanguage().code());
+        entity.setLanguageRequested(
+                domain.getLanguageRequested() == null ? null : domain.getLanguageRequested().code()
+        );
         entity.setContentLocalized(domain.getContentLocalized());
         entity.setErrorCode(domain.getErrorCode());
         entity.setRating(domain.getRating());

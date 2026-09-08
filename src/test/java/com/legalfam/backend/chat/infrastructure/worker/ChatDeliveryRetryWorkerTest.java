@@ -101,6 +101,7 @@ class ChatDeliveryRetryWorkerTest {
                 "hola",
                 "es",
                 null,
+                null,
                 Instant.now(),
                 List.of(),
                 null,

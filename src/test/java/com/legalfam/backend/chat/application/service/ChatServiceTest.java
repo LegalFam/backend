@@ -214,6 +214,7 @@ class ChatServiceTest {
                         ChatMessageRole.USER,
                         "quiero pension de alimentos",
                         ChatLanguage.QU,
+                        null,
                         "mikuy qullqita munani",
                         null, null, null, null, null, null,
                         List.of(), List.of(), null, null,

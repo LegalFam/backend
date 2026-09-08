@@ -88,7 +88,14 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
             return null;
         }
 
-        ChatLanguage safeLanguage = language == null ? ChatLanguage.ES : language;
+        ChatLanguage requestedLanguage = language == null ? ChatLanguage.ES : language;
+        // El idioma con que se envio el turno es la preferencia de interfaz del usuario, y
+        // puede no ser la lengua en que escribio. El flujo la lee del texto y esa lectura
+        // manda; si no la devuelve (flujo anterior a la deteccion) se respeta la solicitada.
+        String detected = response.languageDetected();
+        ChatLanguage effectiveLanguage = detected == null || detected.isBlank()
+                ? requestedLanguage
+                : ChatLanguage.fromCode(detected);
         String assistantMessageText = response.message();
         List<ChatCitationResponse> citations = response.citations();
         ChatAssistantMetadata metadata = response.metadata();
@@ -98,7 +105,8 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                 chatSession.getId(),
                 assistantMessageText,
                 response.messageLocalized(),
-                safeLanguage,
+                effectiveLanguage,
+                requestedLanguage,
                 now
         );
         applyMetadata(assistantMessage, metadata);
@@ -106,7 +114,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
 
         persistCitations(assistantMessage, citations);
         consumeTokensForAssistantResult(chatSession.getUserId(), userMessageId, metadata);
-        markUserMessageCompleted(userMessageId, now, response.userMessageTranslated());
+        markUserMessageCompleted(userMessageId, now, effectiveLanguage, response.userMessageTranslated());
         chatSession.recordActivity(now);
         IChatPersistencePort.saveSession(chatSession);
 
@@ -115,6 +123,9 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                 assistantMessage.getId(),
                 assistantMessageText,
                 assistantMessage.getLanguage().code(),
+                assistantMessage.getLanguageRequested() == null
+                        ? null
+                        : assistantMessage.getLanguageRequested().code(),
                 assistantMessage.getContentLocalized(),
                 assistantMessage.getCreatedAt(),
                 citations,
@@ -214,20 +225,24 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         IChatTokenPort.consumeChatTokensForAssistantResult(userId, userMessageId, agentTokenCost);
     }
 
-    private void markUserMessageCompleted(UUID userMessageId, Instant now, String userMessageTranslated) {
+    private void markUserMessageCompleted(
+            UUID userMessageId,
+            Instant now,
+            ChatLanguage detectedLanguage,
+            String userMessageTranslated
+    ) {
         ChatMessage userMessage = IChatPersistencePort.findMessageById(userMessageId).orElse(null);
         if (userMessage == null || userMessage.getRole() != ChatMessageRole.USER) {
             return;
         }
-        // El mensaje se guardo antes de que existiera su traduccion. Ahora que el flujo la
-        // devolvio, `content` pasa a ser el espanol y el original queda en
-        // `content_localized`, para que el proximo turno mande historial en un solo idioma.
-        // Si la traduccion no llego, el metodo no hace nada y el turno sigue mostrandose en
-        // la lengua original: peor historial, pero nunca un mensaje perdido.
-        if (!userMessage.getLanguage().isSpanish()) {
-            userMessage.applyTranslatedContent(userMessageTranslated);
-            IChatPersistencePort.saveMessage(userMessage);
-        }
+        // El mensaje se guardo con el idioma de la interfaz y antes de que existiera su
+        // traduccion. Ahora que el flujo leyo la lengua real y devolvio el espanol, `content`
+        // pasa a ser el espanol y el original queda en `content_localized`, para que el
+        // proximo turno mande historial en un solo idioma. Si la traduccion no llego, el
+        // idioma se corrige igual y el turno sigue mostrandose en la lengua original: peor
+        // historial, pero nunca un mensaje perdido.
+        userMessage.applyDetectedLanguage(detectedLanguage, userMessageTranslated);
+        IChatPersistencePort.saveMessage(userMessage);
         ChatMessageProcessing processing = IChatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
                 .orElseGet(() -> initializeProcessingRecord(userMessageId, now));
         if (processing.complete(now)) {

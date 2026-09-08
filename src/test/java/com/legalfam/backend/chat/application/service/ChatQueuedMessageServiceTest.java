@@ -61,7 +61,7 @@ class ChatQueuedMessageServiceTest {
                 3
         );
         List<ChatCitationResponse> citations = List.of(new ChatCitationResponse("source", "snippet", null, "pasaje literal", "https://example.test", null, null, null));
-        ChatAssistantGatewayResponse response = new ChatAssistantGatewayResponse("respuesta", null, null, citations, metadata);
+        ChatAssistantGatewayResponse response = new ChatAssistantGatewayResponse("respuesta", null, null, null, citations, metadata);
 
         when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);
         when(IChatAssistantGatewayPort.sendMessage("hola", sessionId, previousMessages, ChatLanguage.ES))

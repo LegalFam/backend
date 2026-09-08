@@ -11,6 +11,9 @@ public record ChatMessageResponse(
         // "Ver en espanol".
         String content,
         String language,
+        // Solo cuando el idioma del turno no es el que pidio la interfaz. Null en el caso
+        // normal; con valor, el frontend explica por que este mensaje esta en otra lengua.
+        String languageRequested,
         // Texto en la lengua del usuario. Null en conversaciones en espanol.
         String contentLocalized,
         String errorCode,

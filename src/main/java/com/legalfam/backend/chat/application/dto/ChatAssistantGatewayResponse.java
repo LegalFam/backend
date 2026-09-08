@@ -12,6 +12,10 @@ public record ChatAssistantGatewayResponse(
         // llamar al flujo, asi que esta es la unica oportunidad de dejar el historial en
         // espanol; sin ella los agentes recibirian turnos en idiomas mezclados.
         String userMessageTranslated,
+        // El idioma que el flujo leyo del texto del usuario, que manda sobre el que se pidio
+        // al enviarlo. Vacio si el flujo desplegado es anterior a la deteccion: en ese caso
+        // se respeta el solicitado y todo se comporta como antes.
+        String languageDetected,
         List<ChatCitationResponse> citations,
         ChatAssistantMetadata metadata
 ) {

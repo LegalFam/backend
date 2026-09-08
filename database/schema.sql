@@ -58,7 +58,12 @@ CREATE TABLE IF NOT EXISTS chat_message (
     -- Siempre el espanol canonico, sea cual sea el idioma del usuario: de aca sale el
     -- historial que viaja al flujo n8n.
     content TEXT NOT NULL,
+    -- El idioma EFECTIVO del turno, leido del texto por el flujo n8n. No es lo que pidio la
+    -- interfaz: quien tiene la app en quechua puede escribir en aymara.
     language VARCHAR(8) NOT NULL DEFAULT 'es' CHECK (language IN ('es', 'qu', 'ay')),
+    -- Lo que si habia pedido la interfaz, y solo cuando difiere del efectivo. NULL es el
+    -- caso normal; con valor, el frontend explica por que se respondio en otra lengua.
+    language_requested VARCHAR(8) NULL CHECK (language_requested IS NULL OR language_requested IN ('es', 'qu', 'ay')),
     -- El texto en la lengua del usuario. NULL cuando language = 'es'.
     content_localized TEXT NULL,
     next_steps_localized TEXT NULL,

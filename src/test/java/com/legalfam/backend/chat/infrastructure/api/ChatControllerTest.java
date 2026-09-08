@@ -236,6 +236,7 @@ class ChatControllerTest {
                         "es",
                         null,
                         null,
+                        null,
                         5,
                         "util",
                         Instant.parse("2026-01-01T00:00:01Z"),

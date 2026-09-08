@@ -27,6 +27,7 @@ public class ChatMessageResponseMapper {
                 message.getRole().name(),
                 message.getContent(),
                 message.getLanguage().code(),
+                message.getLanguageRequested() == null ? null : message.getLanguageRequested().code(),
                 message.getContentLocalized(),
                 message.getErrorCode(),
                 message.getRating(),

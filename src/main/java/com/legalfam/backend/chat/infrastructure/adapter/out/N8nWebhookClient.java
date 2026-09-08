@@ -179,14 +179,23 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
     }
 
     private ChatAssistantGatewayResponse mapResponse(JsonNode root, ChatLanguage language) {
+        // Que la respuesta venga traducida lo decide el idioma que el flujo LEYO del mensaje,
+        // no el que se le pidio: un turno escrito en espanol con la interfaz en quechua se
+        // responde en espanol y no trae campos localizados. Un flujo anterior a la deteccion
+        // no devuelve `language`, y entonces se respeta el solicitado, como siempre.
+        String detected = readText(root, "language");
+        ChatLanguage effective = detected == null || detected.isBlank()
+                ? language
+                : ChatLanguage.fromCode(detected);
         // En espanol el flujo no traduce nada, asi que los campos localizados no vienen. Si
         // en una conversacion en otra lengua faltan, la respuesta sigue siendo valida: se
         // muestra el espanol, que es la version autoritativa de todos modos.
-        boolean localized = !language.isSpanish();
+        boolean localized = !effective.isSpanish();
         return new ChatAssistantGatewayResponse(
                 readText(root, "message"),
                 localized ? readText(root, "message_localized") : null,
                 localized ? readText(root, "user_message_es") : null,
+                effective.code(),
                 extractCitations(root.get("citations"), localized),
                 extractMetadata(root, localized)
         );

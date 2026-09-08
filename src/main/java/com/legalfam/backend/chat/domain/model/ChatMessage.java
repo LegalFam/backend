@@ -15,7 +15,14 @@ public class ChatMessage {
     // Siempre el espanol canonico. De aca sale el historial que viaja al flujo n8n, y por
     // eso no cambia aunque el usuario lea en quechua o aymara.
     private String content;
+    // El idioma EFECTIVO del turno: el que el flujo leyo del texto, no el que pidio la
+    // interfaz. Es el que decide en que lengua se muestra el mensaje.
     private ChatLanguage language = ChatLanguage.ES;
+    // El que si habia pedido la interfaz, y solo cuando difiere del efectivo. Null es el
+    // caso normal. Se guarda porque el idioma de la interfaz cambia y el del mensaje no:
+    // sin el, al recargar el historial se perderia la explicacion de por que ese turno
+    // quedo en otra lengua.
+    private ChatLanguage languageRequested;
     // El texto en la lengua del usuario. Null cuando la conversacion es en espanol.
     private String contentLocalized;
     private String errorCode;
@@ -66,15 +73,36 @@ public class ChatMessage {
             ChatLanguage language,
             Instant createdAt
     ) {
+        return assistantMessage(chatSessionId, content, contentLocalized, language, language, createdAt);
+    }
+
+    /**
+     * La respuesta se redacta en el idioma que el flujo leyo del mensaje ({@code language}),
+     * que no siempre es el que pidio la interfaz ({@code languageRequested}). Cuando
+     * coinciden no hay nada que explicar y el solicitado queda en null.
+     */
+    public static ChatMessage assistantMessage(
+            UUID chatSessionId,
+            String content,
+            String contentLocalized,
+            ChatLanguage language,
+            ChatLanguage languageRequested,
+            Instant createdAt
+    ) {
         ChatMessage message = new ChatMessage();
         message.id = UUID.randomUUID();
         message.chatSessionId = chatSessionId;
         message.role = ChatMessageRole.ASSISTANT;
         message.content = content;
         message.language = language == null ? ChatLanguage.ES : language;
+        message.languageRequested = mismatchOrNull(message.language, languageRequested);
         message.contentLocalized = message.language.isSpanish() ? null : normalizeBlank(contentLocalized);
         message.createdAt = createdAt;
         return message;
+    }
+
+    private static ChatLanguage mismatchOrNull(ChatLanguage effective, ChatLanguage requested) {
+        return requested == null || requested == effective ? null : requested;
     }
 
     public static ChatMessage systemMessage(UUID chatSessionId, String content, Instant createdAt) {
@@ -98,6 +126,7 @@ public class ChatMessage {
             ChatMessageRole role,
             String content,
             ChatLanguage language,
+            ChatLanguage languageRequested,
             String contentLocalized,
             String errorCode,
             Integer rating,
@@ -117,6 +146,7 @@ public class ChatMessage {
         message.role = role;
         message.content = content;
         message.language = language == null ? ChatLanguage.ES : language;
+        message.languageRequested = mismatchOrNull(message.language, languageRequested);
         message.contentLocalized = normalizeBlank(contentLocalized);
         message.errorCode = normalizeBlank(errorCode);
         message.rating = rating;
@@ -137,6 +167,28 @@ public class ChatMessage {
      * cuando el flujo n8n devuelve la traduccion, de modo que el historial que reciben los
      * agentes quede integramente en espanol y no mezclado.
      */
+    /**
+     * Corrige el idioma de un mensaje del usuario con el que el flujo leyo del texto y, de
+     * paso, fija su espanol canonico. Se guardo con el idioma de la interfaz, que es la
+     * unica pista disponible antes de la respuesta y puede estar equivocada.
+     *
+     * <p>Si el texto ya estaba en espanol, no hay traduccion ni version localizada que
+     * conmutar: {@code content_localized} vuelve a quedar vacio.
+     */
+    public void applyDetectedLanguage(ChatLanguage detected, String translatedContent) {
+        if (role != ChatMessageRole.USER || detected == null) {
+            return;
+        }
+        ChatLanguage requested = language;
+        language = detected;
+        languageRequested = mismatchOrNull(language, requested);
+        if (language.isSpanish()) {
+            contentLocalized = null;
+            return;
+        }
+        applyTranslatedContent(translatedContent);
+    }
+
     public void applyTranslatedContent(String translatedContent) {
         if (role != ChatMessageRole.USER || language.isSpanish()) {
             return;
@@ -198,6 +250,11 @@ public class ChatMessage {
 
     public String getContent() {
         return content;
+    }
+
+    /** Null cuando el idioma efectivo es el que se habia pedido, que es el caso normal. */
+    public ChatLanguage getLanguageRequested() {
+        return languageRequested;
     }
 
     public ChatLanguage getLanguage() {

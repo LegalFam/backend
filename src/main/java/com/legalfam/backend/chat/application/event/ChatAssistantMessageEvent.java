@@ -11,6 +11,9 @@ public record ChatAssistantMessageEvent(
         UUID messageId,
         String message,
         String language,
+        // Solo cuando el idioma en que se respondio no es el que pidio la interfaz. Null en
+        // el caso normal; con valor, el frontend explica el cambio.
+        String languageRequested,
         String messageLocalized,
         Instant createdAt,
         List<ChatCitationResponse> citations,

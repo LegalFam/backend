@@ -248,6 +248,60 @@ class N8nWebhookClientTest {
         assertNull(response.messageLocalized());
     }
 
+    /** El flujo leyo aymara donde la interfaz habia pedido quechua: manda lo que leyo. */
+    @Test
+    void mapResponseTakesLanguageFromTheFlowNotFromTheRequest() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "message_localized": "jaysawi",
+                  "user_message_es": "que puedo hacer",
+                  "language": "ay",
+                  "language_requested": "qu",
+                  "citations": []
+                }
+                """, ChatLanguage.QU);
+
+        assertEquals("ay", response.languageDetected());
+        assertEquals("jaysawi", response.messageLocalized());
+        assertEquals("que puedo hacer", response.userMessageTranslated());
+    }
+
+    /**
+     * Se pidio quechua pero se escribio en espanol: el flujo responde en espanol y no manda
+     * campos localizados, asi que tampoco hay que ir a buscarlos.
+     */
+    @Test
+    void mapResponseIgnoresLocalizedFieldsWhenTheFlowAnsweredInSpanish() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "language": "es",
+                  "language_requested": "qu",
+                  "citations": []
+                }
+                """, ChatLanguage.QU);
+
+        assertEquals("es", response.languageDetected());
+        assertNull(response.messageLocalized());
+        assertNull(response.userMessageTranslated());
+    }
+
+    /** Flujo anterior a la deteccion: sin `language`, se respeta el idioma solicitado. */
+    @Test
+    void mapResponseFallsBackToRequestedLanguageWhenFlowOmitsIt() throws Exception {
+        ChatAssistantGatewayResponse response = map("""
+                {
+                  "message": "respuesta",
+                  "message_localized": "kutichiy",
+                  "citations": []
+                }
+                """, ChatLanguage.QU);
+
+        assertEquals("qu", response.languageDetected());
+        assertEquals("kutichiy", response.messageLocalized());
+    }
+
     private ChatAssistantGatewayResponse map(String responseBody) throws Exception {
         return map(responseBody, ChatLanguage.ES);
     }
