@@ -1,6 +1,6 @@
 # Resumen — `humo`
 
-Commits: frontend `f206794`, backend `5cc5438`
+Commits: frontend `525af54`, backend `80d1826-dirty`; frontend `525af54-dirty`, backend `80d1826`; frontend `f206794`, backend `5cc5438`
 
 ## Entrega
 
@@ -12,6 +12,8 @@ Commits: frontend `f206794`, backend `5cc5438`
 | S2 | 1 | 0 | 0.0 % | [0.0 %; 79.3 %] | — | — | 0 |
 | S3 | 1 | 1 | 100.0 % | [20.7 %; 100.0 %] | 491.6 | 491.6 | 0 |
 | S4 | 1 | 0 | 0.0 % | [0.0 %; 79.3 %] | — | — | 0 |
+| S5 | 1 | 1 | 100.0 % | [20.7 %; 100.0 %] | 487.5 | 487.5 | 0 |
+| S6 | 1 | 1 | 100.0 % | [20.7 %; 100.0 %] | 1.5 | 1.5 | 0 |
 
 Tiempo hasta la entrega = max(visible en pantalla, `READ`) − vuelta de la conexión (en S0, − t₀; en S4, − apertura de la página nueva).
 
@@ -25,6 +27,8 @@ Tiempo hasta la entrega = max(visible en pantalla, `READ`) − vuelta de la cone
 | S2 | 0 | 0 | 0 | 1 |
 | S3 | 1 | 0 | 0 | 0 |
 | S4 | 0 | 0 | 0 | 1 |
+| S5 | 1 | 0 | 0 | 0 |
+| S6 | 0 | 1 | 0 | 0 |
 
 ## Duplicados, cobros y bloqueo
 
@@ -36,6 +40,8 @@ Tiempo hasta la entrega = max(visible en pantalla, `READ`) − vuelta de la cone
 | S2 | 0 / 0 | 0 | 0 | 0 | 0 | blocked: 1 |
 | S3 | 1 / 2 | 0 | 0 | 0 | 0 | blocked: 1 |
 | S4 | 0 / 0 | 0 | 0 | 0 | 0 | blocked: 1 |
+| S5 | 0 / 0 | 0 | 0 | 0 | 0 | blocked: 1 |
+| S6 | 0 / 0 | 0 | 0 | 0 | 0 | blocked: 1 |
 
 `subscription_delta` incluye el cobro de una consulta de control aceptada después de `READ`; en ese caso se revisa `notes`.
 
@@ -49,6 +55,15 @@ Tiempo hasta la entrega = max(visible en pantalla, `READ`) − vuelta de la cone
 | S2 | 0 | 0 | 1 | 0 | 5–5 |
 | S3 | 1 | 0 | 0 | 0 | 3–3 |
 | S4 | 0 | 0 | 1 | 0 | 5–5 |
+| S5 | 1 | 0 | 0 | 0 | 1–1 |
+| S6 | 1 | 0 | 0 | 0 | 1–1 |
+
+## Tandas (S5, S6)
+
+| Tanda | Pruebas | Entregadas | Inicio del fallo | Fin del fallo |
+|---|--:|--:|---|---|
+| S5-batch-1 | 1 | 1 | 1789657588098 | 1789658310312 (722.2 s) |
+| S6-batch-1 | 1 | 1 | 1789658869455 | 1789658878099 (8.6 s) |
 
 ## Pruebas no entregadas
 

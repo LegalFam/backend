@@ -35,20 +35,34 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && url.pathname === '/delay') {
-    const { sessionId, delayMs } = JSON.parse((await readBody(req)) || '{}')
-    delayOverrides.set(sessionId, Number(delayMs))
+    const { sessionId, delayMs, respondAt } = JSON.parse((await readBody(req)) || '{}')
+    delayOverrides.set(sessionId, respondAt ? { respondAt: Number(respondAt) } : { delayMs: Number(delayMs) })
+    return sendJson(res, 200, { ok: true })
+  }
+
+  if (req.method === 'POST' && url.pathname === '/fail') {
+    const { sessionId } = JSON.parse((await readBody(req)) || '{}')
+    failingSessions.add(sessionId)
     return sendJson(res, 200, { ok: true })
   }
 
   if (req.method === 'POST' && url.pathname === '/webhook/chat-process') {
     const payload = JSON.parse((await readBody(req)) || '{}')
     const sessionId = payload.session_id
-    const delayMs = delayOverrides.get(sessionId) ?? defaultDelayMs ?? sampleLatency()
-    const hit = { sessionId, receivedAt: Date.now(), delayMs, respondedAt: null, aborted: false }
+    const receivedAt = Date.now()
+    const override = delayOverrides.get(sessionId)
+    const delayMs = override?.respondAt
+      ? Math.max(0, override.respondAt - receivedAt)
+      : override?.delayMs ?? defaultDelayMs ?? sampleLatency()
+    const hit = { sessionId, receivedAt, delayMs, respondedAt: null, aborted: false }
     hits.push(hit)
     const timer = setTimeout(() => {
       hit.respondedAt = Date.now()
-      sendJson(res, 200, responseBody)
+      if (failingSessions.has(sessionId)) {
+        hit.failed = true
+        return sendJson(res, 500, { code: 'upstream_unavailable', message: 'mock agent failure' })
+      }
+      return sendJson(res, 200, responseBody)
     }, delayMs)
     req.socket.on('close', () => {
       if (hit.respondedAt === null) {
@@ -63,6 +77,7 @@ const server = http.createServer(async (req, res) => {
 })
 
 const delayOverrides = new Map()
+const failingSessions = new Set()
 
 server.listen(port, '127.0.0.1', () => {
   console.log(`mock-n8n listening on http://127.0.0.1:${port} delay=${defaultDelayMs ?? 'sampled'}`)

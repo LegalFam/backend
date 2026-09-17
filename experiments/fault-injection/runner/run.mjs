@@ -15,6 +15,7 @@ const { values: args } = parseArgs({
   options: {
     scenario: { type: 'string' },
     n: { type: 'string', default: '1' },
+    start: { type: 'string', default: '1' },
     concurrency: { type: 'string', default: '10' },
     out: { type: 'string' },
     'proxy-base': { type: 'string', default: '9100' },
@@ -28,6 +29,7 @@ const { values: args } = parseArgs({
 
 const SCENARIOS = args.scenario.split(',')
 const N = Number(args.n)
+const START = Number(args.start)
 const CONCURRENCY = Number(args.concurrency)
 const OUT_DIR = path.resolve(args.out)
 const LONG_FAULT_MS = Number(args['long-fault-min']) * MINUTE
@@ -37,6 +39,10 @@ const MOCK_DELAY_MS = 20_000
 const LEAD_MS = 5_000
 const GRACE_MS = 15_000
 const BATCH_SCENARIOS = new Set(['S5', 'S6'])
+// El agente falla durante el corte: el error no pasa por el outbox, así que la prueba mira el
+// mensaje de sistema en pantalla y no el evento de entrega.
+const ERROR_SCENARIOS = new Set(['S7'])
+const BATCH_SEND_WINDOW_MS = 90_000
 
 if (SCENARIOS.some((s) => BATCH_SCENARIOS.has(s)) && SCENARIOS.length > 1) {
   throw new Error('S5 and S6 must run alone')
@@ -97,6 +103,14 @@ async function outboxForSession(sessionId, excludeIds = []) {
     [sessionId, excludeIds]
   )
   return rows[0] || null
+}
+
+async function systemMessageId(sessionId) {
+  const { rows } = await db.query(
+    `SELECT id FROM chat_message WHERE chat_session_id = $1 AND role = 'SYSTEM' ORDER BY created_at LIMIT 1`,
+    [sessionId]
+  )
+  return rows[0]?.id ?? null
 }
 
 async function outboxById(assistantId) {
@@ -192,27 +206,32 @@ async function openChat(context, sessionId, logs, pageIndex) {
 
 function parseBackendAttempts(assistantId) {
   const attempts = []
-  const pattern = new RegExp(
+  const attemptPattern = new RegExp(
     `^(\\S+)\\s.*\\[FAULT-INJECTION\\] delivery_attempt messageId=${assistantId} delivered=(true|false) status=\\S+ attemptCount=(\\d+)`
   )
+  const relayPattern = new RegExp(`^(\\S+)\\s.*\\[FAULT-INJECTION\\] relay messageId=${assistantId} .* result=(published|failed)`)
   for (const file of backendLogFiles()) {
     for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
       if (!line.includes(assistantId)) continue
-      const match = line.match(pattern)
-      if (match) attempts.push({ t: Date.parse(match[1]), delivered: match[2] === 'true', attempt: Number(match[3]) })
+      const attempt = line.match(attemptPattern)
+      if (attempt) attempts.push({ kind: 'dispatch', t: Date.parse(attempt[1]), delivered: attempt[2] === 'true', attempt: Number(attempt[3]) })
+      const relay = line.match(relayPattern)
+      if (relay) attempts.push({ kind: 'relay', t: Date.parse(relay[1]), delivered: relay[2] === 'published' })
     }
   }
   return attempts.sort((a, b) => a.t - b.t)
 }
 
+// Un SSE cuenta como reintento si antes de llegar hubo un despacho o un relay previo fallido o repetido.
 function derivePath(logs, assistantId, attempts) {
   const arrivals = logs.filter((log) => log.id === assistantId && (log.ev === 'sse' || log.ev === 'history'))
   if (!arrivals.length) return null
   const first = arrivals.reduce((a, b) => (a.t <= b.t ? a : b))
   if (first.ev === 'history') return 'history'
-  const dispatched = attempts.filter((attempt) => attempt.delivered && attempt.t <= first.t + 1000)
-  const attempt = dispatched.length ? dispatched[dispatched.length - 1].attempt : 1
-  return attempt > 1 ? 'retry_sse' : 'sse'
+  const before = attempts.filter((attempt) => attempt.t <= first.t + 1000)
+  const relays = before.filter((attempt) => attempt.kind === 'relay')
+  const dispatches = before.filter((attempt) => attempt.kind === 'dispatch')
+  return relays.length > 1 || dispatches.length > 1 ? 'retry_sse' : 'sse'
 }
 
 async function runTrial({ trialId, scenario, slot, batch }) {
@@ -240,8 +259,17 @@ async function runTrial({ trialId, scenario, slot, batch }) {
     await fetch(`${MOCK_URL}/delay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: trial.session_id, delayMs: MOCK_DELAY_MS }),
+      body: JSON.stringify(
+        batch ? { sessionId: trial.session_id, respondAt: batch.respondAt } : { sessionId: trial.session_id, delayMs: MOCK_DELAY_MS }
+      ),
     })
+    if (ERROR_SCENARIOS.has(scenario)) {
+      await fetch(`${MOCK_URL}/fail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: trial.session_id }),
+      })
+    }
     const { rows: subscriptionBefore } = await db.query('SELECT remaining_tokens FROM subscriptions WHERE user_id = $1', [userId])
 
     context = await browser.newContext({ proxy: { server: `http://127.0.0.1:${proxy.port}`, bypass: '' } })
@@ -269,21 +297,53 @@ async function runTrial({ trialId, scenario, slot, batch }) {
     if (!userMessage) throw new Error('user message was not persisted')
     trial.user_message_id = userMessage.id
 
-    const hit = await poll(async () => (await mockHits(trial.session_id))[0], { timeoutMs: 60_000 })
+    // El backend atiende 4 llamadas al agente a la vez (chatTaskExecutor), así que con varias
+    // sesiones en paralelo la llamada al mock puede esperar en cola antes de salir.
+    const hit = await poll(async () => (await mockHits(trial.session_id))[0], { timeoutMs: 240_000 })
     if (!hit) throw new Error('mock n8n was never called')
     trial.t0 = hit.receivedAt + hit.delayMs
     batch?.reportT0(trial)
 
-    const probe = probeLock(trial, auth)
+    const probe = ERROR_SCENARIOS.has(scenario)
+      ? Promise.resolve({ lock_check: 'not_applicable' })
+      : probeLock(trial, auth)
+
+    // Observa desde t₀ y en paralelo con el fallo: en S3, S5 y S6 la API sigue en pie y la
+    // respuesta puede aparecer en pantalla mientras dura el corte.
+    let assistantId = null
+    let domCopiesMax = 0
+    const observation = (async () => {
+      let doneAt = null
+      while (!trial.t_fault_end || Date.now() < trial.t_fault_end + WINDOW_MS) {
+        if (doneAt && Date.now() > doneAt + GRACE_MS) break
+        if (!assistantId) {
+          assistantId = ERROR_SCENARIOS.has(scenario)
+            ? await systemMessageId(trial.session_id).catch(() => null)
+            : (await outboxForSession(trial.session_id).catch(() => null))?.aggregate_id ?? null
+        }
+        if (assistantId) {
+          if (page && !page.isClosed()) {
+            const copies = await page.locator(`[data-message-id="${assistantId}"]`).count().catch(() => 0)
+            domCopiesMax = Math.max(domCopiesMax, copies)
+            if (copies > 0 && !trial.t_visible) trial.t_visible = Date.now()
+          }
+          const event = await outboxById(assistantId).catch(() => null)
+          if (event?.status === 'READ' && !trial.t_read) trial.t_read = event.read_at.getTime()
+          const complete = ERROR_SCENARIOS.has(scenario) ? trial.t_visible : trial.t_visible && trial.t_read
+          if (complete && !doneAt) doneAt = Date.now()
+        }
+        await sleep(500)
+      }
+    })()
 
     if (scenario === 'S0') {
       trial.t_fault_start = null
       trial.t_fault_end = trial.t0
-    } else if (scenario === 'S1a' || scenario === 'S1b' || scenario === 'S2') {
+    } else if (scenario === 'S1a' || scenario === 'S1b' || scenario === 'S2' || scenario === 'S7') {
       await waitUntil(trial.t0 - LEAD_MS)
       trial.t_fault_start = Date.now()
       proxy.setMode(scenario === 'S2' ? 'blackhole' : 'reset')
-      await sleep(scenario === 'S1a' ? 30_000 : LONG_FAULT_MS)
+      await sleep(scenario === 'S1a' || scenario === 'S7' ? 30_000 : LONG_FAULT_MS)
       proxy.setMode('pass')
       trial.t_fault_end = Date.now()
     } else if (scenario === 'S3') {
@@ -307,27 +367,7 @@ async function runTrial({ trialId, scenario, slot, batch }) {
       Object.assign(trial, window)
     }
 
-    let assistantId = null
-    let domCopiesMax = 0
-    const deadline = trial.t_fault_end + WINDOW_MS
-    let doneAt = null
-    while (Date.now() < deadline && (!doneAt || Date.now() < doneAt + GRACE_MS)) {
-      if (!assistantId) {
-        const event = await outboxForSession(trial.session_id).catch(() => null)
-        assistantId = event?.aggregate_id ?? null
-      }
-      if (assistantId) {
-        if (page && !page.isClosed()) {
-          const copies = await page.locator(`[data-message-id="${assistantId}"]`).count().catch(() => 0)
-          domCopiesMax = Math.max(domCopiesMax, copies)
-          if (copies > 0 && !trial.t_visible) trial.t_visible = Date.now()
-        }
-        const event = await outboxById(assistantId).catch(() => null)
-        if (event?.status === 'READ' && !trial.t_read) trial.t_read = event.read_at.getTime()
-        if (trial.t_visible && trial.t_read && !doneAt) doneAt = Date.now()
-      }
-      await sleep(500)
-    }
+    await observation
 
     Object.assign(trial, await probe)
     trial.message_id = assistantId
@@ -363,11 +403,13 @@ async function runTrial({ trialId, scenario, slot, batch }) {
     trial.backend_attempts = attempts
     trial.conn_events = logs.filter((log) => log.ev === 'conn').map(({ page: p, state, t }) => ({ page: p, state, t }))
     if (args['trace-network']) trial.network = logs.filter((log) => log.ev.startsWith('net_'))
-    trial.delivered = Boolean(trial.t_visible && trial.t_read)
+    trial.delivered = ERROR_SCENARIOS.has(scenario) ? Boolean(trial.t_visible) : Boolean(trial.t_visible && trial.t_read)
+    trial.sse_error_events = logs.filter((log) => log.ev === 'sse_error' && log.id === assistantId).length
     trial.lock_violation = trial.lock_check === 'violation'
   } catch (error) {
     trial.error = error.message
     trial.delivered = false
+    if (!trial.t0) batch?.reportLost()
   } finally {
     proxy.setMode('pass')
     await context?.close().catch(() => {})
@@ -379,7 +421,7 @@ async function runTrial({ trialId, scenario, slot, batch }) {
 
 async function runParallel() {
   const queue = []
-  for (let i = 1; i <= N; i += 1) {
+  for (let i = START; i < START + N; i += 1) {
     for (const scenario of SCENARIOS) queue.push({ scenario, trialId: `${scenario}-${String(i).padStart(3, '0')}` })
   }
   const freeSlots = Array.from({ length: CONCURRENCY }, (_, slot) => slot)
@@ -400,18 +442,28 @@ async function runParallel() {
 
 async function runBatches(scenario) {
   const batchCount = Math.ceil(N / CONCURRENCY)
-  let trialNumber = 0
+  let trialNumber = START - 1
   for (let b = 0; b < batchCount; b += 1) {
-    const size = Math.min(CONCURRENCY, N - trialNumber)
+    const size = Math.min(CONCURRENCY, N - (trialNumber - START + 1))
     const t0Reports = []
     const allT0 = deferred()
     const windowReady = deferred()
+    // Todas las respuestas de la tanda salen del mock a la vez: con t₀ escalonados, el worker
+    // entregaba las primeras antes de que llegara el fallo compartido.
+    let pending = size
     const batch = {
       id: `${scenario}-batch-${b + 1}`,
+      respondAt: Date.now() + BATCH_SEND_WINDOW_MS,
       faultWindow: windowReady.promise,
       reportT0: (trial) => {
         t0Reports.push(trial)
-        if (t0Reports.length === size) allT0.resolve()
+        pending -= 1
+        if (!pending) allT0.resolve()
+      },
+      // Una prueba que falla antes de llegar a t₀ no puede dejar esperando a la tanda.
+      reportLost: () => {
+        pending -= 1
+        if (!pending) allT0.resolve()
       },
     }
     const trials = []
@@ -419,11 +471,14 @@ async function runBatches(scenario) {
       trialNumber += 1
       trials.push(runTrial({ scenario, slot, batch, trialId: `${scenario}-${String(trialNumber).padStart(3, '0')}` }))
     }
-    await Promise.race([allT0.promise, sleep(120_000)])
+    // El fallo se ancla al instante en que el mock responde a toda la tanda, que el runner fija
+    // de antemano; esperar a que las pruebas reporten su t₀ deja el fallo fuera de la ventana.
+    await Promise.race([allT0.promise, waitUntil(batch.respondAt - 2 * LEAD_MS)])
     const t0s = t0Reports.map((trial) => trial.t0)
+    if (!t0s.length) throw new Error(`${batch.id}: no trial reached t0`)
     const window = {}
     if (scenario === 'S5') {
-      await waitUntil(Math.min(...t0s) - LEAD_MS)
+      await waitUntil(batch.respondAt - LEAD_MS)
       window.t_fault_start = Date.now()
       stopRabbit()
       runLog({ batch: batch.id, rabbit: 'stopped' })
@@ -432,7 +487,7 @@ async function runBatches(scenario) {
       window.t_fault_end = Date.now()
       runLog({ batch: batch.id, rabbit: 'started' })
     } else {
-      await waitUntil(Math.max(...t0s))
+      await waitUntil(batch.respondAt)
       await poll(async () => {
         const outboxes = await Promise.all(t0Reports.map((trial) => outboxForSession(trial.session_id)))
         return outboxes.every(Boolean)

@@ -57,7 +57,7 @@ export async function gitCommit(repoDir) {
 }
 
 export async function gitDirty(repoDir) {
-  return execFileSync('git', ['-C', repoDir, 'status', '--porcelain']).toString().trim().length > 0
+  return execFileSync('git', ['-C', repoDir, 'status', '--porcelain', '--untracked-files=no', '--', '.', ':!experiments']).toString().trim().length > 0
 }
 
 export async function mockHits(sessionId) {
