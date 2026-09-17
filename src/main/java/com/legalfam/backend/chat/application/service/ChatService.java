@@ -39,11 +39,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChatService implements IChatUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
 
     private static final int ASSISTANT_CONTEXT_CONTENT_LIMIT = 2000;
 
@@ -237,8 +241,10 @@ public class ChatService implements IChatUseCase {
                 .orElseThrow(ChatNotFoundException::assistantDeliveryEvent);
 
         Instant now = Instant.now();
-        outboxEvent.markRead(now);
+        boolean changed = outboxEvent.markRead(now);
         IChatPersistencePort.saveOutboxEvent(outboxEvent);
+        log.info("[FAULT-INJECTION] receipt messageId={} firstRead={} attemptCount={}",
+                messageId, changed, outboxEvent.getAttemptCount());
         messageSession.recordActivity(now);
         IChatPersistencePort.saveSession(messageSession);
     }

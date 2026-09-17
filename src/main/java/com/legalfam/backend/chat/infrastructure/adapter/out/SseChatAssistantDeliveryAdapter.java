@@ -68,16 +68,22 @@ public class SseChatAssistantDeliveryAdapter implements IChatAssistantDeliveryPo
 
     @Override
     public boolean dispatchAssistantMessage(UUID userId, UUID sessionId, ChatAssistantMessageEvent event) {
+        String result = dispatchAssistantMessageResult(userId, sessionId, event);
+        log.info("[FAULT-INJECTION] dispatch messageId={} sessionId={} result={}", event.messageId(), sessionId, result);
+        return "sent".equals(result);
+    }
+
+    private String dispatchAssistantMessageResult(UUID userId, UUID sessionId, ChatAssistantMessageEvent event) {
         Map<UUID, SseEmitter> userEmitters = emittersByUser.get(userId);
         if (userEmitters == null) {
             log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return false;
+            return "no_emitter";
         }
 
         SseEmitter emitter = userEmitters.get(sessionId);
         if (emitter == null) {
             log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return false;
+            return "no_emitter";
         }
 
         try {
@@ -85,11 +91,11 @@ public class SseChatAssistantDeliveryAdapter implements IChatAssistantDeliveryPo
                     .name("assistant_message")
                     .id(event.messageId().toString())
                     .data(event));
-            return true;
+            return "sent";
         } catch (IOException | IllegalStateException ex) {
             log.info("Failed to dispatch SSE event for userId={} sessionId={}: {}", userId, sessionId, ex.getMessage());
             removeEmitter(userId, sessionId, emitter);
-            return false;
+            return "send_failed";
         }
     }
 

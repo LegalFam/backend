@@ -63,9 +63,13 @@ public class ChatDeliveryRetryWorker {
                     objectMapper.readValue(event.getPayload(), ChatAssistantDeliveryQueuedEvent.class);
             IChatEventPublisherPort.publishAssistantDelivery(payload);
             relayTransactionService.recordPublishSuccess(aggregateId, now);
+            log.info("[FAULT-INJECTION] relay messageId={} status={} attemptCount={} result=published",
+                    aggregateId, event.getStatus(), event.getAttemptCount());
         } catch (Exception ex) {
             String errorMessage = truncateError(ex.getMessage());
             relayTransactionService.recordPublishFailure(aggregateId, now, retryDelay, errorMessage);
+            log.info("[FAULT-INJECTION] relay messageId={} status={} attemptCount={} result=failed",
+                    aggregateId, event.getStatus(), event.getAttemptCount());
             log.warn("Failed to publish assistant delivery outbox event id={} aggregateId={} error={}",
                     event.getId(), aggregateId, errorMessage);
         }

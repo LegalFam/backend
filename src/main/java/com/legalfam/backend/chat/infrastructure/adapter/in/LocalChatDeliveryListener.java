@@ -6,6 +6,8 @@ import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import java.time.Duration;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.annotation.Propagation;
@@ -18,6 +20,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @ConditionalOnProperty(name = "app.chat.messaging.rabbit.enabled", havingValue = "false")
 public class LocalChatDeliveryListener {
 
+    private static final Logger log = LoggerFactory.getLogger(LocalChatDeliveryListener.class);
     private static final Duration RETRY_DELAY = Duration.ofMinutes(10);
 
     private final IChatPersistencePort IChatPersistencePort;
@@ -45,5 +48,8 @@ public class LocalChatDeliveryListener {
         boolean delivered = IChatAssistantDeliveryPort.dispatchAssistantMessage(event.userId(), event.chatSessionId(), event.event());
         outboxEvent.recordDeliveryAttempt(delivered, now.plus(RETRY_DELAY), "No active SSE subscriber available", now);
         IChatPersistencePort.saveOutboxEvent(outboxEvent);
+        log.info("[FAULT-INJECTION] delivery_attempt messageId={} delivered={} status={} attemptCount={} availableAt={}",
+                event.assistantMessageId(), delivered, outboxEvent.getStatus(), outboxEvent.getAttemptCount(),
+                outboxEvent.getAvailableAt());
     }
 }
