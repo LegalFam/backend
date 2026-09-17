@@ -4,6 +4,7 @@ import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEv
 import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
+import com.legalfam.backend.chat.infrastructure.config.ChatOutboxRelayProperties;
 import java.time.Duration;
 import java.time.Instant;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -16,20 +17,21 @@ import tools.jackson.databind.ObjectMapper;
 @ConditionalOnProperty(name = "app.chat.messaging.rabbit.enabled", havingValue = "true", matchIfMissing = true)
 public class RabbitChatDeliveryListener {
 
-    private static final Duration RETRY_DELAY = Duration.ofMinutes(10);
-
     private final ObjectMapper objectMapper;
     private final IChatPersistencePort IChatPersistencePort;
     private final IChatAssistantDeliveryPort IChatAssistantDeliveryPort;
+    private final Duration retryDelay;
 
     public RabbitChatDeliveryListener(
             ObjectMapper objectMapper,
             IChatPersistencePort IChatPersistencePort,
-            IChatAssistantDeliveryPort IChatAssistantDeliveryPort
+            IChatAssistantDeliveryPort IChatAssistantDeliveryPort,
+            ChatOutboxRelayProperties properties
     ) {
         this.objectMapper = objectMapper;
         this.IChatPersistencePort = IChatPersistencePort;
         this.IChatAssistantDeliveryPort = IChatAssistantDeliveryPort;
+        this.retryDelay = Duration.ofMillis(properties.safeRetryDelayMs());
     }
 
     @RabbitListener(
@@ -47,7 +49,7 @@ public class RabbitChatDeliveryListener {
 
         Instant now = Instant.now();
         boolean delivered = IChatAssistantDeliveryPort.dispatchAssistantMessage(event.userId(), event.chatSessionId(), event.event());
-        outboxEvent.recordDeliveryAttempt(delivered, now.plus(RETRY_DELAY), "No active SSE subscriber available", now);
+        outboxEvent.recordDeliveryAttempt(delivered, now.plus(retryDelay), "No active SSE subscriber available", now);
         IChatPersistencePort.saveOutboxEvent(outboxEvent);
     }
 

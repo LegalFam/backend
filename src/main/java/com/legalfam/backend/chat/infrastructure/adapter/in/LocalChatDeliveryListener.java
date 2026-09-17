@@ -4,6 +4,7 @@ import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEv
 import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
+import com.legalfam.backend.chat.infrastructure.config.ChatOutboxRelayProperties;
 import java.time.Duration;
 import java.time.Instant;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,17 +19,18 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @ConditionalOnProperty(name = "app.chat.messaging.rabbit.enabled", havingValue = "false")
 public class LocalChatDeliveryListener {
 
-    private static final Duration RETRY_DELAY = Duration.ofMinutes(10);
-
     private final IChatPersistencePort IChatPersistencePort;
     private final IChatAssistantDeliveryPort IChatAssistantDeliveryPort;
+    private final Duration retryDelay;
 
     public LocalChatDeliveryListener(
             IChatPersistencePort IChatPersistencePort,
-            IChatAssistantDeliveryPort IChatAssistantDeliveryPort
+            IChatAssistantDeliveryPort IChatAssistantDeliveryPort,
+            ChatOutboxRelayProperties properties
     ) {
         this.IChatPersistencePort = IChatPersistencePort;
         this.IChatAssistantDeliveryPort = IChatAssistantDeliveryPort;
+        this.retryDelay = Duration.ofMillis(properties.safeRetryDelayMs());
     }
 
     @Async("chatTaskExecutor")
@@ -43,7 +45,7 @@ public class LocalChatDeliveryListener {
 
         Instant now = Instant.now();
         boolean delivered = IChatAssistantDeliveryPort.dispatchAssistantMessage(event.userId(), event.chatSessionId(), event.event());
-        outboxEvent.recordDeliveryAttempt(delivered, now.plus(RETRY_DELAY), "No active SSE subscriber available", now);
+        outboxEvent.recordDeliveryAttempt(delivered, now.plus(retryDelay), "No active SSE subscriber available", now);
         IChatPersistencePort.saveOutboxEvent(outboxEvent);
     }
 }
