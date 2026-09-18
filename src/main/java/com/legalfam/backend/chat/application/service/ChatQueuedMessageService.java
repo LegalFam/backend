@@ -1,12 +1,10 @@
 package com.legalfam.backend.chat.application.service;
 
-import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
 import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMessageDispatch;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.port.in.IChatAssistantPersistenceUseCase;
 import com.legalfam.backend.chat.application.port.in.IChatQueuedMessageUseCase;
-import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
@@ -24,16 +22,13 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
 
     private final IChatAssistantGatewayPort IChatAssistantGatewayPort;
     private final IChatAssistantPersistenceUseCase IChatAssistantPersistenceUseCase;
-    private final IChatAssistantDeliveryPort IChatAssistantDeliveryPort;
 
     public ChatQueuedMessageService(
             IChatAssistantGatewayPort IChatAssistantGatewayPort,
-            IChatAssistantPersistenceUseCase IChatAssistantPersistenceUseCase,
-            IChatAssistantDeliveryPort IChatAssistantDeliveryPort
+            IChatAssistantPersistenceUseCase IChatAssistantPersistenceUseCase
     ) {
         this.IChatAssistantGatewayPort = IChatAssistantGatewayPort;
         this.IChatAssistantPersistenceUseCase = IChatAssistantPersistenceUseCase;
-        this.IChatAssistantDeliveryPort = IChatAssistantDeliveryPort;
     }
 
     @Override
@@ -100,16 +95,12 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
             UUID userMessageId,
             ApiErrorDescriptor error
     ) {
-        ChatAssistantErrorDispatch dispatch = IChatAssistantPersistenceUseCase.persistAssistantFailure(
+        IChatAssistantPersistenceUseCase.persistAssistantFailure(
                 chatSessionId,
                 userMessageId,
                 error.code(),
                 error.message()
         );
-        if (dispatch == null) {
-            return;
-        }
-        IChatAssistantDeliveryPort.dispatchAssistantError(dispatch.userId(), dispatch.chatSessionId(), dispatch.event());
     }
 
     private boolean isBlank(String value) {

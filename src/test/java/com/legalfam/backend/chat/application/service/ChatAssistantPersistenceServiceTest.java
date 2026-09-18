@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
+import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
 import com.legalfam.backend.chat.application.port.out.IChatOutboxPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
 import com.legalfam.backend.chat.application.port.out.IChatTokenPort;
@@ -24,6 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -251,6 +253,30 @@ class ChatAssistantPersistenceServiceTest {
         assertNull(assistant.getLanguageRequested());
         assertEquals(ChatLanguage.QU, userMessage.getLanguage());
         assertNull(userMessage.getLanguageRequested());
+    }
+
+    @Test
+    void persistAssistantFailureEnqueuesErrorInOutbox() {
+        UUID userMessageId = UUID.randomUUID();
+        ChatMessage userMessage = ChatMessage.userMessage(SESSION_ID, "hola", Instant.now());
+        List<ChatMessage> saved = arrangeSuccessfulPersistence(userMessageId, userMessage);
+
+        chatAssistantPersistenceService.persistAssistantFailure(
+                SESSION_ID,
+                userMessageId,
+                "upstream_timeout",
+                "Assistant service timed out"
+        );
+
+        ArgumentCaptor<ChatAssistantDeliveryQueuedEvent> delivery =
+                ArgumentCaptor.forClass(ChatAssistantDeliveryQueuedEvent.class);
+        verify(chatOutboxPort).enqueueAssistantDelivery(delivery.capture());
+        ChatMessage failure = saved.getFirst();
+        assertEquals(ChatMessageRole.SYSTEM, failure.getRole());
+        assertEquals(failure.getId(), delivery.getValue().assistantMessageId());
+        assertNull(delivery.getValue().event());
+        assertEquals("upstream_timeout", delivery.getValue().error().errorCode());
+        assertEquals("PENDING", delivery.getValue().error().receiptStatus());
     }
 
     /** Deja el servicio listo para persistir y devuelve la lista donde caen los guardados. */

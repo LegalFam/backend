@@ -232,7 +232,7 @@ public class ChatService implements IChatUseCase {
     public void confirmAssistantReceipt(UUID userId, UUID messageId) {
         ChatMessage message = IChatPersistencePort.findMessageById(messageId)
                 .orElseThrow(ChatNotFoundException::message);
-        if (message.getRole() != ChatMessageRole.ASSISTANT) {
+        if (message.getRole() == ChatMessageRole.USER) {
             throw InvalidChatRequestException.of(ChatApiError.RECEIPT_ONLY_ASSISTANT_MESSAGES);
         }
 

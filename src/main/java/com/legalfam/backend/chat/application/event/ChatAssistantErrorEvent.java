@@ -8,6 +8,7 @@ public record ChatAssistantErrorEvent(
         UUID messageId,
         String errorCode,
         String errorMessage,
-        Instant createdAt
+        Instant createdAt,
+        String receiptStatus
 ) {
 }

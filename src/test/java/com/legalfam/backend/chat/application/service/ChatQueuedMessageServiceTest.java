@@ -1,18 +1,16 @@
 package com.legalfam.backend.chat.application.service;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.legalfam.backend.chat.application.dto.ChatAssistantErrorDispatch;
 import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
-import com.legalfam.backend.chat.application.event.ChatAssistantErrorEvent;
 import com.legalfam.backend.chat.application.event.ChatMessageQueuedEvent;
 import com.legalfam.backend.chat.application.port.in.IChatAssistantPersistenceUseCase;
-import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
 import com.legalfam.backend.chat.domain.exception.ChatApiError;
@@ -34,9 +32,6 @@ class ChatQueuedMessageServiceTest {
 
     @Mock
     private IChatAssistantPersistenceUseCase IChatAssistantPersistenceUseCase;
-
-    @Mock
-    private IChatAssistantDeliveryPort IChatAssistantDeliveryPort;
 
     @InjectMocks
     private ChatQueuedMessageService chatQueuedMessageService;
@@ -76,38 +71,18 @@ class ChatQueuedMessageServiceTest {
                 response,
                 ChatLanguage.ES
         );
-        verify(IChatAssistantDeliveryPort, never()).dispatchAssistantError(
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any()
-        );
+        verify(IChatAssistantPersistenceUseCase, never()).persistAssistantFailure(any(), any(), any(), any());
     }
 
     @Test
-    void processPersistsAndDispatchesFailureWhenAssistantGatewayFails() {
+    void processPersistsFailureWhenAssistantGatewayFails() {
         UUID sessionId = UUID.randomUUID();
         UUID userMessageId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        UUID failureMessageId = UUID.randomUUID();
         ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(sessionId, userMessageId, "hola", List.of(), "es");
-        ChatAssistantErrorEvent errorEvent = new ChatAssistantErrorEvent(
-                sessionId,
-                failureMessageId,
-                "upstream_timeout",
-                "Assistant service timed out",
-                Instant.now()
-        );
-        ChatAssistantErrorDispatch dispatch = new ChatAssistantErrorDispatch(userId, sessionId, errorEvent);
 
         when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);
         when(IChatAssistantGatewayPort.sendMessage("hola", sessionId, List.of(), ChatLanguage.ES))
                 .thenThrow(ChatUpstreamException.of(ChatApiError.UPSTREAM_TIMEOUT));
-        when(IChatAssistantPersistenceUseCase.persistAssistantFailure(
-                sessionId,
-                userMessageId,
-                "upstream_timeout",
-                "Assistant service timed out"
-        )).thenReturn(dispatch);
 
         chatQueuedMessageService.process(event);
 
@@ -117,6 +92,5 @@ class ChatQueuedMessageServiceTest {
                 "upstream_timeout",
                 "Assistant service timed out"
         );
-        verify(IChatAssistantDeliveryPort).dispatchAssistantError(userId, sessionId, errorEvent);
     }
 }

@@ -48,7 +48,7 @@ public class LocalChatDeliveryListener {
         }
 
         Instant now = Instant.now();
-        boolean delivered = IChatAssistantDeliveryPort.dispatchAssistantMessage(event.userId(), event.chatSessionId(), event.event());
+        boolean delivered = IChatAssistantDeliveryPort.dispatch(event);
         outboxEvent.recordDeliveryAttempt(delivered, now.plus(retryDelay), "No active SSE subscriber available", now);
         IChatPersistencePort.saveOutboxEvent(outboxEvent);
         log.info("[FAULT-INJECTION] delivery_attempt messageId={} delivered={} status={} attemptCount={} availableAt={}",

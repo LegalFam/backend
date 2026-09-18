@@ -138,12 +138,9 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
                 "PENDING",
                 true
         );
-        IChatOutboxPort.enqueueAssistantDelivery(new ChatAssistantDeliveryQueuedEvent(
-                chatSession.getUserId(),
-                chatSession.getId(),
-                assistantMessage.getId(),
-                assistantMessageEvent
-        ));
+        IChatOutboxPort.enqueueAssistantDelivery(
+                ChatAssistantDeliveryQueuedEvent.ofMessage(chatSession.getUserId(), assistantMessageEvent)
+        );
 
         return new ChatAssistantMessageDispatch(
                 chatSession.getUserId(),
@@ -172,17 +169,19 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         markUserMessageFailed(userMessageId, errorCode, errorMessage, now);
         chatSession.recordActivity(now);
         IChatPersistencePort.saveSession(chatSession);
-        return new ChatAssistantErrorDispatch(
-                chatSession.getUserId(),
+
+        ChatAssistantErrorEvent errorEvent = new ChatAssistantErrorEvent(
                 chatSession.getId(),
-                new ChatAssistantErrorEvent(
-                        chatSession.getId(),
-                        failureMessage.getId(),
-                        errorCode,
-                        errorMessage,
-                        failureMessage.getCreatedAt()
-                )
+                failureMessage.getId(),
+                errorCode,
+                errorMessage,
+                failureMessage.getCreatedAt(),
+                "PENDING"
         );
+        IChatOutboxPort.enqueueAssistantDelivery(
+                ChatAssistantDeliveryQueuedEvent.ofError(chatSession.getUserId(), errorEvent)
+        );
+        return new ChatAssistantErrorDispatch(chatSession.getUserId(), chatSession.getId(), errorEvent);
     }
 
     private void persistCitations(ChatMessage assistantMessage, List<ChatCitationResponse> citations) {
