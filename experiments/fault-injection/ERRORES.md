@@ -76,7 +76,7 @@ corrección.
 - S0, S1a, S1b, S3: 5/5 entregadas cada uno, 0 duplicados en pantalla y en base de datos, 0 cobros dobles, bloqueo
   `blocked` en las 20. S3: 3 eventos SSE del mismo id por prueba (duplicado de transporte esperado), 1 copia.
 
-## Observación, no defecto de entrega: el backend atiende 4 respuestas a la vez
+## Observación, no defecto de entrega: el backend atiende 4 respuestas a la vez (corregido después de la final, ver abajo)
 
 `chatTaskExecutor` (`AsyncConfig`) tiene `corePoolSize=4`, `maxPoolSize=8` y una cola de 200. Un pool de Spring solo
 crea hilos por encima del núcleo cuando la cola está **llena**, así que con esa cola los 8 hilos nunca se usan: se
@@ -88,13 +88,29 @@ latencia real del agente (mediana 42,5 s) la quinta consulta simultánea empieza
 primera. No se corrige aquí: la spec manda dejar la configuración como en producción. Por eso las tandas de S5 y S6
 son de **4** sesiones y no de 10: con 4 hilos nunca hay 10 respuestas en vuelo a la vez que un corte pueda alcanzar.
 
-## Sin corregir: H2, `assistant_error` fuera del outbox
+## D5 — H2: `assistant_error` fuera del outbox (corregido después de la final)
 
 - **Escenario:** S7 (nuevo, fuera de la spec): el mock falla (`POST /fail`) mientras la conexión está cortada 30 s.
 - **Medido en la final:** 0/50 errores llegan en vivo (0 eventos SSE de error); 50/50 se ven al reconectar, por
   historial, 5,4 s después (mediana). Sin evento de outbox, sin receipt, sin reintento, sin bloqueo y sin cobro.
-- **Causa:** `ChatQueuedMessageService.persistAndDispatchFailure` despacha el error directo, sin outbox.
-- **No se corrige:** el error no se pierde (queda en el historial); meterlo en el outbox queda como trabajo futuro.
+- **Causa:** `ChatQueuedMessageService.persistAndDispatchFailure` despachaba el error directo, sin outbox.
+- **Corrección:** `persistAssistantFailure` guarda el mensaje de sistema y su evento de outbox en la misma
+  transacción; los listeners despachan mensaje o error según el evento (`IChatAssistantDeliveryPort.dispatch`); el
+  receipt acepta mensajes de sistema; el frontend confirma la lectura de los errores. El error queda con la misma
+  garantía que la respuesta: reintento, receipt y bloqueo de la sesión hasta confirmarlo.
+- **Tests:** backend 281 en verde (`persistAssistantFailureEnqueuesErrorInOutbox`,
+  `rabbitListenerDispatchesQueuedAssistantErrorAsError`); frontend 5 en verde (`confirms the receipt of an assistant
+  error`, que falla sin la corrección).
+- **Commits:** `backend main f594383`, `frontend main a730cda`.
+- **Verificación** (`results/post-fix-h2/`, S7, S0 y S1a con n = 3): 9/9 entregadas; los 3 errores de S7 con evento de
+  outbox en `READ` al primer intento.
+- **Ojo al desplegar:** primero el frontend. Un backend nuevo con el frontend viejo deja la sesión bloqueada tras un
+  error, porque el frontend viejo no confirma los mensajes de sistema.
+
+## Pool del backend (corregido después de la final)
+
+`AsyncConfig` pasa a `corePoolSize=8` (mismo commit que D5). Verificado: con 9 sesiones simultáneas, 8 llamadas al
+agente arrancan juntas y la novena 20 s después (una vuelta del mock); antes eran rondas de 4.
 
 ## Commits
 
