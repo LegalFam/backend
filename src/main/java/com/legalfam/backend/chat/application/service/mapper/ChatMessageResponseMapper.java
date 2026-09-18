@@ -4,7 +4,6 @@ import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatMessageResponse;
 import com.legalfam.backend.chat.domain.model.ChatCitation;
 import com.legalfam.backend.chat.domain.model.ChatMessage;
-import com.legalfam.backend.chat.domain.model.ChatMessageRole;
 import com.legalfam.backend.chat.domain.model.ChatOutboxEvent;
 import java.time.Instant;
 import java.util.Collections;
@@ -41,8 +40,8 @@ public class ChatMessageResponseMapper {
                 message.getNextStepsLocalized(),
                 message.getSpecialistSupportRecommended(),
                 message.getCitationSupportStatus(),
-                resolveReceiptStatus(message, outboxEvent),
-                resolveReadAt(message, outboxEvent)
+                resolveReceiptStatus(outboxEvent),
+                resolveReadAt(outboxEvent)
         );
     }
 
@@ -61,17 +60,11 @@ public class ChatMessageResponseMapper {
                 .toList();
     }
 
-    private String resolveReceiptStatus(ChatMessage message, ChatOutboxEvent event) {
-        if (message.getRole() != ChatMessageRole.ASSISTANT || event == null) {
-            return null;
-        }
-        return event.getStatus().name();
+    private String resolveReceiptStatus(ChatOutboxEvent event) {
+        return event == null ? null : event.getStatus().name();
     }
 
-    private Instant resolveReadAt(ChatMessage message, ChatOutboxEvent event) {
-        if (message.getRole() != ChatMessageRole.ASSISTANT || event == null) {
-            return null;
-        }
-        return event.getReadAt();
+    private Instant resolveReadAt(ChatOutboxEvent event) {
+        return event == null ? null : event.getReadAt();
     }
 }

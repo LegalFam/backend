@@ -117,7 +117,8 @@ class ChatDeliveryRetryWorkerTest {
                 userId,
                 sessionId,
                 assistantMessageId,
-                assistantMessageEvent
+                assistantMessageEvent,
+                null
         );
 
         Instant now = Instant.now();

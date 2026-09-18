@@ -1,11 +1,14 @@
 package com.legalfam.backend.chat.infrastructure.adapter.in;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.legalfam.backend.chat.application.event.ChatAssistantDeliveryQueuedEvent;
+import com.legalfam.backend.chat.application.event.ChatAssistantErrorEvent;
 import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
 import com.legalfam.backend.chat.application.port.out.IChatPersistencePort;
@@ -44,7 +47,7 @@ class ChatDeliveryListenerRetryDelayTest {
         ChatOutboxEvent outboxEvent = pendingEvent(event.assistantMessageId());
         when(chatPersistencePort.findOutboxEventByAggregateIdForUpdate(event.assistantMessageId()))
                 .thenReturn(Optional.of(outboxEvent));
-        when(chatAssistantDeliveryPort.dispatchAssistantMessage(any(), any(), any())).thenReturn(false);
+        when(chatAssistantDeliveryPort.dispatch(any())).thenReturn(false);
 
         new LocalChatDeliveryListener(chatPersistencePort, chatAssistantDeliveryPort, properties).process(event);
 
@@ -57,12 +60,38 @@ class ChatDeliveryListenerRetryDelayTest {
         ChatOutboxEvent outboxEvent = pendingEvent(event.assistantMessageId());
         when(chatPersistencePort.findOutboxEventByAggregateIdForUpdate(event.assistantMessageId()))
                 .thenReturn(Optional.of(outboxEvent));
-        when(chatAssistantDeliveryPort.dispatchAssistantMessage(any(), any(), any())).thenReturn(false);
+        when(chatAssistantDeliveryPort.dispatch(any())).thenReturn(false);
 
         new RabbitChatDeliveryListener(objectMapper, chatPersistencePort, chatAssistantDeliveryPort, properties)
                 .process(objectMapper.writeValueAsString(event));
 
         assertRetryDelay();
+    }
+
+    @Test
+    void rabbitListenerDispatchesQueuedAssistantErrorAsError() {
+        UUID sessionId = UUID.randomUUID();
+        ChatAssistantErrorEvent error = new ChatAssistantErrorEvent(
+                sessionId,
+                UUID.randomUUID(),
+                "upstream_timeout",
+                "Assistant service timed out",
+                Instant.now(),
+                "PENDING"
+        );
+        ChatAssistantDeliveryQueuedEvent event = ChatAssistantDeliveryQueuedEvent.ofError(UUID.randomUUID(), error);
+        when(chatPersistencePort.findOutboxEventByAggregateIdForUpdate(error.messageId()))
+                .thenReturn(Optional.of(pendingEvent(error.messageId())));
+        when(chatAssistantDeliveryPort.dispatch(any())).thenCallRealMethod();
+        when(chatAssistantDeliveryPort.dispatchAssistantError(event.userId(), sessionId, error)).thenReturn(true);
+
+        new RabbitChatDeliveryListener(objectMapper, chatPersistencePort, chatAssistantDeliveryPort, properties)
+                .process(objectMapper.writeValueAsString(event));
+
+        verify(chatAssistantDeliveryPort, never()).dispatchAssistantMessage(any(), any(), any());
+        ArgumentCaptor<ChatOutboxEvent> saved = ArgumentCaptor.forClass(ChatOutboxEvent.class);
+        verify(chatPersistencePort).saveOutboxEvent(saved.capture());
+        assertEquals(ChatOutboxEventStatus.PUBLISHED, saved.getValue().getStatus());
     }
 
     private void assertRetryDelay() {
@@ -101,7 +130,8 @@ class ChatDeliveryListenerRetryDelayTest {
                         null,
                         "PENDING",
                         true
-                )
+                ),
+                null
         );
     }
 
