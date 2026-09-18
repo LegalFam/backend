@@ -1,8 +1,10 @@
 # Registro de defectos — inyección de fallos en la entrega de respuestas
 
-Estado al 2026-09-17: **humo completo (S0–S6), piloto hecho (n = 5), tres defectos corregidos y piloto repetido de
-los escenarios afectados.** Los tres defectos son del frontend; están corregidos en `main` (`02aac69`) y traídos a
-esta rama por merge. Resultados en `results/humo/`, `results/piloto/` y `results/piloto-2/` (repetición).
+Estado al 2026-09-18: **cerrado.** Cuatro defectos corregidos (D1–D3 del frontend en `main` `02aac69`, D4 del
+backend en `main` `7a64961`), traídos a esta rama por merge, y **corrida final completa: 450/450 entregadas** (S0–S7,
+n = 50) sin defectos nuevos. Commits congelados y cifras al final de este archivo; reporte completo en
+`07_Reporte_O9.md` de la carpeta del paper. Resultados en `results/humo/`, `results/piloto/`, `results/piloto-2/`,
+`results/piloto-3/` (repeticiones) y `results/final/`.
 
 **Repetición del piloto con las correcciones:** S2 **5/5** entregadas por historial 5,1 s después de volver la red
 (antes 0/5) y S4 **5/5** por historial 0,6 s después de abrir la página nueva (antes 0/5), sin duplicados en
@@ -28,7 +30,7 @@ corrección.
   también un `subscribe` que se queda colgado.
 - **Test:** `reconnects when the stream stays silent past the heartbeat window` y, de regresión, `keeps the stream
   while heartbeats keep arriving`.
-- **Commit:** pendiente. **Piloto repetido:** pendiente.
+- **Commit:** `frontend main 02aac69`. **Piloto repetido:** S2 5/5. **Final:** S2 50/50.
 
 ## D2 — el vigilante de `processing-status` nunca reconcilia
 
@@ -42,7 +44,8 @@ corrección.
   vuelta en que detecta el cambio, y es justo la vuelta que lo desmonta.
 - **Corrección:** `disposed` se mira antes de pedir el estado y no después.
 - **Test:** `reloads the history when the server stops processing`.
-- **Commit:** pendiente. **Piloto repetido:** pendiente.
+- **Commit:** `frontend main 02aac69`. **Piloto repetido:** S5 4/4 por historial. **Final:** S5 50/50 por historial,
+  6,2 s después de parar Rabbit (antes, ~20 min por el reintento del worker).
 
 ## D3 — cierre de sesión al reabrir el chat con el access token vencido
 
@@ -56,7 +59,17 @@ corrección.
 - **Corrección:** si `controller.signal.aborted`, el error se relanza al `catch` exterior, que sale sin cerrar
   sesión (el efecto nuevo ya reconecta con el token nuevo). `logout` queda solo para un refresh que falla de verdad.
 - **Test:** `does not log out when the token refresh restarts the stream`.
-- **Commit:** pendiente. **Piloto repetido:** pendiente.
+- **Commit:** `frontend main 02aac69`. **Piloto repetido:** S4 5/5. **Final:** S4 50/50.
+
+## D4 — H3: retardo de reintento escrito en los listeners
+
+- **Escenarios:** ninguno lo hace fallar; el valor escrito (10 min) coincide con la propiedad, así que no hay
+  diferencia medible.
+- **Causa:** `Rabbit…DeliveryListener` y `Local…DeliveryListener` tenían `RETRY_DELAY` fijo en el código en vez de
+  leer `app.chat.outbox.relay.retry-delay-ms`. Cambiar la propiedad no cambiaba el reintento.
+- **Corrección:** los listeners leen la propiedad.
+- **Test:** 2 nuevos en el backend (279 en verde).
+- **Commit:** `backend main 7a64961`.
 
 ## Sin defecto en el piloto
 
@@ -75,15 +88,24 @@ latencia real del agente (mediana 42,5 s) la quinta consulta simultánea empieza
 primera. No se corrige aquí: la spec manda dejar la configuración como en producción. Por eso las tandas de S5 y S6
 son de **4** sesiones y no de 10: con 4 hilos nunca hay 10 respuestas en vuelo a la vez que un corte pueda alcanzar.
 
-## No ejercitados por los escenarios
+## Sin corregir: H2, `assistant_error` fuera del outbox
 
-- **H2** (`assistant_error` fuera del outbox): el mock siempre responde bien, así que ningún escenario lo dispara.
-  Confirmado solo por lectura de código (`ChatQueuedMessageService.persistAndDispatchFailure`).
-- **H3** (`RETRY_DELAY` fijo en los listeners): mismo valor que la propiedad (10 min); sin diferencia medible.
+- **Escenario:** S7 (nuevo, fuera de la spec): el mock falla (`POST /fail`) mientras la conexión está cortada 30 s.
+- **Medido en la final:** 0/50 errores llegan en vivo (0 eventos SSE de error); 50/50 se ven al reconectar, por
+  historial, 5,4 s después (mediana). Sin evento de outbox, sin receipt, sin reintento, sin bloqueo y sin cobro.
+- **Causa:** `ChatQueuedMessageService.persistAndDispatchFailure` despacha el error directo, sin outbox.
+- **No se corrige:** el error no se pierde (queda en el historial); meterlo en el outbox queda como trabajo futuro.
 
 ## Commits
 
 - Humo: corrido sobre cambios sin commitear (frontend base `eab4a1e`, backend base `dd460e2`); `results/humo/`
   registra los ids de commits que se deshicieron después.
 - Piloto S0–S6: frontend `525af54`, backend `80d1826` (runner con cambios sin commitear en `experiments/`).
-- Congelar commits antes de la final, con permiso de Piero.
+- **Final (congelados):** frontend `2cd0305`, backend `f5a0bc5`. Resultados en `results/final/` (commit `d8642b6`).
+
+## Corrida final
+
+450/450 entregadas (IC 95 % [92,9 %; 100 %] por escenario), 0 duplicados en pantalla y en base de datos, 0 cobros
+dobles, 0 violaciones del bloqueo; S3 con los 2 eventos SSE extra esperados por prueba. Tablas en
+`results/final/summary.md`. Se corrió en varias invocaciones el 17 y 18 sep con los mismos commits; un tramo y una
+tanda de S5 cortados a mano no dejaron filas y se repitieron enteros.

@@ -30,7 +30,10 @@ def nearest_rank(values, q):
 
 
 def delivery_seconds(trial):
-    reference = trial.get("t_fault_end") or trial.get("t0")
+    if trial["scenario"] == "S5":
+        reference = trial["t_fault_start"]
+    else:
+        reference = trial.get("t_fault_end") or trial.get("t0")
     return (max(trial["t_visible"], trial.get("t_read") or 0) - reference) / 1000
 
 
@@ -67,7 +70,7 @@ def summarize(results_dir):
         errors = sum(1 for t in items if t.get("error"))
         lines.append(f"| {scenario} | {n} | {len(delivered)} | {pct(len(delivered) / n)} | [{pct(low)}; {pct(high)}] | {median} | {p90} | {errors} |")
     lines.append("")
-    lines.append("Tiempo hasta la entrega = max(visible en pantalla, `READ`) − vuelta de la conexión (en S0, − t₀; en S4, − apertura de la página nueva).")
+    lines.append("Tiempo hasta la entrega = max(visible en pantalla, `READ`) − vuelta de la conexión (en S0, − t₀; en S4, − apertura de la página nueva; en S5, − caída de Rabbit, porque la respuesta llega por historial antes de que vuelva).")
     lines.append("")
 
     lines.append("## Camino de entrega")
@@ -115,13 +118,15 @@ def summarize(results_dir):
     batches = OrderedDict()
     for trial in trials:
         if trial.get("batch_id"):
-            batches.setdefault(trial["batch_id"], []).append(trial)
+            batches.setdefault((trial["scenario"], trial.get("t_fault_start")), []).append(trial)
     if batches:
         lines.append("## Tandas (S5, S6)")
         lines.append("")
         lines.append("| Tanda | Pruebas | Entregadas | Inicio del fallo | Fin del fallo |")
         lines.append("|---|--:|--:|---|---|")
-        for batch_id, items in batches.items():
+        for items in batches.values():
+            ids = sorted(t["trial_id"] for t in items)
+            batch_id = f"{ids[0]} … {ids[-1]}"
             start = items[0].get("t_fault_start")
             end = items[0].get("t_fault_end")
             duration = f"{(end - start) / 1000:.1f} s" if start and end else "—"
