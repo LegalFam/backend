@@ -107,6 +107,29 @@ son de **4** sesiones y no de 10: con 4 hilos nunca hay 10 respuestas en vuelo a
 - **Ojo al desplegar:** primero el frontend. Un backend nuevo con el frontend viejo deja la sesión bloqueada tras un
   error, porque el frontend viejo no confirma los mensajes de sistema.
 
+## D6 — el backend muere con la llamada al agente en curso: usuario bloqueado para siempre
+
+- **Escenario:** S8 (nuevo): tandas de 8; el backend se mata con `taskkill /F` 5 s antes de que el mock responda y se
+  rearranca con el mismo jar.
+- **Piloto sin corrección** (`results/piloto-s8/`, ventana de 10 min): **0/4**. Las cuatro quedan en `PROCESSING` sin
+  mensaje, y el usuario no puede volver a enviar en ninguna sesión (`ChatSendPolicy` rechaza con un procesamiento
+  activo). En Cloud Run basta un despliegue o una bajada de instancias con una consulta en curso.
+- **Causa:** `ChatMessageQueuedEvent` es un evento de Spring en memoria (también con Rabbit activo) y nada recupera los
+  procesamientos que quedan abiertos al morir la instancia.
+- **Corrección:** `ChatStaleProcessingSweeper`, cada minuto, cierra los procesamientos `QUEUED`/`PROCESSING` sin cambios
+  desde hace más del timeout de n8n + 1 min (6 min con `app.n8n.timeout-ms=300000`): pasado ese plazo ninguna instancia
+  puede seguir con ellos. Los cierra con `persistAssistantFailure` (`upstream_timeout`), que ahora marca el
+  procesamiento bajo bloqueo **antes** de crear el mensaje, así que dos instancias no generan dos errores. El error va
+  por el outbox (D5), no se cobra, y el usuario puede volver a preguntar.
+- **Tests:** backend 283 en verde (`ChatStaleProcessingSweeperTest`, `persistAssistantFailureSkipsMessagesAlreadyFinished`).
+- **Commit:** `backend main db3539e`.
+- **Piloto con la corrección** (`results/piloto-s8-fix/`): **4/4**, error visible ~5 min después del rearranque, outbox
+  `READ`, 1 copia en pantalla, 0 cobros, ningún usuario bloqueado.
+- **Final** (`results/final-s8/`, n = 50 en 7 tandas de 8, backend `ec0fdd3`): **50/50**, IC 95 % [92,9 %; 100 %].
+  Error visible 301,8 s después del rearranque (mediana; rango 301–303), outbox `READ` al primer intento, 1 copia en
+  pantalla, 1 solo mensaje de sistema por sesión, 0 cobros, 0 usuarios bloqueados.
+- **Lo que no hace:** no reintenta la consulta; el usuario ve «tiempo agotado» y la vuelve a enviar.
+
 ## Pool del backend (corregido después de la final)
 
 `AsyncConfig` pasa a `corePoolSize=8` (mismo commit que D5). Verificado: con 9 sesiones simultáneas, 8 llamadas al
