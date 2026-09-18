@@ -38,10 +38,13 @@ const REOPEN_MS = Number(args['reopen-min']) * MINUTE
 const MOCK_DELAY_MS = 20_000
 const LEAD_MS = 5_000
 const GRACE_MS = 15_000
-const BATCH_SCENARIOS = new Set(['S5', 'S6'])
+const BATCH_SCENARIOS = new Set(['S5', 'S6', 'S8'])
 // El agente falla durante el corte: el error no pasa por el outbox, así que la prueba mira el
 // mensaje de sistema en pantalla y no el evento de entrega.
 const ERROR_SCENARIOS = new Set(['S7'])
+// El backend muere con la llamada al agente en curso: no hay respuesta que guardar y lo esperado
+// es un mensaje de sistema entregado por el outbox que libera al usuario.
+const SYSTEM_MESSAGE_SCENARIOS = new Set(['S7', 'S8'])
 const BATCH_SEND_WINDOW_MS = 90_000
 
 if (SCENARIOS.some((s) => BATCH_SCENARIOS.has(s)) && SCENARIOS.length > 1) {
@@ -304,7 +307,7 @@ async function runTrial({ trialId, scenario, slot, batch }) {
     trial.t0 = hit.receivedAt + hit.delayMs
     batch?.reportT0(trial)
 
-    const probe = ERROR_SCENARIOS.has(scenario)
+    const probe = SYSTEM_MESSAGE_SCENARIOS.has(scenario)
       ? Promise.resolve({ lock_check: 'not_applicable' })
       : probeLock(trial, auth)
 
@@ -317,7 +320,7 @@ async function runTrial({ trialId, scenario, slot, batch }) {
       while (!trial.t_fault_end || Date.now() < trial.t_fault_end + WINDOW_MS) {
         if (doneAt && Date.now() > doneAt + GRACE_MS) break
         if (!assistantId) {
-          assistantId = ERROR_SCENARIOS.has(scenario)
+          assistantId = SYSTEM_MESSAGE_SCENARIOS.has(scenario)
             ? await systemMessageId(trial.session_id).catch(() => null)
             : (await outboxForSession(trial.session_id).catch(() => null))?.aggregate_id ?? null
         }
@@ -406,6 +409,7 @@ async function runTrial({ trialId, scenario, slot, batch }) {
     trial.delivered = ERROR_SCENARIOS.has(scenario) ? Boolean(trial.t_visible) : Boolean(trial.t_visible && trial.t_read)
     trial.sse_error_events = logs.filter((log) => log.ev === 'sse_error' && log.id === assistantId).length
     trial.lock_violation = trial.lock_check === 'violation'
+    trial.processing_stuck = await activeProcessing(userId)
   } catch (error) {
     trial.error = error.message
     trial.delivered = false
@@ -486,6 +490,14 @@ async function runBatches(scenario) {
       startRabbit()
       window.t_fault_end = Date.now()
       runLog({ batch: batch.id, rabbit: 'started' })
+    } else if (scenario === 'S8') {
+      await waitUntil(batch.respondAt - LEAD_MS)
+      window.t_fault_start = Date.now()
+      const pid = killBackend()
+      runLog({ batch: batch.id, killed: pid, before_agent_response: true })
+      startBackend(`backend-${batch.id}-restart.log`)
+      window.t_fault_end = await waitBackendHealthy()
+      runLog({ batch: batch.id, backend: 'healthy' })
     } else {
       await waitUntil(batch.respondAt)
       await poll(async () => {
