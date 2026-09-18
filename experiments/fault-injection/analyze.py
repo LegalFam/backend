@@ -10,7 +10,7 @@ import sys
 from collections import Counter, OrderedDict
 from pathlib import Path
 
-SCENARIO_ORDER = ["S0", "S1a", "S1b", "S2", "S3", "S4", "S5", "S6"]
+SCENARIO_ORDER = ["S0", "S1a", "S1b", "S2", "S3", "S4", "S5", "S6", "S7"]
 Z = 1.959963984540054
 
 
@@ -31,7 +31,7 @@ def nearest_rank(values, q):
 
 def delivery_seconds(trial):
     reference = trial.get("t_fault_end") or trial.get("t0")
-    return (max(trial["t_visible"], trial["t_read"]) - reference) / 1000
+    return (max(trial["t_visible"], trial.get("t_read") or 0) - reference) / 1000
 
 
 def pct(value):
