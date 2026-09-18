@@ -164,9 +164,12 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         }
 
         Instant now = Instant.now();
+        if (!markUserMessageFailed(userMessageId, errorCode, errorMessage, now)) {
+            log.debug("Skipping assistant failure: user message already finished userMessageId={}", userMessageId);
+            return null;
+        }
         ChatMessage failureMessage = ChatMessage.systemMessage(chatSession.getId(), errorMessage, errorCode, now);
         failureMessage = IChatPersistencePort.saveMessage(failureMessage);
-        markUserMessageFailed(userMessageId, errorCode, errorMessage, now);
         chatSession.recordActivity(now);
         IChatPersistencePort.saveSession(chatSession);
 
@@ -249,16 +252,18 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         }
     }
 
-    private void markUserMessageFailed(UUID userMessageId, String errorCode, String errorMessage, Instant now) {
+    private boolean markUserMessageFailed(UUID userMessageId, String errorCode, String errorMessage, Instant now) {
         ChatMessage userMessage = IChatPersistencePort.findMessageById(userMessageId).orElse(null);
         if (userMessage == null || userMessage.getRole() != ChatMessageRole.USER) {
-            return;
+            return false;
         }
         ChatMessageProcessing processing = IChatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId)
                 .orElseGet(() -> initializeProcessingRecord(userMessageId, now));
-        if (processing.fail(errorCode, errorMessage, now)) {
-            IChatPersistencePort.saveMessageProcessing(processing);
+        if (!processing.fail(errorCode, errorMessage, now)) {
+            return false;
         }
+        IChatPersistencePort.saveMessageProcessing(processing);
+        return true;
     }
 
     private ChatMessageProcessing initializeProcessingRecord(UUID userMessageId, Instant now) {

@@ -2,6 +2,7 @@ package com.legalfam.backend.chat.infrastructure.persistence;
 
 import com.legalfam.backend.chat.infrastructure.persistence.entity.ChatMessageProcessingEntity;
 import com.legalfam.backend.chat.domain.model.ChatMessageProcessingStatus;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +35,17 @@ public interface IChatMessageProcessingRepository extends JpaRepository<ChatMess
             @Param("userId") UUID userId,
             @Param("statuses") Collection<ChatMessageProcessingStatus> statuses,
             Pageable pageable
+    );
+
+    @Query("""
+            select processing.userMessageId
+            from ChatMessageProcessingEntity processing
+            where processing.status in :statuses
+              and processing.updatedAt < :updatedBefore
+            """)
+    List<UUID> findUserMessageIdsByStatusInAndUpdatedAtBefore(
+            @Param("statuses") Collection<ChatMessageProcessingStatus> statuses,
+            @Param("updatedBefore") Instant updatedBefore
     );
 
     long deleteByUserMessageIdIn(Collection<UUID> userMessageIds);
