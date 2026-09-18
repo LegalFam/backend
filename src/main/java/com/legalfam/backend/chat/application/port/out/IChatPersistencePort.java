@@ -48,6 +48,8 @@ public interface IChatPersistencePort {
 
     Optional<ChatMessageProcessing> findActiveMessageProcessingByUserId(UUID userId);
 
+    List<UUID> findActiveMessageProcessingUpdatedBefore(Instant updatedBefore);
+
     ChatOutboxEvent saveOutboxEvent(ChatOutboxEvent chatOutboxEvent);
 
     Optional<ChatOutboxEvent> findOutboxEventByAggregateId(UUID aggregateId);

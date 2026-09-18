@@ -3,6 +3,7 @@ package com.legalfam.backend.chat.application.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -277,6 +278,30 @@ class ChatAssistantPersistenceServiceTest {
         assertNull(delivery.getValue().event());
         assertEquals("upstream_timeout", delivery.getValue().error().errorCode());
         assertEquals("PENDING", delivery.getValue().error().receiptStatus());
+    }
+
+    @Test
+    void persistAssistantFailureSkipsMessagesAlreadyFinished() {
+        UUID userMessageId = UUID.randomUUID();
+        Instant now = Instant.now();
+        ChatSession session = ChatSession.restore(SESSION_ID, UUID.randomUUID(), null, now, now);
+        when(chatPersistencePort.findSessionById(SESSION_ID)).thenReturn(Optional.of(session));
+        when(chatPersistencePort.findMessageById(userMessageId))
+                .thenReturn(Optional.of(ChatMessage.userMessage(SESSION_ID, "hola", now)));
+        when(chatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId))
+                .thenReturn(Optional.of(ChatMessageProcessing.restore(
+                        UUID.randomUUID(), userMessageId, ChatMessageProcessingStatus.COMPLETED,
+                        null, null, now, now, now, now
+                )));
+
+        assertNull(chatAssistantPersistenceService.persistAssistantFailure(
+                SESSION_ID,
+                userMessageId,
+                "upstream_timeout",
+                "Assistant service timed out"
+        ));
+        verify(chatPersistencePort, never()).saveMessage(any(ChatMessage.class));
+        verify(chatOutboxPort, never()).enqueueAssistantDelivery(any());
     }
 
     /** Deja el servicio listo para persistir y devuelve la lista donde caen los guardados. */

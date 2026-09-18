@@ -192,6 +192,14 @@ public class JpaChatPersistenceAdapter implements IChatPersistencePort {
     }
 
     @Override
+    public List<UUID> findActiveMessageProcessingUpdatedBefore(Instant updatedBefore) {
+        return IChatMessageProcessingRepository.findUserMessageIdsByStatusInAndUpdatedAtBefore(
+                List.of(ChatMessageProcessingStatus.QUEUED, ChatMessageProcessingStatus.PROCESSING),
+                updatedBefore
+        );
+    }
+
+    @Override
     public ChatOutboxEvent saveOutboxEvent(ChatOutboxEvent chatOutboxEvent) {
         return ChatEntityMapper.toDomain(
                 IChatOutboxEventRepository.save(ChatEntityMapper.toEntity(chatOutboxEvent))
