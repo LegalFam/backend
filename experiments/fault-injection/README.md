@@ -1,13 +1,13 @@
 # Inyección de fallos sobre la entrega de respuestas
 
 Mide si la entrega *at-least-once* de las respuestas del asistente se cumple con el backend Java real cuando la
-conexión falla en momentos controlados. Registro de defectos: [`ERRORES.md`](ERRORES.md).
+conexión falla en momentos controlados.
 
 ## Piezas
 
 | Carpeta | Qué hace |
 |---|---|
-| `mock-n8n/` | Responde en `/webhook/chat-process` con la respuesta real de `alim-003` (brazo `full` de `ablacion-v1`). Demora por sesión con `POST /delay`; sin override se sortea de las 63 latencias del brazo `full` (mediana 42,5 s). `GET /hits` devuelve cada llamada con `receivedAt`, `delayMs` y `respondedAt`. |
+| `mock-n8n/` | Responde en `/webhook/chat-process` con la respuesta real de `alim-003` (brazo `full` de la ablación, publicado en `LegalFam/evaluation`). Demora por sesión con `POST /delay`; sin override se sortea de las 63 latencias del brazo `full` (mediana 42,5 s). `GET /hits` devuelve cada llamada con `receivedAt`, `delayMs` y `respondedAt`. |
 | `fault-proxy/` | Proxy HTTP con `CONNECT`, un puerto por prueba, modos `pass`, `reset` y `blackhole` (`POST /mode` al mismo puerto). |
 | `runner/` | Playwright + Node. `seed-users.mjs` crea los usuarios Premium, `services.mjs` arranca y mata el backend, `run.mjs` corre los escenarios. |
 | `analyze.py` | Genera `summary.md` a partir de `results.jsonl`. |
