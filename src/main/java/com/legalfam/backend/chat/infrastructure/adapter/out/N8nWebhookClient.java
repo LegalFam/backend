@@ -4,6 +4,7 @@ import com.legalfam.backend.chat.application.dto.ChatAssistantGatewayResponse;
 import com.legalfam.backend.chat.application.dto.ChatAssistantMetadata;
 import com.legalfam.backend.chat.application.dto.ChatCitationResponse;
 import com.legalfam.backend.chat.application.dto.ChatPreviousMessage;
+import com.legalfam.backend.chat.application.port.out.IChatAssistantDraftListener;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantGatewayPort;
 import com.legalfam.backend.chat.domain.exception.ChatApiError;
 import com.legalfam.backend.chat.domain.exception.ChatUpstreamException;
@@ -11,23 +12,28 @@ import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import com.legalfam.backend.chat.infrastructure.config.N8nProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.MappingIterator;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -39,6 +45,11 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
     private static final Logger log = LoggerFactory.getLogger(N8nWebhookClient.class);
     private static final int MIN_TIMEOUT_MS = 1000;
     private static final int MAX_LOG_BODY_SIZE = 400;
+    /** Nodo del workflow cuyo texto se transmite al usuario mientras se escribe. */
+    static final String STREAM_NODE = "XAI Agent";
+    /** Nodo del workflow que entrega el payload final cuando el webhook responde en streaming. */
+    static final String FINAL_NODE = "Respond to Webhook";
+    private static final String STREAM_CHUNK_PREFIX = "{\"type\":";
 
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
@@ -63,6 +74,18 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
             List<ChatPreviousMessage> previousMessages,
             ChatLanguage language
     ) {
+        return sendMessage(message, sessionId, previousMessages, language, IChatAssistantDraftListener.NONE);
+    }
+
+    @Override
+    public ChatAssistantGatewayResponse sendMessage(
+            String message,
+            UUID sessionId,
+            List<ChatPreviousMessage> previousMessages,
+            ChatLanguage language,
+            IChatAssistantDraftListener draftListener
+    ) {
+        IChatAssistantDraftListener listener = draftListener == null ? IChatAssistantDraftListener.NONE : draftListener;
         ChatLanguage safeLanguage = language == null ? ChatLanguage.ES : language;
         log.info("Preparing n8n webhook call: configuredUrl={}, timeoutMs={}",
                 webhookUrl == null || webhookUrl.isBlank() ? "<empty>" : webhookUrl,
@@ -75,13 +98,23 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
 
         validateWebhookUrl(webhookUrl);
         String payloadJson = buildPayload(message, sessionId, previousMessages, safeLanguage);
-        HttpEntity<String> requestEntity = buildRequestEntity(payloadJson);
-        ResponseEntity<String> response;
+        HttpHeaders requestHeaders = buildRequestHeaders();
+        JsonNode responseBody;
 
         try {
             log.info("Calling n8n webhook: url={}, messageLength={}, sessionId={}, language={}",
                     webhookUrl, message.length(), sessionId, safeLanguage.code());
-            response = restTemplate.exchange(webhookUrl.trim(), HttpMethod.POST, requestEntity, String.class);
+            responseBody = restTemplate.execute(
+                    webhookUrl.trim(),
+                    HttpMethod.POST,
+                    request -> {
+                        request.getHeaders().putAll(requestHeaders);
+                        request.getBody().write(payloadJson.getBytes(StandardCharsets.UTF_8));
+                    },
+                    response -> readResponse(response, listener, sessionId)
+            );
+        } catch (ChatUpstreamException ex) {
+            throw ex;
         } catch (HttpStatusCodeException ex) {
             ex.getResponseBodyAsString();
             String bodyPreview = ex.getResponseBodyAsString().trim();
@@ -102,17 +135,142 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
             throw ChatUpstreamException.of(ChatApiError.UPSTREAM_UNAVAILABLE);
         }
 
-        if (!response.getStatusCode().is2xxSuccessful()) {
-            String bodyPreview = response.getBody() == null ? "" : response.getBody().trim();
-            if (bodyPreview.length() > MAX_LOG_BODY_SIZE) {
-                bodyPreview = bodyPreview.substring(0, MAX_LOG_BODY_SIZE);
+        return mapResponse(responseBody, safeLanguage);
+    }
+
+    /**
+     * Lee la respuesta de n8n en cualquiera de sus dos formas.
+     *
+     * <p>Con el webhook en modo streaming llega una secuencia de objetos
+     * {@code {type, content, metadata: {nodeName, ...}}}: el texto del {@link #STREAM_NODE} se
+     * reenvia a {@code listener} mientras llega y el payload final viene como un {@code item}
+     * del {@link #FINAL_NODE}. Un workflow sin streaming responde con un solo JSON (o texto)
+     * como siempre; los dos conviven para poder desplegar el backend antes que el workflow.
+     */
+    private JsonNode readResponse(ClientHttpResponse response, IChatAssistantDraftListener listener, UUID sessionId)
+            throws IOException {
+        int statusCode = response.getStatusCode().value();
+        InputStream body = new BufferedInputStream(response.getBody());
+        if (statusCode < 200 || statusCode >= 300) {
+            String text = new String(body.readAllBytes(), StandardCharsets.UTF_8);
+            log.warn("n8n webhook returned non-success status: status={}, body={}", statusCode, preview(text));
+            throw buildStatusException(statusCode, text);
+        }
+        if (!startsWithStreamChunk(body)) {
+            return parseResponseBody(new String(body.readAllBytes(), StandardCharsets.UTF_8));
+        }
+        return readStream(body, listener, sessionId);
+    }
+
+    /** Mira el comienzo del cuerpo sin consumirlo. Decide apenas los bytes alcanzan. */
+    private boolean startsWithStreamChunk(InputStream body) throws IOException {
+        body.mark(4096);
+        try {
+            int matched = 0;
+            for (int read = 0; read < 4096; read++) {
+                int next = body.read();
+                if (next < 0) {
+                    return false;
+                }
+                if (Character.isWhitespace(next)) {
+                    continue;
+                }
+                if (next != STREAM_CHUNK_PREFIX.charAt(matched)) {
+                    return false;
+                }
+                matched++;
+                if (matched == STREAM_CHUNK_PREFIX.length()) {
+                    return true;
+                }
             }
-            int statusCode = response.getStatusCode().value();
-            log.warn("n8n webhook returned non-success status: status={}, body={}", statusCode, bodyPreview);
-            throw buildStatusException(statusCode, response.getBody());
+            return false;
+        } finally {
+            body.reset();
+        }
+    }
+
+    private JsonNode readStream(InputStream body, IChatAssistantDraftListener listener, UUID sessionId) {
+        N8nAnswerStreamFilter answer = new N8nAnswerStreamFilter();
+        JsonNode finalPayload = null;
+        List<String> errors = new ArrayList<>();
+        int chunks = 0;
+        long startedAt = System.nanoTime();
+        long firstDraftMs = -1;
+
+        try (MappingIterator<JsonNode> values = objectMapper.readerFor(JsonNode.class).readValues(body)) {
+            while (values.hasNext()) {
+                JsonNode chunk = values.next();
+                chunks++;
+                String type = readText(chunk, "type");
+                String node = readText(chunk.get("metadata"), "nodeName");
+                if ("error".equals(type)) {
+                    String content = readText(chunk, "content");
+                    errors.add((node == null ? "?" : node) + ": " + (content == null ? "" : content));
+                    log.warn("n8n stream reported a node error: sessionId={}, node={}, error={}",
+                            sessionId, node, preview(content));
+                    continue;
+                }
+                if (STREAM_NODE.equals(node)) {
+                    if ("begin".equals(type)) {
+                        boolean hadText = !answer.lastVisible().isEmpty();
+                        answer.reset();
+                        if (hadText) {
+                            // Reintento del agente: lo transmitido antes ya no vale.
+                            notifyDraft(listener, "", sessionId);
+                        }
+                    } else if ("item".equals(type)) {
+                        String visible = answer.append(contentAsText(chunk.get("content")));
+                        if (visible != null) {
+                            if (firstDraftMs < 0) {
+                                firstDraftMs = (System.nanoTime() - startedAt) / 1_000_000;
+                            }
+                            notifyDraft(listener, visible, sessionId);
+                        }
+                    }
+                    continue;
+                }
+                if (FINAL_NODE.equals(node) && "item".equals(type)) {
+                    finalPayload = parseResponseBody(contentAsText(chunk.get("content")));
+                }
+            }
+        } catch (JacksonException ex) {
+            if (finalPayload == null) {
+                log.warn("n8n stream could not be parsed: sessionId={}, chunks={}", sessionId, chunks, ex);
+                throw ChatUpstreamException.of(ChatApiError.UPSTREAM_ERROR);
+            }
+            log.warn("Ignoring unparseable trailing n8n stream data: sessionId={}", sessionId);
         }
 
-        return mapResponse(parseResponseBody(response.getBody()), safeLanguage);
+        log.info("n8n stream finished: sessionId={}, chunks={}, firstDraftMs={}, totalMs={}, errors={}",
+                sessionId, chunks, firstDraftMs, (System.nanoTime() - startedAt) / 1_000_000, errors.size());
+        if (finalPayload != null) {
+            return finalPayload;
+        }
+        if (!errors.isEmpty()) {
+            throw ChatUpstreamException.of(ChatApiError.UPSTREAM_ERROR);
+        }
+        throw ChatUpstreamException.of(ChatApiError.UPSTREAM_EMPTY_RESPONSE);
+    }
+
+    private void notifyDraft(IChatAssistantDraftListener listener, String text, UUID sessionId) {
+        try {
+            listener.onDraft(text);
+        } catch (RuntimeException ex) {
+            // El borrador es un extra: que no llegue no puede costar la respuesta.
+            log.debug("Draft listener failed for sessionId={}: {}", sessionId, ex.getMessage());
+        }
+    }
+
+    private String contentAsText(JsonNode content) {
+        if (content == null || content.isNull()) {
+            return "";
+        }
+        return content.isString() ? content.asString() : content.toString();
+    }
+
+    private String preview(String text) {
+        String trimmed = text == null ? "" : text.trim();
+        return trimmed.length() > MAX_LOG_BODY_SIZE ? trimmed.substring(0, MAX_LOG_BODY_SIZE) : trimmed;
     }
 
     private void validateWebhookUrl(String url) {
@@ -123,7 +281,7 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
         }
     }
 
-    private HttpEntity<String> buildRequestEntity(String payloadJson) {
+    private HttpHeaders buildRequestHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
@@ -132,7 +290,7 @@ public class N8nWebhookClient implements IChatAssistantGatewayPort {
             headers.set(authHeaderName, authToken);
         }
 
-        return new HttpEntity<>(payloadJson, headers);
+        return headers;
     }
 
     private String buildPayload(

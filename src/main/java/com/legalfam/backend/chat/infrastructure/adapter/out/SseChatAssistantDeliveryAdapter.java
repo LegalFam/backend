@@ -1,5 +1,6 @@
 package com.legalfam.backend.chat.infrastructure.adapter.out;
 
+import com.legalfam.backend.chat.application.event.ChatAssistantDraftEvent;
 import com.legalfam.backend.chat.application.event.ChatAssistantMessageEvent;
 import com.legalfam.backend.chat.application.event.ChatAssistantErrorEvent;
 import com.legalfam.backend.chat.application.port.out.IChatAssistantDeliveryPort;
@@ -118,6 +119,30 @@ public class SseChatAssistantDeliveryAdapter implements IChatAssistantDeliveryPo
             removeEmitter(userId, sessionId, emitter);
             return false;
         }
+    }
+
+    @Override
+    public boolean dispatchAssistantDraft(ChatAssistantDraftEvent event) {
+        // El borrador se genera en la instancia que llama a n8n, que no conoce al usuario: se
+        // busca la suscripcion por sesion. La sesion es de un solo usuario y el endpoint de
+        // suscripcion ya valida la propiedad, asi que el borrador no puede cruzar cuentas.
+        // Si el usuario esta conectado a otra instancia no lo ve, y no pasa nada: el mensaje
+        // definitivo llega igual por el outbox.
+        for (Map.Entry<UUID, ConcurrentHashMap<UUID, SseEmitter>> entry : emittersByUser.entrySet()) {
+            SseEmitter emitter = entry.getValue().get(event.sessionId());
+            if (emitter == null) {
+                continue;
+            }
+            try {
+                emitter.send(SseEmitter.event().name("assistant_draft").data(event));
+                return true;
+            } catch (IOException | IllegalStateException ex) {
+                log.debug("Failed to dispatch SSE draft for sessionId={}: {}", event.sessionId(), ex.getMessage());
+                removeEmitter(entry.getKey(), event.sessionId(), emitter);
+                return false;
+            }
+        }
+        return false;
     }
 
     @PreDestroy

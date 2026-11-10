@@ -18,4 +18,19 @@ public interface IChatAssistantGatewayPort {
             List<ChatPreviousMessage> previousMessages,
             ChatLanguage language
     );
+
+    /**
+     * Igual que {@link #sendMessage(String, UUID, List, ChatLanguage)}, pero avisa a
+     * {@code draftListener} con el texto de la respuesta mientras se escribe. Un gateway sin
+     * streaming lo ignora y solo devuelve la respuesta final.
+     */
+    default ChatAssistantGatewayResponse sendMessage(
+            String message,
+            UUID sessionId,
+            List<ChatPreviousMessage> previousMessages,
+            ChatLanguage language,
+            IChatAssistantDraftListener draftListener
+    ) {
+        return sendMessage(message, sessionId, previousMessages, language);
+    }
 }
