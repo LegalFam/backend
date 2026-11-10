@@ -452,8 +452,24 @@ Success response `200` with `text/event-stream`.
 Expected events:
 - `connected`
 - `heartbeat`
+- `assistant_draft`
 - `assistant_message`
 - `assistant_error`
+
+`assistant_draft` carries the assistant answer while it is being written, for Spanish turns:
+
+```json
+{
+  "sessionId": "8b2c...",
+  "userMessageId": "1f4e...",
+  "text": "Con lo que cuentas, el juez fija la pension...",
+  "sequence": 7
+}
+```
+
+- `text` is the full answer written so far (Markdown), not a delta. A shorter text than the previous draft means the flow restarted the answer.
+- Drop a draft whose `sequence` is not greater than the last one seen for the same `userMessageId`.
+- Drafts are not persisted and are best effort: they only reach a subscriber connected to the backend instance that is processing the turn. The final `assistant_message` (or `assistant_error`) always follows and replaces the draft.
 
 Common errors:
 - `403` session belongs to another user
