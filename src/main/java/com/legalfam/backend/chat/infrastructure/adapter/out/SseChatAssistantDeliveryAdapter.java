@@ -8,11 +8,13 @@ import com.legalfam.backend.chat.infrastructure.config.ChatSseProperties;
 import jakarta.annotation.PreDestroy;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -24,7 +26,8 @@ public class SseChatAssistantDeliveryAdapter implements IChatAssistantDeliveryPo
     private static final Logger log = LoggerFactory.getLogger(SseChatAssistantDeliveryAdapter.class);
     private static final long MIN_INTERVAL_MS = 1000L;
 
-    private final ConcurrentHashMap<UUID, ConcurrentHashMap<UUID, SseEmitter>> emittersByUser = new ConcurrentHashMap<>();
+    // Varias pestañas pueden mirar la misma consulta: cada una conserva su propia conexión.
+    private final ConcurrentHashMap<UUID, ConcurrentHashMap<UUID, Set<SseEmitter>>> emittersByUser = new ConcurrentHashMap<>();
     private final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor();
     private final long emitterTimeoutMs;
 
@@ -41,14 +44,10 @@ public class SseChatAssistantDeliveryAdapter implements IChatAssistantDeliveryPo
 
     public SseEmitter subscribe(UUID userId, UUID sessionId) {
         SseEmitter emitter = new SseEmitter(emitterTimeoutMs);
-        ConcurrentHashMap<UUID, SseEmitter> userEmitters = emittersByUser.computeIfAbsent(
-                userId,
-                ignored -> new ConcurrentHashMap<>()
-        );
-        SseEmitter previousEmitter = userEmitters.put(sessionId, emitter);
-        if (previousEmitter != null) {
-            previousEmitter.complete();
-        }
+        emittersByUser
+                .computeIfAbsent(userId, ignored -> new ConcurrentHashMap<>())
+                .computeIfAbsent(sessionId, ignored -> ConcurrentHashMap.newKeySet())
+                .add(emitter);
 
         emitter.onCompletion(() -> removeEmitter(userId, sessionId, emitter));
         emitter.onTimeout(() -> {
@@ -69,56 +68,18 @@ public class SseChatAssistantDeliveryAdapter implements IChatAssistantDeliveryPo
 
     @Override
     public boolean dispatchAssistantMessage(UUID userId, UUID sessionId, ChatAssistantMessageEvent event) {
-        Map<UUID, SseEmitter> userEmitters = emittersByUser.get(userId);
-        if (userEmitters == null) {
-            log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return false;
-        }
-
-        SseEmitter emitter = userEmitters.get(sessionId);
-        if (emitter == null) {
-            log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return false;
-        }
-
-        try {
-            emitter.send(SseEmitter.event()
-                    .name("assistant_message")
-                    .id(event.messageId().toString())
-                    .data(event));
-            return true;
-        } catch (IOException | IllegalStateException ex) {
-            log.info("Failed to dispatch SSE event for userId={} sessionId={}: {}", userId, sessionId, ex.getMessage());
-            removeEmitter(userId, sessionId, emitter);
-            return false;
-        }
+        return sendToSession(userId, sessionId, () -> SseEmitter.event()
+                .name("assistant_message")
+                .id(event.messageId().toString())
+                .data(event));
     }
 
     @Override
     public boolean dispatchAssistantError(UUID userId, UUID sessionId, ChatAssistantErrorEvent event) {
-        Map<UUID, SseEmitter> userEmitters = emittersByUser.get(userId);
-        if (userEmitters == null) {
-            log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return false;
-        }
-
-        SseEmitter emitter = userEmitters.get(sessionId);
-        if (emitter == null) {
-            log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
-            return false;
-        }
-
-        try {
-            emitter.send(SseEmitter.event()
-                    .name("assistant_error")
-                    .id(event.messageId().toString())
-                    .data(event));
-            return true;
-        } catch (IOException | IllegalStateException ex) {
-            log.info("Failed to dispatch SSE error event for userId={} sessionId={}: {}", userId, sessionId, ex.getMessage());
-            removeEmitter(userId, sessionId, emitter);
-            return false;
-        }
+        return sendToSession(userId, sessionId, () -> SseEmitter.event()
+                .name("assistant_error")
+                .id(event.messageId().toString())
+                .data(event));
     }
 
     @Override
@@ -128,18 +89,10 @@ public class SseChatAssistantDeliveryAdapter implements IChatAssistantDeliveryPo
         // suscripcion ya valida la propiedad, asi que el borrador no puede cruzar cuentas.
         // Si el usuario esta conectado a otra instancia no lo ve, y no pasa nada: el mensaje
         // definitivo llega igual por el outbox.
-        for (Map.Entry<UUID, ConcurrentHashMap<UUID, SseEmitter>> entry : emittersByUser.entrySet()) {
-            SseEmitter emitter = entry.getValue().get(event.sessionId());
-            if (emitter == null) {
-                continue;
-            }
-            try {
-                emitter.send(SseEmitter.event().name("assistant_draft").data(event));
-                return true;
-            } catch (IOException | IllegalStateException ex) {
-                log.debug("Failed to dispatch SSE draft for sessionId={}: {}", event.sessionId(), ex.getMessage());
-                removeEmitter(entry.getKey(), event.sessionId(), emitter);
-                return false;
+        for (Map.Entry<UUID, ConcurrentHashMap<UUID, Set<SseEmitter>>> entry : emittersByUser.entrySet()) {
+            if (entry.getValue().containsKey(event.sessionId())) {
+                return sendToSession(entry.getKey(), event.sessionId(),
+                        () -> SseEmitter.event().name("assistant_draft").data(event));
             }
         }
         return false;
@@ -160,24 +113,37 @@ public class SseChatAssistantDeliveryAdapter implements IChatAssistantDeliveryPo
 
     private void sendHeartbeats() {
         emittersByUser.forEach((userId, userEmitters) ->
-                userEmitters.forEach((sessionId, emitter) -> {
-                    try {
-                        emitter.send(SseEmitter.event().name("heartbeat").data("ping"));
-                    } catch (IOException | IllegalStateException ex) {
-                        log.debug("Removing closed SSE emitter for userId={} sessionId={}: {}",
-                                userId,
-                                sessionId,
-                                ex.getMessage());
-                        removeEmitter(userId, sessionId, emitter);
-                    }
-                }));
+                userEmitters.keySet().forEach(sessionId ->
+                        sendToSession(userId, sessionId, () -> SseEmitter.event().name("heartbeat").data("ping"))));
     }
 
-    private void removeEmitter(UUID userId, UUID sessionId, SseEmitter expectedEmitter) {
+    private boolean sendToSession(UUID userId, UUID sessionId, Supplier<SseEmitter.SseEventBuilder> event) {
+        Map<UUID, Set<SseEmitter>> userEmitters = emittersByUser.get(userId);
+        Set<SseEmitter> emitters = userEmitters == null ? null : userEmitters.get(sessionId);
+        if (emitters == null || emitters.isEmpty()) {
+            log.info("No active SSE emitter found for userId={} sessionId={}", userId, sessionId);
+            return false;
+        }
+
+        boolean delivered = false;
+        for (SseEmitter emitter : emitters) {
+            try {
+                emitter.send(event.get());
+                delivered = true;
+            } catch (IOException | IllegalStateException ex) {
+                log.debug("Removing closed SSE emitter for userId={} sessionId={}: {}", userId, sessionId, ex.getMessage());
+                removeEmitter(userId, sessionId, emitter);
+            }
+        }
+        return delivered;
+    }
+
+    private void removeEmitter(UUID userId, UUID sessionId, SseEmitter emitter) {
         emittersByUser.computeIfPresent(userId, (ignoredUserId, userEmitters) -> {
-            userEmitters.computeIfPresent(sessionId, (ignoredSessionId, currentEmitter) ->
-                    currentEmitter == expectedEmitter ? null : currentEmitter
-            );
+            userEmitters.computeIfPresent(sessionId, (ignoredSessionId, emitters) -> {
+                emitters.remove(emitter);
+                return emitters.isEmpty() ? null : emitters;
+            });
             return userEmitters.isEmpty() ? null : userEmitters;
         });
     }
