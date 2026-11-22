@@ -69,6 +69,14 @@ public class ChatMessageProcessing {
         return true;
     }
 
+    public boolean resume(Instant now) {
+        if (!isProcessing()) {
+            return false;
+        }
+        updatedAt = now;
+        return true;
+    }
+
     public boolean complete(Instant now) {
         if (isTerminal()) {
             return false;

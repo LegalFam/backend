@@ -13,9 +13,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * El pedido al agente vive en memoria: si la instancia muere mientras espera la respuesta, el
- * mensaje queda en proceso para siempre y bloquea los envíos del usuario. Pasado el timeout de
- * n8n ninguna instancia puede seguir con él, así que se cierra con un error que el usuario ve.
+ * Red de seguridad de la cola de consultas: si la consulta agotó sus reentregas, se procesó en
+ * local y la instancia murió, o esperó en la cola más que el timeout de n8n, quedaría en proceso
+ * para siempre y bloquearía los envíos del usuario. Se cierra con un error que el usuario ve.
  */
 @Service
 public class ChatStaleProcessingSweeper {

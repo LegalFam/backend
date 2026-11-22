@@ -40,13 +40,13 @@ public class ChatQueuedMessageService implements IChatQueuedMessageUseCase {
     }
 
     @Override
-    public void process(ChatMessageQueuedEvent event) {
+    public void process(ChatMessageQueuedEvent event, boolean takeOver) {
         UUID chatSessionId = event.chatSessionId();
         UUID userMessageId = event.userMessageId();
         String userMessageInput = event.userMessageInput();
         ChatLanguage language = event.resolvedLanguage();
 
-        if (!IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)) {
+        if (!IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId, takeOver)) {
             log.debug("Ignoring duplicate or terminal chat event userMessageId={}", userMessageId);
             return;
         }

@@ -47,7 +47,7 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
 
     @Transactional
     @Override
-    public boolean markUserMessageProcessing(UUID userMessageId) {
+    public boolean markUserMessageProcessing(UUID userMessageId, boolean takeOver) {
         ChatMessage userMessage = IChatPersistencePort.findMessageById(userMessageId).orElse(null);
         if (userMessage == null) {
             log.warn("Skipping processing start: chat message not found userMessageId={}", userMessageId);
@@ -64,11 +64,17 @@ public class ChatAssistantPersistenceService implements IChatAssistantPersistenc
         if (processing.isTerminal()) {
             return false;
         }
+        Instant now = Instant.now();
         if (processing.isProcessing()) {
+            if (!takeOver) {
+                return false;
+            }
+            log.warn("Taking over chat message left in processing userMessageId={}", userMessageId);
+            processing.resume(now);
+            IChatPersistencePort.saveMessageProcessing(processing);
             return true;
         }
 
-        Instant now = Instant.now();
         processing.start(now);
         IChatPersistencePort.saveMessageProcessing(processing);
         return true;

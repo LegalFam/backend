@@ -7,7 +7,11 @@ import com.legalfam.backend.chat.domain.model.ChatLanguage;
 import java.util.UUID;
 
 public interface IChatAssistantPersistenceUseCase {
-    boolean markUserMessageProcessing(UUID userMessageId);
+    /**
+     * Con {@code takeOver} un mensaje que ya figura en proceso se retoma: solo lo pide la
+     * reentrega del broker, que ocurre cuando la instancia que lo procesaba murio.
+     */
+    boolean markUserMessageProcessing(UUID userMessageId, boolean takeOver);
 
     /**
      * Persiste la respuesta del asistente. Recibe la respuesta completa del gateway en vez

@@ -327,6 +327,45 @@ class ChatAssistantPersistenceServiceTest {
         return new ChatAssistantMetadata(null, null, List.of(), List.of(), false, null, 1);
     }
 
+    @Test
+    void markUserMessageProcessingSkipsMessageAlreadyInProcessingUnlessTakingOver() {
+        UUID userMessageId = UUID.randomUUID();
+        Instant stale = Instant.now().minusSeconds(120);
+        ChatMessageProcessing inProcessing = ChatMessageProcessing.restore(
+                UUID.randomUUID(), userMessageId, ChatMessageProcessingStatus.PROCESSING,
+                null, null, stale, null, stale, stale
+        );
+        when(chatPersistencePort.findMessageById(userMessageId))
+                .thenReturn(Optional.of(ChatMessage.userMessage(SESSION_ID, "hola", stale)));
+        when(chatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId))
+                .thenReturn(Optional.of(inProcessing));
+
+        assertEquals(false, chatAssistantPersistenceService.markUserMessageProcessing(userMessageId, false));
+        verify(chatPersistencePort, never()).saveMessageProcessing(any(ChatMessageProcessing.class));
+
+        assertEquals(true, chatAssistantPersistenceService.markUserMessageProcessing(userMessageId, true));
+        ArgumentCaptor<ChatMessageProcessing> saved = ArgumentCaptor.forClass(ChatMessageProcessing.class);
+        verify(chatPersistencePort).saveMessageProcessing(saved.capture());
+        assertEquals(ChatMessageProcessingStatus.PROCESSING, saved.getValue().getStatus());
+        assertEquals(true, saved.getValue().getUpdatedAt().isAfter(stale));
+    }
+
+    @Test
+    void markUserMessageProcessingNeverTakesOverFinishedMessage() {
+        UUID userMessageId = UUID.randomUUID();
+        Instant now = Instant.now();
+        when(chatPersistencePort.findMessageById(userMessageId))
+                .thenReturn(Optional.of(ChatMessage.userMessage(SESSION_ID, "hola", now)));
+        when(chatPersistencePort.findMessageProcessingByUserMessageIdForUpdate(userMessageId))
+                .thenReturn(Optional.of(ChatMessageProcessing.restore(
+                        UUID.randomUUID(), userMessageId, ChatMessageProcessingStatus.COMPLETED,
+                        null, null, now, now, now, now
+                )));
+
+        assertEquals(false, chatAssistantPersistenceService.markUserMessageProcessing(userMessageId, true));
+        verify(chatPersistencePort, never()).saveMessageProcessing(any(ChatMessageProcessing.class));
+    }
+
     private ChatMessageProcessing processing(UUID userMessageId) {
         Instant now = Instant.now();
         return ChatMessageProcessing.restore(

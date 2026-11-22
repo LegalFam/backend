@@ -14,6 +14,11 @@ public record ChatRabbitProperties(
         @NotBlank String deadLetterQueueName,
         @NotBlank String assistantDeliveryRoutingKey,
         @NotBlank String deadLetterRoutingKey,
+        @NotBlank String chatMessageQueuedQueueName,
+        @NotBlank String chatMessageQueuedRoutingKey,
+        @NotBlank String chatMessageQueuedDeadLetterQueueName,
+        @NotBlank String chatMessageQueuedDeadLetterRoutingKey,
+        @Positive Integer chatMessageQueuedDeliveryLimit,
         @Positive Long queueTtlMs,
         @Positive Long publisherConfirmTimeoutMs
 ) {
@@ -23,5 +28,9 @@ public record ChatRabbitProperties(
 
     public long safePublisherConfirmTimeoutMs() {
         return publisherConfirmTimeoutMs == null ? 5000L : publisherConfirmTimeoutMs;
+    }
+
+    public int safeChatMessageQueuedDeliveryLimit() {
+        return chatMessageQueuedDeliveryLimit == null ? 2 : chatMessageQueuedDeliveryLimit;
     }
 }

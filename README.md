@@ -106,8 +106,11 @@ Notes:
 - Non-secret payment configuration lives in `src/main/resources/payment/payment.properties`.
 - API request bodies use Bean Validation and return the standard error shape for invalid fields.
 - `POST /api/v1/chat/send` enqueues message processing asynchronously.
-- With `CHAT_RABBIT_ENABLED=true` (default), chat processing uses `Transactional Outbox + RabbitMQ`.
-- With `CHAT_RABBIT_ENABLED=false`, the backend still uses the same transactional outbox, but the relay dispatches locally after commit.
+- With `CHAT_RABBIT_ENABLED=true` (default), RabbitMQ carries both directions of the chat:
+  - Queries: after commit the user message is published to the quorum queue `chat.message.queued.q` (publisher confirms, prefetch 1, 8 consumers per instance, 2 redeliveries, then `chat.message.queued.dlq`). The message is acked only when processing finishes, so if an instance dies mid-call the broker redelivers it and another instance takes it over. If the broker does not confirm, the instance processes the query itself.
+  - Answers: transactional outbox, relayed every 5 s to `chat.assistant.delivery.q` and pushed over SSE.
+  - Consumers run in the background, so Cloud Run needs CPU always allocated (`--no-cpu-throttling`, set in the deploy workflow).
+- With `CHAT_RABBIT_ENABLED=false`, queries run locally after commit and answers still go through the transactional outbox.
 - For the auth module, SMTP credentials come from env (`MAIL_*`), while non-secret settings (sender, link paths, token TTLs) are bound through typed properties from `src/main/resources/auth/auth.properties`.
 - `AUTH_MAIL_ENABLED=false` skips SMTP entirely and logs the verification / reset link at INFO instead. That is the default for local dev and the test profile, so neither the app nor `./mvnw test` needs a mail server.
 - `FRONTEND_BASE_URL` must be the deployed SPA origin **without** a trailing path, and the SPA must serve `/verificar-correo` and `/restablecer-contrasena` (see `app.frontend.*-path`).

@@ -69,11 +69,11 @@ class ChatQueuedMessageServiceTest {
         List<ChatCitationResponse> citations = List.of(new ChatCitationResponse("source", "snippet", null, "pasaje literal", "https://example.test", null, null, null));
         ChatAssistantGatewayResponse response = new ChatAssistantGatewayResponse("respuesta", null, null, null, citations, metadata);
 
-        when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);
+        when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId, false)).thenReturn(true);
         when(IChatAssistantGatewayPort.sendMessage(eq("hola"), eq(sessionId), eq(previousMessages), eq(ChatLanguage.ES), any()))
                 .thenReturn(response);
 
-        chatQueuedMessageService.process(event);
+        chatQueuedMessageService.process(event, false);
 
         verify(IChatAssistantGatewayPort).sendMessage(eq("hola"), eq(sessionId), eq(previousMessages), eq(ChatLanguage.ES), any());
         verify(IChatAssistantPersistenceUseCase).persistAssistantMessage(
@@ -91,11 +91,11 @@ class ChatQueuedMessageServiceTest {
         UUID userMessageId = UUID.randomUUID();
         ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(sessionId, userMessageId, "hola", List.of(), "es");
 
-        when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);
+        when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId, false)).thenReturn(true);
         when(IChatAssistantGatewayPort.sendMessage(eq("hola"), eq(sessionId), eq(List.of()), eq(ChatLanguage.ES), any()))
                 .thenThrow(ChatUpstreamException.of(ChatApiError.UPSTREAM_TIMEOUT));
 
-        chatQueuedMessageService.process(event);
+        chatQueuedMessageService.process(event, false);
 
         verify(IChatAssistantPersistenceUseCase).persistAssistantFailure(
                 sessionId,
@@ -110,7 +110,7 @@ class ChatQueuedMessageServiceTest {
         UUID sessionId = UUID.randomUUID();
         UUID userMessageId = UUID.randomUUID();
         ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(sessionId, userMessageId, "hola", List.of(), "es");
-        when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);
+        when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId, false)).thenReturn(true);
         when(IChatAssistantGatewayPort.sendMessage(eq("hola"), eq(sessionId), eq(List.of()), eq(ChatLanguage.ES), any()))
                 .thenAnswer(invocation -> {
                     IChatAssistantDraftListener listener = invocation.getArgument(4);
@@ -122,7 +122,7 @@ class ChatQueuedMessageServiceTest {
                     return simpleResponse();
                 });
 
-        chatQueuedMessageService.process(event);
+        chatQueuedMessageService.process(event, false);
 
         ArgumentCaptor<ChatAssistantDraftEvent> drafts = ArgumentCaptor.forClass(ChatAssistantDraftEvent.class);
         verify(IChatAssistantDeliveryPort, times(2)).dispatchAssistantDraft(drafts.capture());
@@ -140,12 +140,12 @@ class ChatQueuedMessageServiceTest {
         UUID sessionId = UUID.randomUUID();
         UUID userMessageId = UUID.randomUUID();
         ChatMessageQueuedEvent event = new ChatMessageQueuedEvent(sessionId, userMessageId, "napaykullayki", List.of(), "qu");
-        when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId)).thenReturn(true);
+        when(IChatAssistantPersistenceUseCase.markUserMessageProcessing(userMessageId, false)).thenReturn(true);
         ArgumentCaptor<IChatAssistantDraftListener> listener = ArgumentCaptor.forClass(IChatAssistantDraftListener.class);
         when(IChatAssistantGatewayPort.sendMessage(eq("napaykullayki"), eq(sessionId), eq(List.of()), eq(ChatLanguage.QU), listener.capture()))
                 .thenReturn(simpleResponse());
 
-        chatQueuedMessageService.process(event);
+        chatQueuedMessageService.process(event, false);
 
         assertSame(IChatAssistantDraftListener.NONE, listener.getValue());
         verify(IChatAssistantDeliveryPort, never()).dispatchAssistantDraft(any());

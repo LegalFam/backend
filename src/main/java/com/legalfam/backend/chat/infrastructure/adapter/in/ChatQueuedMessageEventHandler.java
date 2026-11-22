@@ -13,7 +13,7 @@ public class ChatQueuedMessageEventHandler {
         this.IChatQueuedMessageUseCase = IChatQueuedMessageUseCase;
     }
 
-    public void process(ChatMessageQueuedEvent event) {
-        IChatQueuedMessageUseCase.process(event);
+    public void process(ChatMessageQueuedEvent event, boolean takeOver) {
+        IChatQueuedMessageUseCase.process(event, takeOver);
     }
 }

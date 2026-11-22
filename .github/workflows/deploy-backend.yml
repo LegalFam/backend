@@ -125,6 +125,7 @@ jobs:
             --allow-unauthenticated \
             --service-account "${{ vars.CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT }}" \
             --port 8080 \
+            --no-cpu-throttling \
             --network "${{ vars.VPC_NETWORK }}" \
             --subnet "${{ vars.VPC_SUBNET }}" \
             --vpc-egress "${{ vars.VPC_EGRESS }}" \
