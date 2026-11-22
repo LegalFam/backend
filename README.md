@@ -107,7 +107,7 @@ Notes:
 - API request bodies use Bean Validation and return the standard error shape for invalid fields.
 - `POST /api/v1/chat/send` enqueues message processing asynchronously.
 - With `CHAT_RABBIT_ENABLED=true` (default), RabbitMQ carries both directions of the chat:
-  - Queries: after commit the user message is published to the quorum queue `chat.message.queued.q` (publisher confirms, prefetch 1, 8 consumers per instance, 2 redeliveries, then `chat.message.queued.dlq`). The message is acked only when processing finishes, so if an instance dies mid-call the broker redelivers it and another instance takes it over. If the broker does not confirm, the instance processes the query itself.
+  - Queries: after commit the user message is published to the quorum queue `chat.message.queued.q` (publisher confirms, prefetch 1, 8 consumers per instance, 2 redeliveries, then `chat.message.queued.dlq`). The message is acked only when processing finishes, so if an instance dies mid-call the broker redelivers it and another instance takes it over. If the broker does not confirm, or no consumer takes the query within 2 minutes (for example, the broker went down with it inside), the accepting instance processes it itself; a later delivery finds it already in progress and is dropped.
   - Answers: transactional outbox, relayed every 5 s to `chat.assistant.delivery.q` and pushed over SSE.
   - Consumers run in the background, so Cloud Run needs CPU always allocated (`--no-cpu-throttling`, set in the deploy workflow).
 - With `CHAT_RABBIT_ENABLED=false`, queries run locally after commit and answers still go through the transactional outbox.

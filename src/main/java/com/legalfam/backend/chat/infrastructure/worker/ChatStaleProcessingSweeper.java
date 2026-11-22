@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Red de seguridad de la cola de consultas: si la consulta agotó sus reentregas, se procesó en
- * local y la instancia murió, o esperó en la cola más que el timeout de n8n, quedaría en proceso
+ * local y la instancia murió, o esperó en la cola y la instancia que la aceptó murió, quedaría en proceso
  * para siempre y bloquearía los envíos del usuario. Se cierra con un error que el usuario ve.
  */
 @Service

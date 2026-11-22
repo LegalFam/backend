@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,6 +35,13 @@ class ChatMessageQueuedDispatcherTest {
     }
 
     @Test
+    void processesLocallyWhenTheConfirmedQueryIsNotTakenInTime() {
+        dispatcher(sender, 0L).dispatch(event);
+
+        verify(handler, timeout(1000)).process(event, false);
+    }
+
+    @Test
     void processesLocallyWhenTheBrokerDoesNotConfirm() {
         doThrow(new IllegalStateException("broker down")).when(sender).send(any(), any(), any());
 
@@ -51,6 +59,11 @@ class ChatMessageQueuedDispatcherTest {
 
     @SuppressWarnings("unchecked")
     private ChatMessageQueuedDispatcher dispatcher(ConfirmedRabbitSender available) {
+        return dispatcher(available, 60_000L);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ChatMessageQueuedDispatcher dispatcher(ConfirmedRabbitSender available, long localFallbackMs) {
         ObjectProvider<ConfirmedRabbitSender> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(available);
         ChatRabbitProperties properties = new ChatRabbitProperties(
@@ -58,6 +71,6 @@ class ChatMessageQueuedDispatcherTest {
                 "chat.assistant.delivery.v1", "chat.assistant.delivery.dlq", "chat.message.queued.q", ROUTING_KEY,
                 "chat.message.queued.dlq", "chat.message.queued.dlq", 2, 10800000L, 5000L
         );
-        return new ChatMessageQueuedDispatcher(handler, provider, properties);
+        return new ChatMessageQueuedDispatcher(handler, provider, properties, Runnable::run, localFallbackMs);
     }
 }
